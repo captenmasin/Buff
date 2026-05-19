@@ -2,7 +2,7 @@
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Camera, ChevronLeft, Plus, Utensils, X } from '@lucide/vue';
+import { Barcode, Camera, ChevronLeft, Dumbbell, Plus, Utensils, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 
 const props = defineProps({
@@ -19,6 +19,20 @@ const mealLabels = {
     dinner: 'Dinner',
     snacks: 'Snacks',
 };
+
+function currentTime() {
+    return new Date().toTimeString().slice(0, 5);
+}
+
+function addModeUrl(mode, extra = {}) {
+    const params = new URLSearchParams({
+        date: props.date,
+        mode,
+        ...extra,
+    });
+
+    return `/add?${params.toString()}`;
+}
 
 function smartMealType() {
     const hour = new Date().getHours();
@@ -59,6 +73,13 @@ const barcodeMealForm = useForm({
     food_product_id: '',
     portion_quantity: 100,
     portion_unit: 'g',
+});
+
+const workoutForm = useForm({
+    date: props.date,
+    title: '',
+    calories_burned: 0,
+    time: currentTime(),
 });
 
 const customCalories = computed(() => {
@@ -235,6 +256,10 @@ function addCustomMeal() {
     customMealForm.post('/meals/custom');
 }
 
+function addWorkout() {
+    workoutForm.post('/workouts');
+}
+
 function selectPreviousCustomMeal(meal) {
     customMealForm.name = meal.name;
     customMealForm.protein_g = meal.protein_g;
@@ -267,14 +292,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <Head title="Add meal" />
+    <Head title="Add" />
 
     <section class="space-y-5">
         <header class="flex items-start justify-between gap-4">
             <div>
                 <p class="text-sm font-semibold text-stone-500">{{ displayDate }}</p>
                 <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">
-                    {{ mode === 'barcode' ? 'Scan food' : mode === 'custom' ? 'Custom meal' : 'Add meal' }}
+                    {{ mode === 'barcode' ? 'Scan food' : mode === 'custom' ? 'Custom meal' : mode === 'workout' ? 'Workout' : 'Add' }}
                 </h1>
             </div>
             <Link href="/" class="rounded-md border border-stone-200 bg-white p-2 text-stone-600 active:bg-stone-100" aria-label="Back to today">
@@ -283,7 +308,7 @@ onUnmounted(() => {
         </header>
 
         <article v-if="mode === 'choose'" class="grid gap-3">
-            <Link href="/add?mode=barcode&scan=1" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+            <Link :href="addModeUrl('barcode', { scan: '1' })" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
                     <Barcode :size="22" />
                 </span>
@@ -293,13 +318,23 @@ onUnmounted(() => {
                 </span>
             </Link>
 
-            <Link href="/add?mode=custom" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+            <Link :href="addModeUrl('custom')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#d28a45] text-white">
                     <Utensils :size="22" />
                 </span>
                 <span>
                     <span class="block font-bold">Custom meal</span>
                     <span class="block text-sm font-medium text-stone-500">Enter macros</span>
+                </span>
+            </Link>
+
+            <Link :href="addModeUrl('workout')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+                <span class="grid h-11 w-11 place-items-center rounded-md bg-[#6f9b58] text-white">
+                    <Dumbbell :size="22" />
+                </span>
+                <span>
+                    <span class="block font-bold">Workout</span>
+                    <span class="block text-sm font-medium text-stone-500">Log calories burned</span>
                 </span>
             </Link>
         </article>
@@ -475,6 +510,54 @@ onUnmounted(() => {
 
                 <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="customMealForm.processing">
                     Add {{ customCalories }} kcal
+                </button>
+            </form>
+        </article>
+
+        <article v-if="mode === 'workout'" class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <div class="flex items-center gap-2">
+                <Dumbbell :size="21" class="text-[#6f9b58]" />
+                <h2 class="font-bold">Workout</h2>
+            </div>
+
+            <form class="mt-4 space-y-4" @submit.prevent="addWorkout">
+                <label class="block">
+                    <span class="text-xs font-bold uppercase text-stone-500">Title</span>
+                    <input
+                        v-model="workoutForm.title"
+                        type="text"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                    >
+                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.title }}</span>
+                </label>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <label>
+                        <span class="text-xs font-bold uppercase text-stone-500">Calories burnt</span>
+                        <input
+                            v-model.number="workoutForm.calories_burned"
+                            type="number"
+                            min="1"
+                            step="1"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-bold outline-none focus:border-[#6f9b58]"
+                        >
+                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.calories_burned }}</span>
+                    </label>
+
+                    <label>
+                        <span class="text-xs font-bold uppercase text-stone-500">Time</span>
+                        <input
+                            v-model="workoutForm.time"
+                            type="time"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-bold outline-none focus:border-[#6f9b58]"
+                        >
+                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.time }}</span>
+                    </label>
+                </div>
+
+                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="workoutForm.processing">
+                    <Plus :size="18" />
+                    Add workout
                 </button>
             </form>
         </article>

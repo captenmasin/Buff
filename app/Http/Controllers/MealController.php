@@ -27,7 +27,7 @@ class MealController extends Controller
                 ? Carbon::parse($request->string('date')->toString())->toDateString()
                 : today()->toDateString(),
             'mealTypes' => MealEntry::MEAL_TYPES,
-            'mode' => in_array($mode, ['barcode', 'custom'], true) ? $mode : 'choose',
+            'mode' => in_array($mode, ['barcode', 'custom', 'workout'], true) ? $mode : 'choose',
             'autoScan' => $request->boolean('scan'),
             'previousCustomMeals' => $this->previousCustomMeals(),
         ]);

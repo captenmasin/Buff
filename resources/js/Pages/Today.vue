@@ -1,7 +1,7 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
 import { computed } from 'vue';
-import { Flame, Trash2 } from '@lucide/vue';
+import { Dumbbell, Trash2 } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import Card from "../Components/Card.vue";
 
@@ -18,11 +18,6 @@ const mealLabels = {
     snacks: 'Snacks',
 };
 
-const burnedForm = useForm({
-    date: props.summary.date,
-    burned_calories: props.summary.log.burned_calories,
-});
-
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const displayDate = computed(() => formatDisplayDate(props.summary.date));
 const calorieProgress = computed(() => {
@@ -35,12 +30,12 @@ function macroProgress(consumed, goal) {
     return Math.min(100, Math.round((consumed / goal) * 100));
 }
 
-function saveBurned() {
-    burnedForm.put('/burned-calories', { preserveScroll: true });
-}
-
 function removeEntry(id) {
     router.delete(`/meals/${id}`, { preserveScroll: true });
+}
+
+function removeWorkout(id) {
+    router.delete(`/workouts/${id}`, { preserveScroll: true });
 }
 
 function dayStatusClass(status) {
@@ -88,13 +83,14 @@ function dayStatusClass(status) {
             <Link href="/goals" class="font-bold underline">Set goals</Link>
         </div>
 
-        <article class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <Card>
             <div class="flex items-start justify-between gap-4">
-                <div>
+                <div class="w-full">
                     <p class="text-sm font-semibold text-stone-500">Calories</p>
-                    <div class="mt-1 flex items-baseline gap-2">
+                    <div class="mt-2.5 flex items-baseline gap-2">
                         <span class="text-4xl font-semibold">{{ summary.totals.calories }}</span>
-                        <span class="text-lg text-stone-500">/ {{ summary.goal?.calories ?? 0 }}</span>
+                        <span class="text-xs text-stone-500">/ {{ summary.totals.calories_remaining ?? 0 }}</span>
+                        <span class="text-xs text-stone-500 ml-auto" v-if="summary.log.burned_calories">{{ summary.log.burned_calories }} burned</span>
                     </div>
                 </div>
             </div>
@@ -102,26 +98,7 @@ function dayStatusClass(status) {
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
                 <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
             </div>
-            <p class="mt-2 text-xs text-stone-500">
-                {{ summary.totals.calories_remaining }} remaining
-            </p>
-
-            <form class="mt-4 flex items-end gap-2" @submit.prevent="saveBurned">
-                <label class="flex-1">
-                    <span class="text-xs font-bold uppercase text-stone-500">Burned today</span>
-                    <input
-                        v-model="burnedForm.burned_calories"
-                        type="number"
-                        min="0"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base font-semibold outline-none focus:border-[#6f9b58]"
-                    >
-                </label>
-                <button class="flex h-12 items-center gap-2 rounded-md bg-[#253d2c] px-4 text-sm font-bold text-white active:bg-[#17211b]" :disabled="burnedForm.processing">
-                    <Flame :size="18" />
-                    Save
-                </button>
-            </form>
-        </article>
+        </Card>
 
         <Card class="grid grid-cols-3 gap-5">
             <div
@@ -146,7 +123,7 @@ function dayStatusClass(status) {
                 <h2 class="text-lg font-bold">Meals</h2>
             </div>
 
-            <article v-for="mealType in mealTypes" :key="mealType" class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card v-for="mealType in mealTypes" :key="mealType">
                 <h3 class="font-bold">{{ mealLabels[mealType] }}</h3>
 
                 <div v-if="summary.entries[mealType]?.length" class="mt-3 divide-y divide-stone-100">
@@ -164,7 +141,34 @@ function dayStatusClass(status) {
                 </div>
 
                 <p v-else class="mt-3 text-sm text-stone-500">No entries yet.</p>
-            </article>
+            </Card>
+        </section>
+
+        <section class="space-y-4">
+            <div>
+                <h2 class="text-lg font-bold">Workouts</h2>
+            </div>
+
+            <Card>
+                <div v-if="summary.workouts?.length" class="divide-y divide-stone-100">
+                    <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
+                        <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-[#dce8d4] text-[#253d2c]">
+                            <Dumbbell :size="19" />
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="truncate font-semibold">{{ workout.title }}</p>
+                            <p class="text-sm text-stone-500">
+                                {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}
+                            </p>
+                        </div>
+                        <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Remove workout" @click="removeWorkout(workout.id)">
+                            <Trash2 :size="18" />
+                        </button>
+                    </div>
+                </div>
+
+                <p v-else class="text-sm text-stone-500">No workouts yet.</p>
+            </Card>
         </section>
     </section>
 </template>

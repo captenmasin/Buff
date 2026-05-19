@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\DailyGoal;
-use App\Models\DailyLog;
 use App\Models\MealEntry;
+use App\Models\WorkoutEntry;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -23,9 +23,11 @@ class DashboardTest extends TestCase
             'macro_calories' => 2000,
         ]);
 
-        DailyLog::query()->create([
+        WorkoutEntry::query()->create([
             'date' => '2026-05-19',
-            'burned_calories' => 300,
+            'title' => 'Bike ride',
+            'calories_burned' => 300,
+            'logged_at' => '2026-05-19 18:30:00',
         ]);
 
         MealEntry::query()->create([
@@ -47,6 +49,9 @@ class DashboardTest extends TestCase
                 ->where('summary.totals.calories_remaining', 1800)
                 ->where('summary.totals.protein_remaining', 130)
                 ->has('summary.entries.breakfast', 1)
+                ->has('summary.workouts', 1)
+                ->where('summary.workouts.0.title', 'Bike ride')
+                ->where('summary.workouts.0.logged_time', '18:30')
             );
     }
 
@@ -60,9 +65,11 @@ class DashboardTest extends TestCase
             'macro_calories' => 2000,
         ]);
 
-        DailyLog::query()->create([
+        WorkoutEntry::query()->create([
             'date' => '2026-05-19',
-            'burned_calories' => 300,
+            'title' => 'Bike ride',
+            'calories_burned' => 300,
+            'logged_at' => '2026-05-19 18:30:00',
         ]);
 
         MealEntry::query()->create([

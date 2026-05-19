@@ -4,10 +4,10 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\WorkoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', DashboardController::class);
-Route::put('/burned-calories', [DashboardController::class, 'updateBurnedCalories']);
 
 Route::get('/goals', [GoalController::class, 'edit']);
 Route::put('/goals', [GoalController::class, 'update']);
@@ -20,3 +20,6 @@ Route::post('/barcode/lookup', [MealController::class, 'lookupBarcode']);
 Route::post('/meals/custom', [MealController::class, 'storeCustom']);
 Route::post('/meals/barcode', [MealController::class, 'storeBarcode']);
 Route::delete('/meals/{mealEntry}', [MealController::class, 'destroy']);
+
+Route::post('/workouts', [WorkoutController::class, 'store']);
+Route::delete('/workouts/{workoutEntry}', [WorkoutController::class, 'destroy']);

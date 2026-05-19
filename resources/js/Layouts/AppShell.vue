@@ -1,7 +1,7 @@
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
+import { Barcode, Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
 
 const page = usePage();
 const addDrawerOpen = ref(false);
@@ -11,7 +11,7 @@ const toastTimer = ref(null);
 let removeFlashToastListener = null;
 
 const navItems = [
-    { href: '/', label: 'Today', icon: Home, match: '/' },
+    { href: '/', label: 'Home', icon: Home, match: '/' },
     { href: '/goals', label: 'Goals', icon: Target, match: '/goals' },
     { href: '/progress', label: 'Progress', icon: Scale, match: '/progress' },
 ];
@@ -178,12 +178,12 @@ onUnmounted(() => {
             :class="addDrawerOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!addDrawerOpen"
             :inert="!addDrawerOpen"
-            aria-label="Add meal"
+            aria-label="Add"
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-bold">Add meal</h2>
-                <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close add meal drawer" @click="closeAddDrawer">
+                <h2 class="text-lg font-bold">Add</h2>
+                <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close add drawer" @click="closeAddDrawer">
                     <X :size="20" />
                 </button>
             </div>
@@ -206,6 +206,16 @@ onUnmounted(() => {
                     <span>
                         <span class="block font-bold">Custom meal</span>
                         <span class="block text-sm font-medium text-stone-500">Enter macros</span>
+                    </span>
+                </button>
+
+                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('workout')">
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-[#6f9b58] text-white">
+                        <Dumbbell :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-bold">Workout</span>
+                        <span class="block text-sm font-medium text-stone-500">Log calories burned</span>
                     </span>
                 </button>
             </div>
@@ -243,7 +253,7 @@ onUnmounted(() => {
                 <button
                     class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
                     :class="isAddActive ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500'"
-                    aria-label="Add meal"
+                    aria-label="Add"
                     @click="openAddDrawer"
                 >
                     <Plus :size="20" stroke-width="2.2" />

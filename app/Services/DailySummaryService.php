@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\DailyGoal;
-use App\Models\DailyLog;
 use App\Models\MealEntry;
+use App\Models\WorkoutEntry;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 
@@ -16,21 +16,21 @@ class DailySummaryService
             ->latest('updated_at')
             ->first();
 
-        $log = DailyLog::query()->firstOrCreate(
-            ['date' => $date->copy()->startOfDay()],
-            ['burned_calories' => 0]
-        );
-
         $entries = MealEntry::query()
             ->with('foodProduct')
             ->whereDate('date', $date->toDateString())
             ->oldest()
             ->get();
 
+        $workouts = WorkoutEntry::query()
+            ->whereDate('date', $date->toDateString())
+            ->oldest('logged_at')
+            ->get();
+
         $totals = $this->totals($entries);
 
         $calorieGoal = $goal?->calories ?? 0;
-        $burned = $log->burned_calories;
+        $burned = (int) $workouts->sum('calories_burned');
 
         return [
             'date' => $date->toDateString(),
@@ -64,6 +64,14 @@ class DailySummaryService
                     'carbs_g' => (float) $entry->carbs_g,
                     'fat_g' => (float) $entry->fat_g,
                 ])->all())
+                ->all(),
+            'workouts' => $workouts
+                ->map(fn (WorkoutEntry $workout): array => [
+                    'id' => $workout->id,
+                    'title' => $workout->title,
+                    'calories_burned' => $workout->calories_burned,
+                    'logged_time' => $workout->logged_at?->format('H:i'),
+                ])
                 ->all(),
         ];
     }

@@ -3,8 +3,8 @@
 namespace App\Services;
 
 use App\Models\DailyGoal;
-use App\Models\DailyLog;
 use App\Models\MealEntry;
+use App\Models\WorkoutEntry;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
 
@@ -24,19 +24,21 @@ class WeekSummaryService
             ->get()
             ->keyBy(fn (MealEntry $entry): string => $entry->date->toDateString());
 
-        $logsByDate = DailyLog::query()
+        $workoutsByDate = WorkoutEntry::query()
+            ->selectRaw('date, sum(calories_burned) as calories_burned')
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->groupBy('date')
             ->get()
-            ->keyBy(fn (DailyLog $log): string => $log->date->toDateString());
+            ->keyBy(fn (WorkoutEntry $workout): string => $workout->date->toDateString());
 
         $goal = DailyGoal::query()->latest('updated_at')->first();
 
         return collect(range(0, 6))
-            ->map(function (int $offset) use ($start, $selectedDate, $entriesByDate, $logsByDate, $goal): array {
+            ->map(function (int $offset) use ($start, $selectedDate, $entriesByDate, $workoutsByDate, $goal): array {
                 $date = $start->copy()->addDays($offset);
                 $dateString = $date->toDateString();
                 $consumed = (int) ($entriesByDate->get($dateString)?->calories ?? 0);
-                $burned = (int) ($logsByDate->get($dateString)?->burned_calories ?? 0);
+                $burned = (int) ($workoutsByDate->get($dateString)?->calories_burned ?? 0);
                 $target = $goal ? $goal->calories + $burned : null;
 
                 return [

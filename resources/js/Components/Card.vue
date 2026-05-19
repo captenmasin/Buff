@@ -3,7 +3,7 @@
 </script>
 
 <template>
-    <article class="rounded-md border border-stone-200 bg-white p-3 shadow-sm">
+    <article class="rounded-md border border-stone-200 bg-white p-3">
         <slot />
     </article>
 </template>
