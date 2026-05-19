@@ -1,0 +1,61 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@source '../**/*.vue';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+html {
+    background: #f6f7f4;
+}
+
+body {
+    min-height: 100vh;
+    background: #f6f7f4;
+    color: #17211b;
+    font-family: var(--font-sans);
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+.app-shell {
+    min-height: 100dvh;
+}
+
+.app-main {
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+}
+
+.bottom-nav {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+}
+
+.bottom-drawer {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+@supports (padding-top: max(0px)) {
+    .app-main {
+        padding-top: calc(max(env(safe-area-inset-top, 0px), 2rem) + 0.75rem);
+    }
+
+    .bottom-nav {
+        padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+    }
+
+    .bottom-drawer {
+        padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 0.75rem) + 1rem);
+    }
+}
