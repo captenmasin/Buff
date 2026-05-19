@@ -16,7 +16,6 @@ class DashboardTest extends TestCase
     public function test_it_reports_daily_calorie_and_macro_remaining_totals(): void
     {
         DailyGoal::query()->create([
-            'starts_on' => '2026-05-19',
             'calories' => 2000,
             'protein_g' => 170,
             'carbs_g' => 195,
@@ -54,7 +53,6 @@ class DashboardTest extends TestCase
     public function test_it_reports_monday_first_week_statuses_with_burned_calorie_offset(): void
     {
         DailyGoal::query()->create([
-            'starts_on' => '2026-05-18',
             'calories' => 2000,
             'protein_g' => 170,
             'carbs_g' => 195,

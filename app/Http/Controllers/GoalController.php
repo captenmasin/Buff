@@ -6,7 +6,6 @@ use App\Models\DailyGoal;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -15,18 +14,16 @@ class GoalController extends Controller
 {
     public function edit(): Response
     {
-        $goal = DailyGoal::query()->latest('starts_on')->first();
+        $goal = DailyGoal::query()->latest('updated_at')->first();
 
         return Inertia::render('Goals', [
             'goal' => $goal ? [
-                'starts_on' => $goal->starts_on->toDateString(),
                 'calories' => $goal->calories,
                 'protein_g' => (float) $goal->protein_g,
                 'carbs_g' => (float) $goal->carbs_g,
                 'fat_g' => (float) $goal->fat_g,
                 'macro_calories' => $goal->macro_calories,
             ] : [
-                'starts_on' => today()->toDateString(),
                 'calories' => 2000,
                 'protein_g' => 170,
                 'carbs_g' => 195,
@@ -39,7 +36,6 @@ class GoalController extends Controller
     public function update(Request $request, NutritionCalculator $calculator): RedirectResponse
     {
         $validated = $request->validate([
-            'starts_on' => ['required', 'date'],
             'calories' => ['required', 'integer', 'min:1', 'max:20000'],
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
@@ -58,13 +54,16 @@ class GoalController extends Controller
             ]);
         }
 
-        DailyGoal::query()->updateOrCreate(
-            ['starts_on' => Carbon::parse($validated['starts_on'])->startOfDay()],
-            [
-                ...$validated,
-                'macro_calories' => $macroCalories,
-            ]
-        );
+        $values = [
+            ...$validated,
+            'macro_calories' => $macroCalories,
+        ];
+
+        $goal = DailyGoal::query()->first();
+
+        $goal
+            ? $goal->update($values)
+            : DailyGoal::query()->create($values);
 
         return redirect('/')->with('message', 'Daily goals saved.');
     }

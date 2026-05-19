@@ -22,6 +22,8 @@
         "@inertiajs/vue3": "^3.1.1",
         "@lucide/vue": "^1.16.0",
         "@vitejs/plugin-vue": "^6.0.7",
+        "@zxing/browser": "^0.1.5",
+        "@zxing/library": "^0.21.3",
         "axios": "^1.16.1",
         "vue": "^3.5.34"
     }

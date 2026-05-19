@@ -10,7 +10,6 @@ class DailyGoal extends Model
     use HasUuids;
 
     protected $fillable = [
-        'starts_on',
         'calories',
         'protein_g',
         'carbs_g',
@@ -21,7 +20,6 @@ class DailyGoal extends Model
     protected function casts(): array
     {
         return [
-            'starts_on' => 'date',
             'calories' => 'integer',
             'protein_g' => 'decimal:2',
             'carbs_g' => 'decimal:2',

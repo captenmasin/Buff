@@ -1,8 +1,9 @@
 <script setup>
 import { Head, Link, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Camera, ChevronLeft, Plus, Utensils } from '@lucide/vue';
+import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
+import { Barcode, Camera, ChevronLeft, Plus, Utensils, X } from '@lucide/vue';
+import { formatDisplayDate } from '../dateFormat';
 
 const props = defineProps({
     date: { type: String, required: true },
@@ -35,6 +36,10 @@ const lookupError = ref('');
 const lookupLoading = ref(false);
 const nativeMessage = ref('');
 const nativeBridge = ref(null);
+const scannerStarting = ref(false);
+const webScannerOpen = ref(false);
+const webScannerVideo = ref(null);
+const webScannerControls = ref(null);
 const product = ref(null);
 const portionOptions = ref([]);
 const selectedPortionKey = ref('');
@@ -65,6 +70,8 @@ const barcodeCalories = computed(() => {
 
     return Math.round(Number(product.value.calories_per_100) * (Number(barcodeMealForm.portion_quantity) / 100));
 });
+
+const displayDate = computed(() => formatDisplayDate(props.date));
 
 function setMealType(mealType) {
     selectedMealType.value = mealType;
@@ -107,20 +114,104 @@ async function lookup(scannedBarcode = null) {
 
 async function startScan() {
     nativeMessage.value = '';
+    scannerStarting.value = true;
 
-    if (!nativeBridge.value) {
-        nativeMessage.value = 'Native scanner is available when running inside the NativePHP mobile app. Enter the barcode manually for now.';
+    if (nativeBridge.value) {
+        try {
+            await nativeBridge.value.Scanner.scan()
+                .prompt('Scan food barcode')
+                .formats(['ean13', 'ean8', 'upca', 'upce', 'code128'])
+                .id('product-scanner');
+
+            return;
+        } catch {
+            // Fall through to the web camera scanner when the native scanner plugin is unavailable.
+        } finally {
+            scannerStarting.value = false;
+        }
+    }
+
+    await startWebScan();
+}
+
+async function startWebScan() {
+    stopWebScan();
+    nativeMessage.value = '';
+    scannerStarting.value = true;
+    webScannerOpen.value = true;
+
+    await nextTick();
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+        webScannerOpen.value = false;
+        nativeMessage.value = 'Camera scanning is not available on this device. Enter the barcode manually.';
+        scannerStarting.value = false;
         return;
     }
 
     try {
-        await nativeBridge.value.Scanner.scan()
-            .prompt('Scan food barcode')
-            .formats(['ean13', 'ean8', 'upca', 'upce', 'code128'])
-            .id('product-scanner');
+        const [{ BrowserMultiFormatReader }, { BarcodeFormat, DecodeHintType }] = await Promise.all([
+            import('@zxing/browser'),
+            import('@zxing/library'),
+        ]);
+        const hints = new Map();
+
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+            BarcodeFormat.EAN_13,
+            BarcodeFormat.EAN_8,
+            BarcodeFormat.UPC_A,
+            BarcodeFormat.UPC_E,
+            BarcodeFormat.CODE_128,
+        ]);
+
+        const reader = new BrowserMultiFormatReader(hints, {
+            delayBetweenScanAttempts: 150,
+            delayBetweenScanSuccess: 300,
+        });
+        const controls = await reader.decodeFromConstraints(
+            {
+                audio: false,
+                video: {
+                    facingMode: { ideal: 'environment' },
+                },
+            },
+            webScannerVideo.value,
+            (result) => {
+                const scanned = result?.getText();
+
+                if (!scanned) return;
+
+                barcode.value = scanned;
+                stopWebScan();
+                lookup(scanned);
+            },
+        );
+
+        webScannerControls.value = controls;
     } catch (error) {
-        nativeMessage.value = 'Scanner could not start. Enter the barcode manually.';
+        stopWebScan();
+        nativeMessage.value = cameraErrorMessage(error);
+    } finally {
+        scannerStarting.value = false;
     }
+}
+
+function stopWebScan() {
+    webScannerControls.value?.stop();
+    webScannerControls.value = null;
+    webScannerOpen.value = false;
+}
+
+function cameraErrorMessage(error) {
+    if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+        return 'Camera permission was denied. Allow camera access for Buff, or enter the barcode manually.';
+    }
+
+    if (error?.name === 'NotFoundError' || error?.name === 'OverconstrainedError') {
+        return 'No usable camera was found. Enter the barcode manually.';
+    }
+
+    return 'Scanner could not start. Enter the barcode manually.';
 }
 
 function handleScan(payload) {
@@ -167,6 +258,8 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    stopWebScan();
+
     if (nativeBridge.value) {
         nativeBridge.value.Off(nativeBridge.value.Events.Scanner.CodeScanned, handleScan);
     }
@@ -179,7 +272,7 @@ onUnmounted(() => {
     <section class="space-y-5">
         <header class="flex items-start justify-between gap-4">
             <div>
-                <p class="text-sm font-semibold text-stone-500">{{ date }}</p>
+                <p class="text-sm font-semibold text-stone-500">{{ displayDate }}</p>
                 <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">
                     {{ mode === 'barcode' ? 'Scan food' : mode === 'custom' ? 'Custom meal' : 'Add meal' }}
                 </h1>
@@ -233,6 +326,16 @@ onUnmounted(() => {
             <button class="mt-3 w-full rounded-md border border-stone-300 px-4 py-3 text-sm font-bold active:bg-stone-100" :disabled="lookupLoading" @click="lookup()">
                 {{ lookupLoading ? 'Looking up...' : 'Look up barcode' }}
             </button>
+
+            <div v-if="webScannerOpen" class="mt-3 overflow-hidden rounded-md border border-stone-200 bg-[#17211b]">
+                <div class="flex items-center justify-between gap-3 px-3 py-2 text-white">
+                    <span class="text-sm font-bold">{{ scannerStarting ? 'Opening camera...' : 'Point camera at barcode' }}</span>
+                    <button class="rounded-md p-2 active:bg-white/10" aria-label="Close scanner" @click="stopWebScan">
+                        <X :size="18" />
+                    </button>
+                </div>
+                <video ref="webScannerVideo" class="aspect-[4/3] w-full bg-black object-cover" muted playsinline />
+            </div>
 
             <p v-if="nativeMessage" class="mt-3 rounded-md bg-stone-100 p-3 text-sm font-semibold text-stone-700">{{ nativeMessage }}</p>
             <p v-if="lookupError" class="mt-3 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-800">{{ lookupError }}</p>

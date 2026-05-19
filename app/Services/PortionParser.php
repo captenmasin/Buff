@@ -46,7 +46,7 @@ class PortionParser
 
         if ($product->package_quantity !== null && $product->package_unit !== null) {
             $options[] = [
-                'label' => 'Whole item'.($product->package_label ? " ({$product->package_label})" : ''),
+                'label' => 'Whole thing'.($product->package_label ? " ({$product->package_label})" : ''),
                 'quantity' => (float) $product->package_quantity,
                 'unit' => $product->package_unit,
             ];

@@ -7,7 +7,6 @@ use App\Models\DailyLog;
 use App\Models\MealEntry;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 
 class WeekSummaryService
 {
@@ -30,16 +29,12 @@ class WeekSummaryService
             ->get()
             ->keyBy(fn (DailyLog $log): string => $log->date->toDateString());
 
-        $goals = DailyGoal::query()
-            ->whereDate('starts_on', '<=', $end->toDateString())
-            ->oldest('starts_on')
-            ->get();
+        $goal = DailyGoal::query()->latest('updated_at')->first();
 
         return collect(range(0, 6))
-            ->map(function (int $offset) use ($start, $selectedDate, $entriesByDate, $logsByDate, $goals): array {
+            ->map(function (int $offset) use ($start, $selectedDate, $entriesByDate, $logsByDate, $goal): array {
                 $date = $start->copy()->addDays($offset);
                 $dateString = $date->toDateString();
-                $goal = $this->goalForDate($goals, $date);
                 $consumed = (int) ($entriesByDate->get($dateString)?->calories ?? 0);
                 $burned = (int) ($logsByDate->get($dateString)?->burned_calories ?? 0);
                 $target = $goal ? $goal->calories + $burned : null;
@@ -68,12 +63,5 @@ class WeekSummaryService
         }
 
         return $consumed < $target ? 'under' : 'over';
-    }
-
-    private function goalForDate(Collection $goals, CarbonInterface $date): ?DailyGoal
-    {
-        return $goals
-            ->filter(fn (DailyGoal $goal): bool => $goal->starts_on->lte($date))
-            ->last();
     }
 }

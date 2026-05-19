@@ -2,6 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { Flame, Trash2 } from '@lucide/vue';
+import { formatDisplayDate } from '../dateFormat';
 
 const props = defineProps({
     summary: { type: Object, required: true },
@@ -22,6 +23,7 @@ const burnedForm = useForm({
 });
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
+const displayDate = computed(() => formatDisplayDate(props.summary.date));
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
     return Math.min(100, Math.round((props.summary.totals.calories / props.summary.goal.calories) * 100));
@@ -57,7 +59,7 @@ function dayStatusClass(status) {
         <header>
             <div>
                 <p class="text-sm font-semibold text-stone-500">Buff</p>
-                <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">{{ summary.date }}</h1>
+                <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">{{ displayDate }}</h1>
             </div>
         </header>
 

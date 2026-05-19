@@ -6,6 +6,9 @@ import { Barcode, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
 const page = usePage();
 const addDrawerOpen = ref(false);
 const drawerHistoryActive = ref(false);
+const fallbackToast = ref('');
+const toastTimer = ref(null);
+let removeFlashToastListener = null;
 
 const navItems = [
     { href: '/', label: 'Today', icon: Home, match: '/' },
@@ -82,16 +85,60 @@ function openAddMode(mode) {
     router.visit(`/add?${params.toString()}`);
 }
 
+function clearFallbackToast() {
+    if (toastTimer.value) {
+        window.clearTimeout(toastTimer.value);
+        toastTimer.value = null;
+    }
+
+    fallbackToast.value = '';
+}
+
+function showFallbackToast(message) {
+    clearFallbackToast();
+
+    fallbackToast.value = message;
+    toastTimer.value = window.setTimeout(() => {
+        fallbackToast.value = '';
+        toastTimer.value = null;
+    }, 4000);
+}
+
+async function showFlashToast(message) {
+    if (!message) {
+        return;
+    }
+
+    try {
+        const native = await import('#nativephp');
+        await native.Dialog.toast(message, 'long');
+    } catch {
+        showFallbackToast(message);
+    }
+}
+
 onMounted(() => {
     window.addEventListener('popstate', handlePopState);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
+
+    showFlashToast(page.props.flash?.message);
+
+    removeFlashToastListener = router.on('success', (event) => {
+        showFlashToast(event.detail.page.props.flash?.message);
+    });
 });
 
 onUnmounted(() => {
     window.removeEventListener('popstate', handlePopState);
+    clearFallbackToast();
 
     if (window.__buffHandleAndroidBack === handleNativeAndroidBack) {
         delete window.__buffHandleAndroidBack;
+    }
+
+    if (removeFlashToastListener) {
+        removeFlashToastListener();
+        removeFlashToastListener = null;
     }
 });
 </script>
@@ -99,15 +146,26 @@ onUnmounted(() => {
 <template>
     <div class="app-shell mx-auto flex max-w-md flex-col bg-[#f6f7f4]">
         <main class="app-main flex-1 px-4">
-            <div
-                v-if="$page.props.flash?.message"
-                class="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-medium text-emerald-800"
-            >
-                {{ $page.props.flash.message }}
-            </div>
-
             <slot />
         </main>
+
+        <Transition
+            enter-active-class="transition duration-200 ease-out"
+            enter-from-class="translate-y-3 opacity-0"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition duration-150 ease-in"
+            leave-from-class="translate-y-0 opacity-100"
+            leave-to-class="translate-y-3 opacity-0"
+        >
+            <div
+                v-if="fallbackToast"
+                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-md bg-[#253d2c] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(23,33,27,0.24)]"
+                role="status"
+                aria-live="polite"
+            >
+                {{ fallbackToast }}
+            </div>
+        </Transition>
 
         <div
             v-if="addDrawerOpen"

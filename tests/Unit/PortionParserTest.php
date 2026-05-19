@@ -33,7 +33,7 @@ class PortionParserTest extends TestCase
         $options = $parser->optionsForProduct($product);
 
         $this->assertSame('1 serving (30g)', $options[0]['label']);
-        $this->assertSame('Whole item (300g)', $options[1]['label']);
+        $this->assertSame('Whole thing (300g)', $options[1]['label']);
         $this->assertContains('100g', array_column($options, 'label'));
     }
 }

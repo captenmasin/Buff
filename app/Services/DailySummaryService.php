@@ -13,8 +13,7 @@ class DailySummaryService
     public function forDate(CarbonInterface $date): array
     {
         $goal = DailyGoal::query()
-            ->whereDate('starts_on', '<=', $date->toDateString())
-            ->latest('starts_on')
+            ->latest('updated_at')
             ->first();
 
         $log = DailyLog::query()->firstOrCreate(
