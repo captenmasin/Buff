@@ -63,7 +63,7 @@ function dayStatusClass(status) {
             </div>
         </header>
 
-        <nav class="grid grid-cols-7 gap-2 rounded-md border border-stone-200 bg-white p-2 shadow-sm" aria-label="Week">
+        <nav class="grid grid-cols-7 gap-2" aria-label="Week">
             <Link
                 v-for="day in week"
                 :key="day.date"
@@ -90,21 +90,20 @@ function dayStatusClass(status) {
         <article class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
             <div class="flex items-start justify-between gap-4">
                 <div>
-                    <p class="text-sm font-semibold text-stone-500">Calories left</p>
-                    <div class="mt-1 flex items-end gap-2">
-                        <span class="text-4xl font-bold">{{ summary.totals.calories_remaining }}</span>
-                        <span class="pb-1 text-sm font-semibold text-stone-500">kcal</span>
+                    <p class="text-sm font-semibold text-stone-500">Calories</p>
+                    <div class="mt-1 flex items-baseline gap-2">
+                        <span class="text-4xl font-semibold">{{ summary.totals.calories }}</span>
+                        <span class="text-lg text-stone-500">/ {{ summary.goal?.calories ?? 0 }}</span>
                     </div>
-                </div>
-                <div class="rounded-md bg-[#253d2c] px-3 py-2 text-right text-white">
-                    <p class="text-xs font-semibold text-white/70">Eaten</p>
-                    <p class="text-lg font-bold">{{ summary.totals.calories }}</p>
                 </div>
             </div>
 
-            <div class="mt-4 h-3 overflow-hidden rounded bg-stone-100">
+            <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
                 <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
             </div>
+            <p class="mt-2 text-xs text-stone-500">
+                {{ summary.totals.calories_remaining }} remaining
+            </p>
 
             <form class="mt-4 flex items-end gap-2" @submit.prevent="saveBurned">
                 <label class="flex-1">
@@ -123,7 +122,7 @@ function dayStatusClass(status) {
             </form>
         </article>
 
-        <article class="grid grid-cols-3 gap-3">
+        <article class="grid grid-cols-3 gap-5 rounded-md border border-stone-200 bg-white p-3 shadow-sm">
             <div
                 v-for="macro in [
                     ['Protein', summary.totals.protein_g, summary.goal?.protein_g, summary.totals.protein_remaining],
@@ -131,7 +130,6 @@ function dayStatusClass(status) {
                     ['Fat', summary.totals.fat_g, summary.goal?.fat_g, summary.totals.fat_remaining],
                 ]"
                 :key="macro[0]"
-                class="rounded-md border border-stone-200 bg-white p-3 shadow-sm"
             >
                 <p class="text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
                 <p class="mt-2 text-xl font-bold">{{ Math.round(macro[3] ?? 0) }}g</p>
