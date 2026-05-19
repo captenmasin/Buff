@@ -3,6 +3,7 @@ import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { Flame, Trash2 } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
+import Card from "../Components/Card.vue";
 
 const props = defineProps({
     summary: { type: Object, required: true },
@@ -122,7 +123,7 @@ function dayStatusClass(status) {
             </form>
         </article>
 
-        <article class="grid grid-cols-3 gap-5 rounded-md border border-stone-200 bg-white p-3 shadow-sm">
+        <Card class="grid grid-cols-3 gap-5">
             <div
                 v-for="macro in [
                     ['Protein', summary.totals.protein_g, summary.goal?.protein_g, summary.totals.protein_remaining],
@@ -138,7 +139,7 @@ function dayStatusClass(status) {
                     <div class="h-full rounded bg-[#d28a45]" :style="{ width: `${macroProgress(macro[1], macro[2])}%` }" />
                 </div>
             </div>
-        </article>
+        </Card>
 
         <section class="space-y-4">
             <div>
