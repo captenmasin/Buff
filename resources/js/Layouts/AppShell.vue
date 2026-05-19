@@ -241,15 +241,13 @@ onUnmounted(() => {
                 </Link>
 
                 <button
-                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition active:bg-stone-100"
+                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
                     :class="isAddActive ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500'"
                     aria-label="Add meal"
                     @click="openAddDrawer"
                 >
-                    <span class="grid h-7 w-7 place-items-center rounded-full bg-[#253d2c] text-white">
-                        <Plus :size="20" stroke-width="2.5" />
-                    </span>
-                    <span>Add</span>
+                    <Plus :size="20" stroke-width="2.2" />
+                    <span class="text-[11px] font-semibold">Add</span>
                 </button>
             </div>
         </nav>
