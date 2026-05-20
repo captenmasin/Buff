@@ -278,10 +278,10 @@ onBeforeUnmount(() => {
                 <div v-if="summary.entries[mealType]?.length" class="mt-0 divide-y divide-stone-100">
                     <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
                         <button class="min-w-0 flex-1 text-left" @click="openMeal(entry, mealType)">
-                            <p class="truncate">{{ entry.name }} <span class="ml-2">&bull; {{ entry.portion_quantity }}{{ entry.portion_unit }}</span></p>
-<!--                            <p class="text-sm text-stone-500">-->
-<!--                                {{ entry.calories }} kcal · P {{ entry.protein_g }}g · C {{ entry.carbs_g }}g · F {{ entry.fat_g }}g-->
-<!--                            </p>-->
+                            <p class="truncate">{{ entry.name }}</p>
+                            <p class="text-sm text-stone-500">
+                                {{ entry.calories }} kcal · {{ entry.portion_quantity }}{{ entry.portion_unit }}
+                            </p>
                         </button>
                         <div class="relative flex-none">
                             <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
@@ -378,10 +378,12 @@ onBeforeUnmount(() => {
                     <img v-if="selectedMeal.image_url" :src="selectedMeal.image_url" alt="" class="h-24 w-24 flex-none rounded-md object-cover">
                     <div class="min-w-0 flex-1 text-sm  text-stone-600">
                         <p v-if="selectedMeal.brand" class="truncate">{{ selectedMeal.brand }}</p>
-                        <p v-if="selectedMeal.portion_quantity">{{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
-<!--                            <span v-if="selectedMeal.serving_label"> · {{ selectedMeal.serving_label }}</span>-->
-                        </p>
-                        <p>{{ selectedMeal.calories }} kcal</p>
+                        <div>
+                            {{ selectedMeal.calories }} kcal
+                        <span v-if="selectedMeal.portion_quantity">
+                             · {{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
+                        </span>
+                        </div>
                     </div>
                 </div>
                 <div class="mt-4 grid min-w-0 grid-cols-3 gap-2">

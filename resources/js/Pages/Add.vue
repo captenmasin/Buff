@@ -398,13 +398,6 @@ function addWorkout() {
     workoutForm.post('/workouts');
 }
 
-function repeatBreakfast(meal) {
-    router.post(`/meals/${meal.id}/repeat`, {
-        date: props.date,
-        meal_type: 'breakfast',
-    }, { preserveScroll: true });
-}
-
 function selectPreviousCustomMeal(meal) {
     customMealForm.name = meal.name;
     customMealForm.protein_g = meal.protein_g;
@@ -491,31 +484,6 @@ onUnmounted(() => {
         </div>
 
         <article v-if="mode === 'choose'" class="grid gap-3">
-            <div v-if="previousBreakfastMeals.length" class="rounded-md border border-stone-200 bg-white p-4">
-                <p class="text-xs font-semibold uppercase text-stone-500">Repeat breakfast</p>
-                <div class="mt-3 grid gap-2">
-                    <button
-                        v-for="meal in previousBreakfastMeals"
-                        :key="meal.id"
-                        type="button"
-                        class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3 text-left active:bg-stone-100"
-                        @click="repeatBreakfast(meal)"
-                    >
-                        <img v-if="meal.image_url" :src="meal.image_url" alt="" class="h-11 w-11 rounded-md object-cover">
-                        <span v-else class="grid h-11 w-11 place-items-center rounded-md bg-[#dce8d4] text-[#253d2c]">
-                            <Utensils :size="20" />
-                        </span>
-                        <span class="min-w-0 flex-1">
-                            <span class="block truncate font-semibold">{{ meal.name }}</span>
-                            <span class="block truncate text-sm  text-stone-500">
-                                {{ meal.calories }} kcal · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
-                            </span>
-                        </span>
-                        <Plus :size="18" class="text-stone-400" />
-                    </button>
-                </div>
-            </div>
-
             <Link :href="addModeUrl('food')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
                     <Utensils :size="22" />
@@ -608,8 +576,8 @@ onUnmounted(() => {
                         </span>
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ entry.name }}</span>
-                            <span class="block truncate text-sm  text-stone-500">
-                                {{ entry.calories }} kcal<span v-if="entry.portion_quantity"> · {{ entry.portion_quantity }}{{ entry.portion_unit }}</span> · P {{ entry.protein_g }}g · C {{ entry.carbs_g }}g · F {{ entry.fat_g }}g
+                            <span class="block truncate text-sm text-stone-500">
+                                <span v-if="entry.portion_quantity">{{ entry.portion_quantity }}{{ entry.portion_unit }}</span>
                             </span>
                         </span>
                     </button>
