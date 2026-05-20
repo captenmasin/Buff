@@ -98,22 +98,21 @@ function dayStatusClass(status) {
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
                 <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
             </div>
-        </Card>
-
-        <Card class="grid grid-cols-3 gap-5">
-            <div
-                v-for="macro in [
+            <div class="grid grid-cols-3 mt-7 gap-5">
+                <div
+                    v-for="macro in [
                     ['Protein', summary.totals.protein_g, summary.goal?.protein_g, summary.totals.protein_remaining],
                     ['Carbs', summary.totals.carbs_g, summary.goal?.carbs_g, summary.totals.carbs_remaining],
                     ['Fat', summary.totals.fat_g, summary.goal?.fat_g, summary.totals.fat_remaining],
                 ]"
-                :key="macro[0]"
-            >
-                <p class="text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
-                <p class="mt-2 text-xl font-bold">{{ Math.round(macro[3] ?? 0) }}g</p>
-                <p class="text-xs font-semibold text-stone-500">left</p>
-                <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
-                    <div class="h-full rounded bg-[#d28a45]" :style="{ width: `${macroProgress(macro[1], macro[2])}%` }" />
+                    :key="macro[0]"
+                >
+                    <p class="text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
+                    <p class="mt-2 text-xl font-bold">{{ Math.round(macro[3] ?? 0) }}g</p>
+                    <p class="text-xs font-semibold text-stone-500">left</p>
+                    <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
+                        <div class="h-full rounded bg-[#d28a45]" :style="{ width: `${macroProgress(macro[1], macro[2])}%` }" />
+                    </div>
                 </div>
             </div>
         </Card>
