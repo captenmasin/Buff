@@ -305,7 +305,7 @@ onBeforeUnmount(() => {
                             <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
                                 <EllipsisVertical :size="18"/>
                             </button>
-                            <div v-if="openMealActions === entry.id" class="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-md border border-stone-200 bg-white text-sm  shadow">
+                            <Card v-if="openMealActions === entry.id" class="absolute p-2 right-0 top-10 z-20 w-36 overflow-hidden">
                                 <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="openMeal(entry, mealType)">
                                     <Info :size="16"/>
                                     Info
@@ -318,7 +318,7 @@ onBeforeUnmount(() => {
                                     <Trash2 :size="16"/>
                                     Delete
                                 </button>
-                            </div>
+                            </Card>
                         </div>
                     </div>
                 </div>
