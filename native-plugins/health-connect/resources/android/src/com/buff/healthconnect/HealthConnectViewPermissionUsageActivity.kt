@@ -1,0 +1,3 @@
+package com.buff.healthconnect
+
+class HealthConnectViewPermissionUsageActivity : HealthConnectPermissionsRationaleActivity()

@@ -14,7 +14,17 @@ class PortionParserTest extends TestCase
 
         $this->assertSame(['quantity' => 38.0, 'unit' => 'g', 'label' => '38g'], $parser->parse('38g'));
         $this->assertSame(['quantity' => 330.0, 'unit' => 'ml', 'label' => '330 ml'], $parser->parse('330 ml'));
+        $this->assertSame(['quantity' => 2000.0, 'unit' => 'ml', 'label' => '2l'], $parser->parse('2l'));
         $this->assertNull($parser->parse('one pack'));
+    }
+
+    public function test_it_parses_structured_quantities(): void
+    {
+        $parser = new PortionParser;
+
+        $this->assertSame(['quantity' => 2000.0, 'unit' => 'ml', 'label' => '2l'], $parser->parseQuantity(2, 'l', '2l'));
+        $this->assertSame(['quantity' => 200.0, 'unit' => 'g', 'label' => '200g'], $parser->parseQuantity(200, 'g'));
+        $this->assertNull($parser->parseQuantity(200, 'portion'));
     }
 
     public function test_it_builds_common_options_with_serving_and_package_first(): void

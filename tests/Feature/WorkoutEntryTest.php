@@ -24,6 +24,7 @@ class WorkoutEntryTest extends TestCase
 
         $this->assertSame('Strength training', $workout->title);
         $this->assertSame(250, $workout->calories_burned);
+        $this->assertSame(WorkoutEntry::SOURCE_MANUAL, $workout->source_type);
         $this->assertSame('2026-05-19 07:45:00', $workout->logged_at->format('Y-m-d H:i:s'));
     }
 

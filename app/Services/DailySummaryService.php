@@ -71,6 +71,8 @@ class DailySummaryService
                     'title' => $workout->title,
                     'calories_burned' => $workout->calories_burned,
                     'logged_time' => $workout->logged_at?->format('H:i'),
+                    'source_type' => $workout->source_type,
+                    'external_source' => $workout->external_source,
                 ])
                 ->all(),
         ];

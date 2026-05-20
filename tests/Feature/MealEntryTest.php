@@ -56,6 +56,33 @@ class MealEntryTest extends TestCase
         $this->assertSame(MealEntry::SOURCE_BARCODE, $entry->source_type);
     }
 
+    public function test_it_creates_a_barcode_meal_from_a_liquid_product_portion(): void
+    {
+        $product = FoodProduct::query()->create([
+            'barcode' => '5000181036312',
+            'name' => 'Milk',
+            'nutrition_unit' => 'ml',
+            'calories_per_100' => 41.5,
+            'protein_per_100' => 4.55,
+            'carbs_per_100' => 4.9,
+            'fat_per_100' => 0.4,
+        ]);
+
+        $this->post('/meals/barcode', [
+            'date' => '2026-05-20',
+            'meal_type' => 'breakfast',
+            'food_product_id' => $product->id,
+            'portion_quantity' => 200,
+            'portion_unit' => 'ml',
+        ])->assertRedirect('/?date=2026-05-20');
+
+        $entry = MealEntry::query()->first();
+
+        $this->assertSame(83, $entry->calories);
+        $this->assertSame(9.1, (float) $entry->protein_g);
+        $this->assertSame('ml', $entry->portion_unit);
+    }
+
     public function test_it_passes_unique_recent_previous_custom_meals_to_add_page(): void
     {
         $olderDuplicate = MealEntry::query()->create([

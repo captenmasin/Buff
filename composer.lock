@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "0567cc6bd6c6c8d235e017ef308d5661",
+    "content-hash": "0efb21f2e51ae571e8bdb2129bd1a540",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -120,6 +120,39 @@
                 }
             ],
             "time": "2026-02-10T14:33:43+00:00"
+        },
+        {
+            "name": "buff/health-connect",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "native-plugins/health-connect",
+                "reference": "bc175e772ec140531757b5fccc06e3f10b8e4c61"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Buff\\HealthConnect\\HealthConnectServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Buff\\HealthConnect\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Android Health Connect workout importer for Buff.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "carbonphp/carbon-doctrine-types",

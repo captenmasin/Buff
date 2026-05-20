@@ -34,7 +34,12 @@ class OpenFoodFactsService
                 'brands',
                 'image_url',
                 'serving_size',
+                'serving_quantity',
+                'serving_quantity_unit',
                 'quantity',
+                'product_quantity',
+                'product_quantity_unit',
+                'nutrition_data_per',
                 'nutriments',
             ]),
         ])->throw();
@@ -69,9 +74,21 @@ class OpenFoodFactsService
             ]);
         }
 
-        $serving = $this->portionParser->parse($product['serving_size'] ?? null);
-        $package = $this->portionParser->parse($product['quantity'] ?? null);
-        $nutritionUnit = $serving['unit'] ?? $package['unit'] ?? 'g';
+        $serving = $this->portionParser->parseQuantity(
+            $product['serving_quantity'] ?? null,
+            $product['serving_quantity_unit'] ?? null,
+            $product['serving_size'] ?? null,
+        ) ?? $this->portionParser->parse($product['serving_size'] ?? null);
+
+        $package = $this->portionParser->parseQuantity(
+            $product['product_quantity'] ?? null,
+            $product['product_quantity_unit'] ?? null,
+            $product['quantity'] ?? null,
+        ) ?? $this->portionParser->parse($product['quantity'] ?? null);
+
+        $nutritionUnit = $this->nutritionUnit($product, $serving, $package);
+        $serving = $this->normalizePortionUnit($serving, $nutritionUnit);
+        $package = $this->normalizePortionUnit($package, $nutritionUnit);
 
         return FoodProduct::query()->updateOrCreate(
             ['barcode' => $barcode],
@@ -103,5 +120,34 @@ class OpenFoodFactsService
         }
 
         return (float) $nutriments[$key];
+    }
+
+    private function nutritionUnit(array $product, ?array $serving, ?array $package): string
+    {
+        $nutritionDataPer = strtolower((string) ($product['nutrition_data_per'] ?? ''));
+
+        if (str_contains($nutritionDataPer, '100ml')) {
+            return 'ml';
+        }
+
+        if (($package['unit'] ?? null) === 'ml' || ($serving['unit'] ?? null) === 'ml') {
+            return 'ml';
+        }
+
+        return 'g';
+    }
+
+    private function normalizePortionUnit(?array $portion, string $nutritionUnit): ?array
+    {
+        if ($portion === null || ($portion['unit'] ?? null) === $nutritionUnit) {
+            return $portion;
+        }
+
+        if ($nutritionUnit === 'ml' && ($portion['unit'] ?? null) === 'g') {
+            $portion['unit'] = 'ml';
+            $portion['label'] = $this->portionParser->formatQuantity($portion['quantity'], 'ml');
+        }
+
+        return $portion;
     }
 }

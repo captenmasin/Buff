@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
+use App\Http\Controllers\HealthConnectController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\WorkoutController;
@@ -23,3 +24,7 @@ Route::delete('/meals/{mealEntry}', [MealController::class, 'destroy']);
 
 Route::post('/workouts', [WorkoutController::class, 'store']);
 Route::delete('/workouts/{workoutEntry}', [WorkoutController::class, 'destroy']);
+
+Route::get('/health-connect/status', [HealthConnectController::class, 'status']);
+Route::post('/health-connect/connect', [HealthConnectController::class, 'connect']);
+Route::post('/health-connect/sync', [HealthConnectController::class, 'sync']);

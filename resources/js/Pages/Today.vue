@@ -1,7 +1,8 @@
 <script setup>
 import { Head, Link, router } from '@inertiajs/vue3';
-import { computed } from 'vue';
-import { Dumbbell, Trash2 } from '@lucide/vue';
+import axios from 'axios';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { Dumbbell, Link2, RefreshCw, Trash2 } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import Card from "../Components/Card.vue";
 
@@ -9,6 +10,7 @@ const props = defineProps({
     summary: { type: Object, required: true },
     week: { type: Array, required: true },
     mealTypes: { type: Array, required: true },
+    healthConnect: { type: Object, required: true },
 });
 
 const mealLabels = {
@@ -20,6 +22,8 @@ const mealLabels = {
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const displayDate = computed(() => formatDisplayDate(props.summary.date));
+const healthConnectState = ref({ ...props.healthConnect });
+const healthConnectLoading = ref(false);
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
     return Math.min(100, Math.round((props.summary.totals.calories / props.summary.goal.calories) * 100));
@@ -38,6 +42,67 @@ function removeWorkout(id) {
     router.delete(`/workouts/${id}`, { preserveScroll: true });
 }
 
+const healthConnectLabel = computed(() => {
+    if (!healthConnectState.value.available) return 'Unavailable';
+    if (healthConnectState.value.status === 'connected') return 'Connected';
+    if (healthConnectState.value.status === 'background_permission_required') return 'Background access needed';
+    if (healthConnectState.value.status === 'sync_queued') return 'Sync queued';
+    return 'Permission needed';
+});
+
+const healthConnectDetail = computed(() => {
+    if (healthConnectState.value.last_successful_sync_at) {
+        if (Number(healthConnectState.value.synced_records || 0) === 0) {
+            return 'Last sync found no workouts in Health Connect.';
+        }
+
+        return `Last synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+    }
+
+    if (healthConnectState.value.last_error) {
+        return healthConnectState.value.last_error;
+    }
+
+    return 'Automatically imports workouts with calories.';
+});
+
+async function refreshHealthConnectStatus() {
+    try {
+        const { data } = await axios.get('/health-connect/status');
+        healthConnectState.value = { ...healthConnectState.value, ...data };
+    } catch {
+        healthConnectState.value = { ...healthConnectState.value, last_error: 'Could not check Health Connect.' };
+    }
+}
+
+async function connectHealthConnect() {
+    healthConnectLoading.value = true;
+
+    try {
+        const { data } = await axios.post('/health-connect/connect');
+        healthConnectState.value = { ...healthConnectState.value, ...data, ...(data.native || {}) };
+    } finally {
+        healthConnectLoading.value = false;
+    }
+}
+
+async function syncHealthConnect() {
+    healthConnectLoading.value = true;
+
+    try {
+        const { data } = await axios.post('/health-connect/sync');
+        healthConnectState.value = { ...healthConnectState.value, ...data, ...(data.native || {}) };
+    } finally {
+        healthConnectLoading.value = false;
+    }
+}
+
+function handleWindowFocus() {
+    if (healthConnectState.value.supported) {
+        refreshHealthConnectStatus();
+    }
+}
+
 function dayStatusClass(status) {
     return {
         target: 'bg-emerald-500',
@@ -46,6 +111,17 @@ function dayStatusClass(status) {
         neutral: 'bg-stone-300',
     }[status] || 'bg-stone-300';
 }
+
+onMounted(() => {
+    if (healthConnectState.value.supported) {
+        refreshHealthConnectStatus();
+        window.addEventListener('focus', handleWindowFocus);
+    }
+});
+
+onBeforeUnmount(() => {
+    window.removeEventListener('focus', handleWindowFocus);
+});
 </script>
 
 <template>
@@ -149,6 +225,33 @@ function dayStatusClass(status) {
             </div>
 
             <Card>
+                <div v-if="healthConnectState.supported" class="mb-3 flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3">
+                    <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-[#253d2c] text-white">
+                        <Link2 :size="18" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <p class="font-semibold">{{ healthConnectLabel }}</p>
+                        <p class="truncate text-sm text-stone-500">{{ healthConnectDetail }}</p>
+                    </div>
+                    <button
+                        v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
+                        class="grid h-10 w-10 place-items-center rounded-md border border-stone-200 bg-white text-stone-700 disabled:opacity-60"
+                        :disabled="healthConnectLoading"
+                        aria-label="Sync Health Connect"
+                        @click="syncHealthConnect"
+                    >
+                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }" />
+                    </button>
+                    <button
+                        v-else
+                        class="flex h-10 items-center rounded-md bg-[#253d2c] px-3 text-sm font-bold text-white disabled:opacity-60"
+                        :disabled="healthConnectLoading || !healthConnectState.available"
+                        @click="connectHealthConnect"
+                    >
+                        Connect
+                    </button>
+                </div>
+
                 <div v-if="summary.workouts?.length" class="divide-y divide-stone-100">
                     <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
                         <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-[#dce8d4] text-[#253d2c]">
@@ -157,7 +260,7 @@ function dayStatusClass(status) {
                         <div class="min-w-0 flex-1">
                             <p class="truncate font-semibold">{{ workout.title }}</p>
                             <p class="text-sm text-stone-500">
-                                {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}
+                                {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}<span v-if="workout.source_type === 'health_connect'"> · Health Connect</span>
                             </p>
                         </div>
                         <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Remove workout" @click="removeWorkout(workout.id)">

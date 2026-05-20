@@ -1,0 +1,47 @@
+{
+    "namespace": "HealthConnect",
+    "bridge_functions": [
+        {
+            "name": "HealthConnect.Status",
+            "android": "com.buff.healthconnect.HealthConnectFunctions.Status",
+            "android_params": ["context"],
+            "description": "Return Android Health Connect availability and permission state."
+        },
+        {
+            "name": "HealthConnect.RequestPermissions",
+            "android": "com.buff.healthconnect.HealthConnectFunctions.RequestPermissions",
+            "android_params": ["activity"],
+            "description": "Launch the Android Health Connect permission flow."
+        },
+        {
+            "name": "HealthConnect.SyncNow",
+            "android": "com.buff.healthconnect.HealthConnectFunctions.SyncNow",
+            "android_params": ["context"],
+            "description": "Queue an immediate Health Connect workout sync."
+        },
+        {
+            "name": "HealthConnect.Schedule",
+            "android": "com.buff.healthconnect.HealthConnectFunctions.Schedule",
+            "android_params": ["context"],
+            "description": "Schedule recurring Health Connect workout sync."
+        }
+    ],
+    "android": {
+        "min_version": 33,
+        "permissions": [
+            "android.permission.health.READ_EXERCISE",
+            "android.permission.health.READ_TOTAL_CALORIES_BURNED",
+            "android.permission.health.READ_ACTIVE_CALORIES_BURNED",
+            "android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND"
+        ],
+        "dependencies": {
+            "implementation": [
+                "androidx.health.connect:connect-client:1.1.0",
+                "androidx.work:work-runtime-ktx:2.11.2"
+            ]
+        }
+    },
+    "ios": {
+        "min_version": 18
+    }
+}
