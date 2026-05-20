@@ -7,14 +7,103 @@ import {formatDisplayDate} from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
 
-const props = defineProps({
-    summary: {type: Object, required: true},
-    week: {type: Array, required: true},
-    mealTypes: {type: Array, required: true},
-    healthConnect: {type: Object, required: true},
-});
+type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
+type DayStatus = 'target' | 'under' | 'over' | 'neutral';
 
-const mealLabels = {
+interface DailyGoal {
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    macro_calories: number;
+}
+
+interface DailyTotals {
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    calories_remaining: number;
+    protein_remaining: number;
+    carbs_remaining: number;
+    fat_remaining: number;
+}
+
+interface MealEntry {
+    id: number;
+    name: string;
+    meal_type?: MealType;
+    source_type: string;
+    portion_quantity: number | null;
+    portion_unit: string | null;
+    brand?: string | null;
+    image_url?: string | null;
+    serving_label?: string | null;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+}
+
+type SelectedMeal = MealEntry & { meal_type: MealType };
+
+interface WorkoutEntry {
+    id: number;
+    title: string;
+    calories_burned: number;
+    logged_time: string | null;
+    source_type: string;
+    external_source?: string | null;
+}
+
+interface DailySummary {
+    date: string;
+    goal: DailyGoal | null;
+    log: {
+        burned_calories: number;
+    };
+    totals: DailyTotals;
+    entries: Partial<Record<MealType, MealEntry[]>>;
+    workouts: WorkoutEntry[];
+}
+
+interface WeekDay {
+    date: string;
+    label: string;
+    status: DayStatus;
+    is_today: boolean;
+    is_selected: boolean;
+    effective_target?: number;
+}
+
+interface HealthConnectState {
+    available: boolean;
+    supported: boolean;
+    status: string;
+    last_successful_sync_at?: string | null;
+    synced_records?: number | null;
+    last_error?: string | null;
+}
+
+interface MacroCard {
+    key: MacroKey;
+    slug: string;
+    label: string;
+    consumed: number;
+    goal?: number;
+    remaining: number;
+    color: string;
+}
+
+const props = defineProps<{
+    summary: DailySummary;
+    week: WeekDay[];
+    mealTypes: MealType[];
+    healthConnect: HealthConnectState;
+}>();
+
+const mealLabels: Record<MealType, string> = {
     breakfast: 'Breakfast',
     lunch: 'Lunch',
     dinner: 'Dinner',
@@ -26,22 +115,22 @@ const mealIcons = {
     lunch: Sandwich,
     dinner: Drumstick,
     snacks: Apple,
-}
+};
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const datePickerOpen = ref(false);
-const selectedMeal = ref(null);
-const editingMeal = ref(null);
-const openMealActions = ref(null);
+const selectedMeal = ref<SelectedMeal | null>(null);
+const editingMeal = ref<SelectedMeal | null>(null);
+const openMealActions = ref<number | null>(null);
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
     return Math.min(100, Math.round((props.summary.totals.calories / props.summary.goal.calories) * 100));
 });
 
-const macros = computed(() => [
+const macros = computed<MacroCard[]>(() => [
     {key: 'protein_g', slug: 'protein', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-sky-500'},
     {key: 'carbs_g', slug: 'carbs', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-orange-500'},
     {key: 'fat_g', slug: 'fat', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-red-500'},
@@ -56,12 +145,30 @@ const editMealForm = useForm({
     fat_g: 0,
 });
 
-function macroProgress(consumed, goal) {
+const selectedMealMacros = computed(() => {
+    if (!selectedMeal.value) {
+        return [];
+    }
+
+    return [
+        ['Protein', selectedMeal.value.protein_g, props.summary.goal?.protein_g],
+        ['Carbs', selectedMeal.value.carbs_g, props.summary.goal?.carbs_g],
+        ['Fat', selectedMeal.value.fat_g, props.summary.goal?.fat_g],
+    ] as const;
+});
+
+const editMealMacroFields: ReadonlyArray<readonly [MacroKey, string]> = [
+    ['protein_g', 'Protein'],
+    ['carbs_g', 'Carbs'],
+    ['fat_g', 'Fat'],
+];
+
+function macroProgress(consumed: number, goal?: number) {
     if (!goal) return 0;
     return Math.min(100, Math.round((consumed / goal) * 100));
 }
 
-function removeEntry(id) {
+function removeEntry(id: number) {
     openMealActions.value = null;
 
     if (window.confirm('Delete this meal?')) {
@@ -70,7 +177,7 @@ function removeEntry(id) {
     }
 }
 
-function removeWorkout(id) {
+function removeWorkout(id: number) {
     hapticImpact();
     router.delete(`/workouts/${id}`, {preserveScroll: true});
 }
@@ -136,7 +243,7 @@ function handleWindowFocus() {
     }
 }
 
-function dayStatusClass(status) {
+function dayStatusClass(status: DayStatus) {
     return {
         target: 'bg-emerald-500',
         under: 'bg-amber-400',
@@ -145,17 +252,21 @@ function dayStatusClass(status) {
     }[status] || 'bg-stone-300';
 }
 
-function selectDate(event) {
-    router.visit(`/?date=${event.target.value}`, {preserveScroll: true});
+function selectDate(event: Event) {
+    const target = event.target instanceof HTMLInputElement ? event.target : null;
+
+    if (target) {
+        router.visit(`/?date=${target.value}`, {preserveScroll: true});
+    }
 }
 
-function openMeal(entry, mealType) {
+function openMeal(entry: MealEntry, mealType: MealType) {
     openMealActions.value = null;
     hapticImpact();
     selectedMeal.value = {...entry, meal_type: mealType};
 }
 
-function startEditingMeal(entry, mealType) {
+function startEditingMeal(entry: MealEntry, mealType: MealType) {
     openMealActions.value = null;
     hapticImpact();
     editingMeal.value = {...entry, meal_type: mealType};
@@ -172,6 +283,10 @@ function startEditingMeal(entry, mealType) {
 }
 
 function saveMealEdit() {
+    if (!editingMeal.value) {
+        return;
+    }
+
     hapticImpact();
     editMealForm.put(`/meals/${editingMeal.value.id}`, {
         preserveScroll: true,
@@ -181,13 +296,13 @@ function saveMealEdit() {
     });
 }
 
-function macroPercent(consumed, goal) {
+function macroPercent(consumed: number, goal?: number) {
     if (!goal) return 0;
 
     return Math.round((Number(consumed) / Number(goal)) * 100);
 }
 
-function toggleMealActions(entryId) {
+function toggleMealActions(entryId: number) {
     openMealActions.value = openMealActions.value === entryId ? null : entryId;
     hapticImpact(18);
 }
@@ -295,7 +410,7 @@ onBeforeUnmount(() => {
                     <div class="mt-1 h-2 overflow-hidden rounded bg-stone-100">
                         <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }"/>
                     </div>
-                    <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
+<!--                    <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>-->
                 </Link>
             </div>
         </Card>
@@ -433,11 +548,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
                 <div class="mt-4 grid min-w-0 grid-cols-3 gap-2">
-                    <div v-for="macro in [
-                        ['Protein', selectedMeal.protein_g, summary.goal?.protein_g],
-                        ['Carbs', selectedMeal.carbs_g, summary.goal?.carbs_g],
-                        ['Fat', selectedMeal.fat_g, summary.goal?.fat_g],
-                    ]" :key="macro[0]" class="min-w-0 rounded-md bg-stone-50 p-3 max-[360px]:p-2">
+                    <div v-for="macro in selectedMealMacros" :key="macro[0]" class="min-w-0 rounded-md bg-stone-50 p-3 max-[360px]:p-2">
                         <p class="truncate text-xs font-semibold uppercase text-stone-500">{{ macro[0] }}</p>
                         <p class="mt-1 font-semibold">{{ macro[1] }}g</p>
                         <p class="truncate text-xs  text-stone-500">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
@@ -462,11 +573,7 @@ onBeforeUnmount(() => {
                     </label>
 
                     <div class="grid grid-cols-3 gap-2">
-                        <label v-for="field in [
-                            ['protein_g', 'Protein'],
-                            ['carbs_g', 'Carbs'],
-                            ['fat_g', 'Fat'],
-                        ]" :key="field[0]">
+                        <label v-for="field in editMealMacroFields" :key="field[0]">
                             <span class="text-xs font-semibold uppercase text-stone-500">{{ field[1] }}</span>
                             <input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]">
                         </label>

@@ -7,29 +7,97 @@ import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
 
-const props = defineProps({
-    date: { type: String, required: true },
-    mealTypes: { type: Array, required: true },
-    mode: { type: String, required: true },
-    meal: { type: String, required: false, default: null },
-    autoScan: { type: Boolean, default: false },
-    previousFoodEntries: { type: Array, default: () => [] },
-    previousCustomMeals: { type: Array, default: () => [] },
-    previousBreakfastMeals: { type: Array, default: () => [] },
+type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+type MacroField = 'protein_g' | 'carbs_g' | 'fat_g';
+
+interface FoodProduct {
+    type?: 'product';
+    id: string;
+    barcode: string;
+    name: string;
+    brand?: string | null;
+    image_url?: string | null;
+    nutrition_unit?: string | null;
+    calories_per_100: number;
+    protein_per_100: number;
+    carbs_per_100: number;
+    fat_per_100: number;
+}
+
+interface PreviousMeal {
+    type: 'previous_meal';
+    id: number;
+    name: string;
+    brand?: string | null;
+    image_url?: string | null;
+    portion_quantity: number | null;
+    portion_unit: string | null;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+}
+
+type FoodSearchResult = FoodProduct | PreviousMeal;
+
+interface PortionOption {
+    label?: string;
+    quantity: number;
+    unit: string;
+}
+
+interface NativeBridge {
+    Scanner: {
+        scan(): {
+            prompt(message: string): ReturnType<NativeBridge['Scanner']['scan']>;
+            formats(formats: string[]): ReturnType<NativeBridge['Scanner']['scan']>;
+            id(id: string): Promise<void>;
+        };
+    };
+    On(eventName: string, callback: (payload: unknown, eventName: string) => void): void;
+    Off(eventName: string, callback: (payload: unknown, eventName: string) => void): void;
+    Events: {
+        Scanner: {
+            CodeScanned: string;
+        };
+    };
+}
+
+const props = withDefaults(defineProps<{
+    date: string;
+    mealTypes: MealType[];
+    mode: string;
+    meal?: MealType | null;
+    autoScan?: boolean;
+    previousFoodEntries?: PreviousMeal[];
+    previousCustomMeals?: PreviousMeal[];
+    previousBreakfastMeals?: PreviousMeal[];
+}>(), {
+    meal: null,
+    autoScan: false,
+    previousFoodEntries: () => [],
+    previousCustomMeals: () => [],
+    previousBreakfastMeals: () => [],
 });
 
-const mealLabels = {
+const mealLabels: Record<MealType, string> = {
     breakfast: 'Breakfast',
     lunch: 'Lunch',
     dinner: 'Dinner',
     snacks: 'Snacks',
 };
 
+const customMealMacroFields: ReadonlyArray<readonly [MacroField, string]> = [
+    ['protein_g', 'Protein'],
+    ['carbs_g', 'Carbs'],
+    ['fat_g', 'Fat'],
+];
+
 function currentTime() {
     return new Date().toTimeString().slice(0, 5);
 }
 
-function addModeUrl(mode, extra = {}) {
+function addModeUrl(mode: string, extra: Record<string, string> = {}) {
     const params = new URLSearchParams({
         date: props.date,
         mode,
@@ -39,7 +107,7 @@ function addModeUrl(mode, extra = {}) {
     return `/add?${params.toString()}`;
 }
 
-function smartMealType() {
+function smartMealType(): MealType {
     const hour = new Date().getHours();
 
     if (hour < 10) return 'breakfast';
@@ -49,25 +117,25 @@ function smartMealType() {
     return 'snacks';
 }
 
-const selectedMealType = ref(smartMealType());
+const selectedMealType = ref<MealType>(smartMealType());
 const barcode = ref('');
 const lookupError = ref('');
 const lookupLoading = ref(false);
 const nativeMessage = ref('');
-const nativeBridge = ref(null);
+const nativeBridge = ref<NativeBridge | null>(null);
 const scannerStarting = ref(false);
 const webScannerOpen = ref(false);
-const webScannerVideo = ref(null);
-const webScannerControls = ref(null);
-const product = ref(null);
-const portionOptions = ref([]);
+const webScannerVideo = ref<HTMLVideoElement | null>(null);
+const webScannerControls = ref<{ stop(): void } | null>(null);
+const product = ref<FoodProduct | null>(null);
+const portionOptions = ref<PortionOption[]>([]);
 const selectedPortionKey = ref('');
 const manualBarcodeOpen = ref(false);
 const foodSearch = ref('');
 const foodSearchLoading = ref(false);
-const foodSearchResults = ref([]);
-const selectedPreviousMeal = ref(null);
-const previousMealPortionQuantity = ref(null);
+const foodSearchResults = ref<FoodSearchResult[]>([]);
+const selectedPreviousMeal = ref<PreviousMeal | null>(null);
+const previousMealPortionQuantity = ref<number | null>(null);
 const previousMealPortionUnit = ref('g');
 let foodSearchRequestId = 0;
 
@@ -125,19 +193,19 @@ const displayDate = computed(() => formatDisplayDate(props.date));
 const foodSearchQuery = computed(() => foodSearch.value.trim());
 const foodAddSheetOpen = computed(() => Boolean(product.value || selectedPreviousMeal.value));
 
-function setMealType(mealType) {
+function setMealType(mealType: MealType) {
     selectedMealType.value = mealType;
     customMealForm.meal_type = mealType;
     barcodeMealForm.meal_type = mealType;
 }
 
-function selectPortion(option, index) {
+function selectPortion(option: PortionOption, index: number) {
     selectedPortionKey.value = String(index);
     barcodeMealForm.portion_quantity = option.quantity;
     barcodeMealForm.portion_unit = option.unit;
 }
 
-async function lookup(scannedBarcode = null) {
+async function lookup(scannedBarcode: string | null = null) {
     lookupError.value = '';
     lookupLoading.value = true;
     selectedPreviousMeal.value = null;
@@ -159,7 +227,7 @@ async function lookup(scannedBarcode = null) {
         }
     } catch (error) {
         product.value = null;
-        const errors = error.response?.data?.errors;
+        const errors = axios.isAxiosError(error) ? error.response?.data?.errors : null;
         lookupError.value = errors?.barcode?.[0] || 'Could not look up that barcode. Add it as custom food instead.';
     } finally {
         lookupLoading.value = false;
@@ -197,7 +265,7 @@ async function searchFoodProducts() {
     }
 }
 
-function selectFoodProduct(foodProduct) {
+function selectFoodProduct(foodProduct: FoodProduct) {
     selectedPreviousMeal.value = null;
     product.value = foodProduct;
     portionOptions.value = [
@@ -210,7 +278,7 @@ function selectFoodProduct(foodProduct) {
     hapticImpact();
 }
 
-function selectPreviousMeal(meal) {
+function selectPreviousMeal(meal: PreviousMeal) {
     selectedPreviousMeal.value = meal;
     product.value = null;
     previousMealPortionQuantity.value = meal.portion_quantity;
@@ -218,7 +286,7 @@ function selectPreviousMeal(meal) {
     hapticImpact();
 }
 
-function selectFoodResult(result) {
+function selectFoodResult(result: FoodSearchResult) {
     if (result.type === 'previous_meal') {
         selectPreviousMeal(result);
         return;
@@ -329,22 +397,26 @@ function stopWebScan() {
     manualBarcodeOpen.value = false;
 }
 
-function cameraErrorMessage(error) {
-    if (error?.name === 'NotAllowedError' || error?.name === 'SecurityError') {
+function cameraErrorMessage(error: unknown) {
+    const errorName = error instanceof DOMException || error instanceof Error ? error.name : null;
+
+    if (errorName === 'NotAllowedError' || errorName === 'SecurityError') {
         return 'Camera permission was denied. Allow camera access for Buff, or enter the barcode manually.';
     }
 
-    if (error?.name === 'NotFoundError' || error?.name === 'OverconstrainedError') {
+    if (errorName === 'NotFoundError' || errorName === 'OverconstrainedError') {
         return 'No usable camera was found. Enter the barcode manually.';
     }
 
     return 'Scanner could not start. Enter the barcode manually.';
 }
 
-function handleScan(payload) {
-    if (payload?.id && payload.id !== 'product-scanner') return;
+function handleScan(payload: unknown) {
+    const scanPayload = typeof payload === 'object' && payload !== null ? payload as { id?: string; data?: string } : null;
 
-    const scanned = payload?.data || payload;
+    if (scanPayload?.id && scanPayload.id !== 'product-scanner') return;
+
+    const scanned = scanPayload?.data || (typeof payload === 'string' ? payload : null);
 
     if (scanned) {
         barcode.value = scanned;
@@ -363,7 +435,12 @@ function addPreviousMeal() {
 
     hapticImpact();
 
-    const payload = {
+    const payload: {
+        date: string;
+        meal_type: MealType;
+        portion_quantity?: number | null;
+        portion_unit?: string;
+    } = {
         date: props.date,
         meal_type: selectedMealType.value,
     };
@@ -394,7 +471,7 @@ function addWorkout() {
     workoutForm.post('/workouts');
 }
 
-function selectPreviousCustomMeal(meal) {
+function selectPreviousCustomMeal(meal: PreviousMeal) {
     customMealForm.name = meal.name;
     customMealForm.portion_quantity = meal.portion_quantity ?? 100;
     customMealForm.portion_unit = meal.portion_unit || 'g';
@@ -797,11 +874,7 @@ onUnmounted(() => {
                 </div>
 
                 <div class="grid grid-cols-3 gap-2">
-                    <label v-for="field in [
-                        ['protein_g', 'Protein'],
-                        ['carbs_g', 'Carbs'],
-                        ['fat_g', 'Fat'],
-                    ]" :key="field[0]">
+                    <label v-for="field in customMealMacroFields" :key="field[0]">
                         <span class="text-xs font-semibold uppercase text-stone-500">{{ field[1] }}</span>
                         <input
                             v-model.number="customMealForm[field[0]]"

@@ -4,12 +4,40 @@ import { computed } from 'vue';
 import { Trash2, TrendingDown, TrendingUp } from '@lucide/vue';
 import Card from "../Components/Card.vue";
 
-const props = defineProps({
-    today: { type: String, required: true },
-    latest: { type: Object, default: null },
-    goals: { type: Object, default: null },
-    delta: { type: Object, default: null },
-    history: { type: Array, required: true },
+interface BodyMetric {
+    id: number;
+    date: string;
+    weight_kg: number;
+    body_fat_percent: number | null;
+    notes: string | null;
+}
+
+interface BodyGoals {
+    height_cm: number | null;
+    target_weight_kg: number | null;
+    target_body_fat_percent: number | null;
+}
+
+interface BodyDelta {
+    weight_kg: number;
+    body_fat_percent: number | null;
+}
+
+interface ChartRange {
+    min: number;
+    max: number;
+}
+
+const props = withDefaults(defineProps<{
+    today: string;
+    latest?: BodyMetric | null;
+    goals?: BodyGoals | null;
+    delta?: BodyDelta | null;
+    history: BodyMetric[];
+}>(), {
+    latest: null,
+    goals: null,
+    delta: null,
 });
 
 const form = useForm({
@@ -37,7 +65,7 @@ const bodyFatRange = computed(() => rangeFor(chartMetrics.value.map((metric) => 
 const weightPoints = computed(() => chartPoints(chartMetrics.value.map((metric) => metric.weight_kg), weightRange.value));
 const bodyFatPoints = computed(() => chartPoints(chartMetrics.value.map((metric) => metric.body_fat_percent), bodyFatRange.value));
 
-function deltaLabel(value, suffix) {
+function deltaLabel(value: number | null | undefined, suffix: string) {
     if (value === null || value === undefined) return 'No change';
 
     const sign = value > 0 ? '+' : '';
@@ -53,10 +81,10 @@ function saveHeight() {
     heightForm.put('/progress/height', { preserveScroll: true });
 }
 
-function rangeFor(values, target = null) {
+function rangeFor(values: Array<number | null>, target: number | null = null): ChartRange {
     const numeric = values.map(Number).filter((value) => Number.isFinite(value));
 
-    if (target !== null && target !== undefined && target !== '') {
+    if (target !== null && target !== undefined) {
         numeric.push(Number(target));
     }
 
@@ -69,7 +97,7 @@ function rangeFor(values, target = null) {
     return { min: min - padding, max: max + padding };
 }
 
-function chartPoints(values, range) {
+function chartPoints(values: Array<number | null>, range: ChartRange): string {
     const numeric = values.map((value) => value === null || value === undefined ? null : Number(value));
     const count = Math.max(numeric.length - 1, 1);
 
@@ -86,13 +114,13 @@ function chartPoints(values, range) {
         .join(' ');
 }
 
-function targetY(target, range) {
-    if (target === null || target === undefined || target === '') return null;
+function targetY(target: number | null | undefined, range: ChartRange): number | null {
+    if (target === null || target === undefined) return null;
 
     return 100 - (((Number(target) - range.min) / (range.max - range.min)) * 100);
 }
 
-function removeMetric(metric) {
+function removeMetric(metric: BodyMetric) {
     if (window.confirm(`Delete progress item from ${metric.date}?`)) {
         router.delete(`/progress/body-metrics/${metric.id}`, { preserveScroll: true });
     }

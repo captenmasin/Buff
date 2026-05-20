@@ -4,13 +4,16 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 
-const page = usePage();
+const page = usePage<{
+    summary?: { date: string };
+    flash?: { message?: string };
+}>();
 const addDrawerOpen = ref(false);
 const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
-const toastTimer = ref(null);
-let removeFlashToastListener = null;
-let foodGoalReminderTimer = null;
+const toastTimer = ref<number | null>(null);
+let removeFlashToastListener: (() => void) | null = null;
+let foodGoalReminderTimer: number | null = null;
 
 const foodGoalReminderStorageKey = 'buff.foodGoalReminder';
 
@@ -73,7 +76,7 @@ function handleNativeAndroidBack() {
     return false;
 }
 
-function openAddMode(mode) {
+function openAddMode(mode: string) {
     hapticImpact();
     closeDrawerImmediately();
 
@@ -96,7 +99,7 @@ function clearFallbackToast() {
     fallbackToast.value = '';
 }
 
-function showFallbackToast(message) {
+function showFallbackToast(message: string) {
     clearFallbackToast();
 
     fallbackToast.value = message;
@@ -106,7 +109,7 @@ function showFallbackToast(message) {
     }, 4000);
 }
 
-async function showFlashToast(message) {
+async function showFlashToast(message?: string) {
     if (!message) {
         return;
     }
@@ -119,7 +122,7 @@ async function showFlashToast(message) {
     }
 }
 
-function foodGoalReminderSettings() {
+function foodGoalReminderSettings(): { enabled?: boolean; time?: string } {
     try {
         return JSON.parse(window.localStorage.getItem(foodGoalReminderStorageKey) || '{}');
     } catch {
@@ -127,7 +130,7 @@ function foodGoalReminderSettings() {
     }
 }
 
-function nextReminderDelay(time) {
+function nextReminderDelay(time?: string) {
     const [hours, minutes] = String(time || '20:00').split(':').map(Number);
     const next = new Date();
 
@@ -188,7 +191,9 @@ onMounted(() => {
     showFlashToast(page.props.flash?.message);
 
     removeFlashToastListener = router.on('success', (event) => {
-        showFlashToast(event.detail.page.props.flash?.message);
+        const flash = event.detail.page.props.flash as { message?: string } | undefined;
+
+        showFlashToast(flash?.message);
     });
 });
 

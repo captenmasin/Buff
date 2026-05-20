@@ -5,20 +5,47 @@ import { computed } from 'vue';
 import Card from '../Components/Card.vue';
 import { formatDisplayDate } from '../dateFormat';
 
-const props = defineProps({
-    date: { type: String, required: true },
-    macro: { type: Object, required: true },
-    entries: { type: Array, required: true },
-});
+type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
 
-const mealLabels = {
+interface MacroSummary {
+    slug: string;
+    key: MacroKey;
+    label: string;
+    consumed_g: number;
+    goal_g: number;
+    current_percentage: number;
+    goal_percentage: number;
+}
+
+interface MacroEntry {
+    id: number;
+    meal_type: MealType;
+    name: string;
+    brand?: string | null;
+    image_url?: string | null;
+    portion_quantity: number | null;
+    portion_unit: string | null;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+}
+
+const props = defineProps<{
+    date: string;
+    macro: MacroSummary;
+    entries: MacroEntry[];
+}>();
+
+const mealLabels: Record<MealType, string> = {
     breakfast: 'Breakfast',
     lunch: 'Lunch',
     dinner: 'Dinner',
     snacks: 'Snacks',
 };
 
-const macroColors = {
+const macroColors: Record<MacroKey, string> = {
     protein_g: 'bg-sky-500',
     carbs_g: 'bg-orange-500',
     fat_g: 'bg-red-500',
@@ -27,7 +54,7 @@ const macroColors = {
 const displayDate = computed(() => formatDisplayDate(props.date, { weekday: 'short' }));
 const progressWidth = computed(() => Math.min(100, Math.max(0, Number(props.macro.current_percentage || 0))));
 
-function grams(value) {
+function grams(value: number | string | null | undefined) {
     return `${Math.round(Number(value || 0))}g`;
 }
 </script>

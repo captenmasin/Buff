@@ -1,40 +1,29 @@
 <?php
 
-namespace Tests\Feature;
-
 use App\Models\WorkoutEntry;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
-use Tests\TestCase;
 
-class WorkoutEntryTest extends TestCase
-{
-    use RefreshDatabase;
+it('creates a workout entry', function (): void {
+    $this->post('/workouts', [
+        'date' => '2026-05-19',
+        'title' => 'Strength training',
+        'calories_burned' => 250,
+        'time' => '07:45',
+    ])->assertRedirect('/?date=2026-05-19');
 
-    public function test_it_creates_a_workout_entry(): void
-    {
-        $this->post('/workouts', [
-            'date' => '2026-05-19',
-            'title' => 'Strength training',
-            'calories_burned' => 250,
-            'time' => '07:45',
-        ])->assertRedirect('/?date=2026-05-19');
+    $workout = WorkoutEntry::query()->first();
 
-        $workout = WorkoutEntry::query()->first();
+    expect($workout->title)->toBe('Strength training')
+        ->and($workout->calories_burned)->toBe(250)
+        ->and($workout->source_type)->toBe(WorkoutEntry::SOURCE_MANUAL)
+        ->and($workout->logged_at->format('Y-m-d H:i:s'))->toBe('2026-05-19 07:45:00');
+});
 
-        $this->assertSame('Strength training', $workout->title);
-        $this->assertSame(250, $workout->calories_burned);
-        $this->assertSame(WorkoutEntry::SOURCE_MANUAL, $workout->source_type);
-        $this->assertSame('2026-05-19 07:45:00', $workout->logged_at->format('Y-m-d H:i:s'));
-    }
-
-    public function test_add_page_accepts_workout_mode(): void
-    {
-        $this->get('/add?mode=workout')
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('Add')
-                ->where('mode', 'workout')
-            );
-    }
-}
+it('opens the add page in workout mode', function (): void {
+    $this->get('/add?mode=workout')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->where('mode', 'workout')
+        );
+});
