@@ -19,6 +19,8 @@ class MealEntryTest extends TestCase
             'date' => '2026-05-19',
             'meal_type' => 'lunch',
             'name' => 'Chicken bowl',
+            'portion_quantity' => 350,
+            'portion_unit' => 'g',
             'protein_g' => 45,
             'carbs_g' => 50,
             'fat_g' => 12,
@@ -27,6 +29,8 @@ class MealEntryTest extends TestCase
         $entry = MealEntry::query()->first();
 
         $this->assertSame(488, $entry->calories);
+        $this->assertSame(350.0, (float) $entry->portion_quantity);
+        $this->assertSame('g', $entry->portion_unit);
         $this->assertSame(MealEntry::SOURCE_CUSTOM, $entry->source_type);
     }
 
@@ -91,6 +95,8 @@ class MealEntryTest extends TestCase
             'meal_type' => 'breakfast',
             'source_type' => MealEntry::SOURCE_CUSTOM,
             'name' => 'Chicken bowl',
+            'portion_quantity' => 350,
+            'portion_unit' => 'g',
             'calories' => 488,
             'protein_g' => 45,
             'carbs_g' => 50,
@@ -103,6 +109,8 @@ class MealEntryTest extends TestCase
             'meal_type' => 'lunch',
             'source_type' => MealEntry::SOURCE_CUSTOM,
             'name' => 'Chicken bowl',
+            'portion_quantity' => 350,
+            'portion_unit' => 'g',
             'calories' => 488,
             'protein_g' => 45,
             'carbs_g' => 50,
@@ -115,6 +123,8 @@ class MealEntryTest extends TestCase
             'meal_type' => 'snacks',
             'source_type' => MealEntry::SOURCE_CUSTOM,
             'name' => 'Protein snack',
+            'portion_quantity' => 90,
+            'portion_unit' => 'g',
             'calories' => 200,
             'protein_g' => 30,
             'carbs_g' => 5,
@@ -127,7 +137,10 @@ class MealEntryTest extends TestCase
                 ->component('Add')
                 ->has('previousCustomMeals', 2)
                 ->where('previousCustomMeals.0.name', 'Protein snack')
+                ->where('previousCustomMeals.0.portion_quantity', 90)
+                ->where('previousCustomMeals.0.portion_unit', 'g')
                 ->where('previousCustomMeals.1.name', 'Chicken bowl')
+                ->where('previousCustomMeals.1.portion_quantity', 350)
             );
     }
 

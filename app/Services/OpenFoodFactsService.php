@@ -128,7 +128,7 @@ class OpenFoodFactsService
 
         if ($protein === null || $carbs === null || $fat === null || $calories === null) {
             throw ValidationException::withMessages([
-                'barcode' => 'This product is missing usable macro nutrition data. Add it as a custom meal instead.',
+                'barcode' => 'This product is missing usable macro nutrition data. Add it as custom food instead.',
             ]);
         }
 

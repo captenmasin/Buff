@@ -41,9 +41,9 @@ const calorieProgress = computed(() => {
 });
 
 const macros = computed(() => [
-    {key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-[#5b7fbd]'},
-    {key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-[#d28a45]'},
-    {key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-[#b05252]'},
+    {key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-sky-500'},
+    {key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-orange-500'},
+    {key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-red-500'},
 ]);
 
 const editMealForm = useForm({
@@ -86,7 +86,7 @@ const healthConnectDetail = computed(() => {
             return 'Last sync found no workouts in Health Connect.';
         }
 
-        return `Last synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
+        return `Synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
     }
 
     if (healthConnectState.value.last_error) {
@@ -253,7 +253,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
-                <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }"/>
+                <div class="h-full rounded bg-emerald-500" :style="{ width: `${calorieProgress}%` }"/>
             </div>
             <p class="mt-2 text-xs  text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
             <div class="grid grid-cols-3 mt-7 gap-5">
@@ -266,7 +266,7 @@ onBeforeUnmount(() => {
                         {{ Math.round(macro.consumed ?? 0) }}g
                         <span class="text-xs  text-stone-500">/ {{ Math.round(macro.goal ?? 0) }}g</span>
                     </p>
-                    <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
+                    <div class="mt-1 h-2 overflow-hidden rounded bg-stone-100">
                         <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }"/>
                     </div>
                     <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
@@ -297,7 +297,7 @@ onBeforeUnmount(() => {
                     <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
                         <button class="min-w-0 flex-1 text-left" @click="openMeal(entry, mealType)">
                             <p class="truncate">{{ entry.name }}</p>
-                            <p class="text-sm text-stone-500">
+                            <p class="text-xs text-stone-500">
                                 {{ entry.calories }} kcal · {{ entry.portion_quantity }}{{ entry.portion_unit }}
                             </p>
                         </button>

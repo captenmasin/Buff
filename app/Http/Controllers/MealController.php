@@ -7,10 +7,12 @@ use App\Models\MealEntry;
 use App\Services\NutritionCalculator;
 use App\Services\OpenFoodFactsService;
 use App\Services\PortionParser;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -104,6 +106,8 @@ class MealController extends Controller
             'date' => ['required', 'date'],
             'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
             'name' => ['required', 'string', 'max:120'],
+            'portion_quantity' => ['required', 'numeric', 'min:0.1', 'max:10000'],
+            'portion_unit' => ['required', Rule::in(['g', 'ml'])],
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
@@ -115,7 +119,7 @@ class MealController extends Controller
             'calories' => $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
         ]);
 
-        return redirect('/?date='.$validated['date'])->with('message', 'Custom meal added.');
+        return redirect('/?date='.$validated['date'])->with('message', 'Custom food added.');
     }
 
     public function storeBarcode(Request $request, NutritionCalculator $calculator): RedirectResponse
@@ -256,7 +260,7 @@ class MealController extends Controller
         $copy->fat_g = round((float) $mealEntry->fat_g * $factor, 2);
     }
 
-    private function previousMealsForSearch(string $query): \Illuminate\Support\Collection
+    private function previousMealsForSearch(string $query): Collection
     {
         return $this->previousFoodEntryQuery()
             ->where('name', 'like', "%{$query}%")
@@ -282,7 +286,7 @@ class MealController extends Controller
             ->all();
     }
 
-    private function previousFoodEntryQuery(): \Illuminate\Database\Eloquent\Builder
+    private function previousFoodEntryQuery(): Builder
     {
         return MealEntry::query()
             ->with('foodProduct')
@@ -330,6 +334,8 @@ class MealController extends Controller
             ->get()
             ->unique(fn (MealEntry $entry): string => implode('|', [
                 mb_strtolower($entry->name),
+                (float) $entry->portion_quantity,
+                (string) $entry->portion_unit,
                 (float) $entry->protein_g,
                 (float) $entry->carbs_g,
                 (float) $entry->fat_g,
@@ -338,6 +344,8 @@ class MealController extends Controller
             ->map(fn (MealEntry $entry): array => [
                 'id' => $entry->id,
                 'name' => $entry->name,
+                'portion_quantity' => $entry->portion_quantity !== null ? (float) $entry->portion_quantity : null,
+                'portion_unit' => $entry->portion_unit,
                 'calories' => $entry->calories,
                 'protein_g' => (float) $entry->protein_g,
                 'carbs_g' => (float) $entry->carbs_g,

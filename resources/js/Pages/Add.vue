@@ -2,7 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Camera, Dumbbell, LoaderCircle, Plus, Search, Utensils, History, X } from '@lucide/vue';
+import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils, History, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import Card from "../Components/Card.vue";
 
@@ -74,6 +74,8 @@ const customMealForm = useForm({
     date: props.date,
     meal_type: selectedMealType.value,
     name: '',
+    portion_quantity: 100,
+    portion_unit: 'g',
     protein_g: 0,
     carbs_g: 0,
     fat_g: 0,
@@ -157,7 +159,7 @@ async function lookup(scannedBarcode = null) {
     } catch (error) {
         product.value = null;
         const errors = error.response?.data?.errors;
-        lookupError.value = errors?.barcode?.[0] || 'Could not look up that barcode. Add it as a custom meal instead.';
+        lookupError.value = errors?.barcode?.[0] || 'Could not look up that barcode. Add it as custom food instead.';
     } finally {
         lookupLoading.value = false;
     }
@@ -401,6 +403,8 @@ function addWorkout() {
 
 function selectPreviousCustomMeal(meal) {
     customMealForm.name = meal.name;
+    customMealForm.portion_quantity = meal.portion_quantity ?? 100;
+    customMealForm.portion_unit = meal.portion_unit || 'g';
     customMealForm.protein_g = meal.protein_g;
     customMealForm.carbs_g = meal.carbs_g;
     customMealForm.fat_g = meal.fat_g;
@@ -442,7 +446,7 @@ onUnmounted(() => {
             <div>
                 <p class="text-sm  text-stone-500">{{ displayDate }}</p>
                 <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">
-                    {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom meal' : mode === 'workout' ? 'Workout' : 'Add' }}
+                    {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'workout' ? 'Workout' : 'Add' }}
                     <span v-if="meal">
                          - {{ meal }}
                     </span>
@@ -533,10 +537,18 @@ onUnmounted(() => {
                 </button>
             </form>
 
+            <div class="flex gap-2">
             <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="scannerStarting" @click="startScan">
                 <Camera :size="20" />
-                {{ scannerStarting ? 'Opening scanner...' : 'Scan barcode' }}
+                {{ scannerStarting ? 'Opening...' : 'Scan' }}
             </button>
+            <Link
+                :href="`/add?date=${date}&mode=custom`"
+                class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3  text-white active:bg-[#17211b]">
+                <Pencil :size="20" />
+                Custom
+            </Link>
+            </div>
 
             <p v-if="nativeMessage" class="mt-3 rounded-md bg-stone-100 p-3 text-sm  text-stone-700">{{ nativeMessage }}</p>
             <p v-if="lookupError" class="mt-3 rounded-md bg-red-50 p-3 text-sm  text-red-800">{{ lookupError }}</p>
@@ -733,11 +745,11 @@ onUnmounted(() => {
         <Card v-if="mode === 'custom'">
             <div class="flex items-center gap-2">
                 <Utensils :size="21" class="text-[#d28a45]" />
-                <h2 class="font-semibold">Custom meal</h2>
+                <h2 class="font-semibold">Custom food</h2>
             </div>
 
             <div v-if="previousCustomMeals.length" class="mt-4">
-                <p class="text-xs font-semibold uppercase text-stone-500">Previous custom meals</p>
+                <p class="text-xs font-semibold uppercase text-stone-500">Previous custom foods</p>
                 <div class="mt-2 grid gap-2">
                     <button
                         v-for="meal in previousCustomMeals"
@@ -748,7 +760,7 @@ onUnmounted(() => {
                     >
                         <span class="block font-semibold">{{ meal.name }}</span>
                         <span class="block text-sm  text-stone-500">
-                            {{ meal.calories }} kcal · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
+                            {{ meal.calories }} kcal<span v-if="meal.portion_quantity"> · {{ meal.portion_quantity }}{{ meal.portion_unit }}</span> · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
                         </span>
                     </button>
                 </div>
@@ -764,6 +776,32 @@ onUnmounted(() => {
                     >
                     <span v-if="customMealForm.errors.name" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.name }}</span>
                 </label>
+
+                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
+                    <label>
+                        <span class="text-xs font-semibold uppercase text-stone-500">Portion</span>
+                        <input
+                            v-model.number="customMealForm.portion_quantity"
+                            type="number"
+                            min="0.1"
+                            step="0.1"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
+                        >
+                        <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.portion_quantity }}</span>
+                    </label>
+
+                    <label>
+                        <span class="text-xs font-semibold uppercase text-stone-500">Unit</span>
+                        <select
+                            v-model="customMealForm.portion_unit"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        >
+                            <option value="g">g</option>
+                            <option value="ml">ml</option>
+                        </select>
+                        <span v-if="customMealForm.errors.portion_unit" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.portion_unit }}</span>
+                    </label>
+                </div>
 
                 <div class="grid grid-cols-3 gap-2">
                     <label v-for="field in [
