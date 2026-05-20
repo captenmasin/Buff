@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\DailyGoal;
 use App\Models\FoodProduct;
 
 class NutritionCalculator
@@ -14,6 +15,24 @@ class NutritionCalculator
     public function goalMatchesCalories(float|int|string $calories, float|int|string $protein, float|int|string $carbs, float|int|string $fat): bool
     {
         return $this->macroCalories($protein, $carbs, $fat) === (int) round((float) $calories);
+    }
+
+    /**
+     * @return array{calories: int, protein_g: float, carbs_g: float, fat_g: float, macro_calories: int}
+     */
+    public function effectiveDailyGoal(DailyGoal $goal, int $burnedCalories): array
+    {
+        $effectiveCalories = $goal->calories + max($burnedCalories, 0);
+        $macroCalories = max($goal->macro_calories, 1);
+        $scale = $effectiveCalories / $macroCalories;
+
+        return [
+            'calories' => $effectiveCalories,
+            'protein_g' => round((float) $goal->protein_g * $scale, 2),
+            'carbs_g' => round((float) $goal->carbs_g * $scale, 2),
+            'fat_g' => round((float) $goal->fat_g * $scale, 2),
+            'macro_calories' => $effectiveCalories,
+        ];
     }
 
     public function macrosForPortion(FoodProduct $product, float|int|string $quantity): array

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\DailyGoal;
 use App\Models\MealEntry;
+use App\Models\WorkoutEntry;
+use App\Services\NutritionCalculator;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -29,7 +31,7 @@ class MacroController extends Controller
         ],
     ];
 
-    public function __invoke(Request $request, string $macro): Response
+    public function __invoke(Request $request, string $macro, NutritionCalculator $calculator): Response
     {
         abort_unless(array_key_exists($macro, self::MACROS), 404);
 
@@ -43,6 +45,12 @@ class MacroController extends Controller
         $goal = DailyGoal::query()
             ->latest('updated_at')
             ->first();
+
+        $burned = (int) WorkoutEntry::query()
+            ->whereDate('date', $date->toDateString())
+            ->sum('calories_burned');
+
+        $effectiveGoal = $goal ? $calculator->effectiveDailyGoal($goal, $burned) : null;
 
         $entries = MealEntry::query()
             ->with('foodProduct')
@@ -64,9 +72,9 @@ class MacroController extends Controller
                 'key' => $macroKey,
                 'label' => $macroDefinition['label'],
                 'consumed_g' => $totals[$macroKey],
-                'goal_g' => $goal ? (float) $goal->{$macroKey} : 0,
+                'goal_g' => $effectiveGoal[$macroKey] ?? 0,
                 'current_percentage' => $this->macroPercentage($totals, $macroKey),
-                'goal_percentage' => $goal ? $this->goalPercentage($goal, $macroKey) : 0,
+                'goal_percentage' => $effectiveGoal ? $this->goalPercentage($effectiveGoal, $macroKey) : 0,
             ],
             'entries' => $entries
                 ->map(fn (MealEntry $entry): array => [
@@ -93,20 +101,23 @@ class MacroController extends Controller
     {
         $macroCalories = $this->macroCalories($totals);
 
-        if ($macroCalories === 0) {
+        if ($macroCalories <= 0) {
             return 0;
         }
 
         return (int) round(($totals[$macroKey] * self::multiplierFor($macroKey)) / $macroCalories * 100);
     }
 
-    private function goalPercentage(DailyGoal $goal, string $macroKey): int
+    /**
+     * @param  array{calories: int, protein_g: float, carbs_g: float, fat_g: float, macro_calories: int}  $goal
+     */
+    private function goalPercentage(array $goal, string $macroKey): int
     {
-        if ($goal->macro_calories === 0) {
+        if ($goal['macro_calories'] === 0) {
             return 0;
         }
 
-        return (int) round(((float) $goal->{$macroKey} * self::multiplierFor($macroKey)) / $goal->macro_calories * 100);
+        return (int) round($goal[$macroKey] * self::multiplierFor($macroKey) / $goal['macro_calories'] * 100);
     }
 
     /**

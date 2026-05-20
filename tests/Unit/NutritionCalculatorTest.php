@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\DailyGoal;
 use App\Models\FoodProduct;
 use App\Services\NutritionCalculator;
 
@@ -25,5 +26,24 @@ it('calculates product portions from per 100 values', function (): void {
         'protein_g' => 5.0,
         'carbs_g' => 15.0,
         'fat_g' => 2.5,
+    ]);
+});
+
+it('scales daily macro goals from burned calories', function (): void {
+    $calculator = new NutritionCalculator;
+    $goal = new DailyGoal([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    expect($calculator->effectiveDailyGoal($goal, 300))->toBe([
+        'calories' => 2300,
+        'protein_g' => 195.5,
+        'carbs_g' => 224.25,
+        'fat_g' => 69.0,
+        'macro_calories' => 2300,
     ]);
 });

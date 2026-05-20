@@ -10,6 +10,8 @@ use Illuminate\Support\Collection;
 
 class DailySummaryService
 {
+    public function __construct(private NutritionCalculator $calculator) {}
+
     public function forDate(CarbonInterface $date): array
     {
         $goal = DailyGoal::query()
@@ -31,25 +33,20 @@ class DailySummaryService
 
         $calorieGoal = $goal?->calories ?? 0;
         $burned = (int) $workouts->sum('calories_burned');
+        $effectiveGoal = $goal ? $this->calculator->effectiveDailyGoal($goal, $burned) : null;
 
         return [
             'date' => $date->toDateString(),
-            'goal' => $goal ? [
-                'calories' => $goal->calories,
-                'protein_g' => (float) $goal->protein_g,
-                'carbs_g' => (float) $goal->carbs_g,
-                'fat_g' => (float) $goal->fat_g,
-                'macro_calories' => $goal->macro_calories,
-            ] : null,
+            'goal' => $effectiveGoal,
             'log' => [
                 'burned_calories' => $burned,
             ],
             'totals' => [
                 ...$totals,
                 'calories_remaining' => $calorieGoal + $burned - $totals['calories'],
-                'protein_remaining' => $goal ? round((float) $goal->protein_g - $totals['protein_g'], 2) : 0,
-                'carbs_remaining' => $goal ? round((float) $goal->carbs_g - $totals['carbs_g'], 2) : 0,
-                'fat_remaining' => $goal ? round((float) $goal->fat_g - $totals['fat_g'], 2) : 0,
+                'protein_remaining' => $effectiveGoal ? round($effectiveGoal['protein_g'] - $totals['protein_g'], 2) : 0,
+                'carbs_remaining' => $effectiveGoal ? round($effectiveGoal['carbs_g'] - $totals['carbs_g'], 2) : 0,
+                'fat_remaining' => $effectiveGoal ? round($effectiveGoal['fat_g'] - $totals['fat_g'], 2) : 0,
             ],
             'entries' => $entries
                 ->groupBy('meal_type')
