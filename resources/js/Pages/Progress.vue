@@ -104,41 +104,41 @@ function removeMetric(metric) {
 
     <section class="space-y-5">
         <header>
-            <p class="text-sm font-semibold text-stone-500">Body metrics</p>
-            <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">Progress</h1>
+            <p class="text-sm  text-stone-500">Body metrics</p>
+            <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">Progress</h1>
         </header>
 
         <article class="grid grid-cols-3 gap-3">
             <Card>
-                <p class="text-xs font-bold uppercase text-stone-500">Weight</p>
-                <p class="mt-2 text-3xl font-bold">{{ latest?.weight_kg ?? '--' }}<span class="text-sm text-stone-500"> kg</span></p>
-                <p class="mt-1 flex items-center gap-1 text-sm font-semibold" :class="delta?.weight_kg > 0 ? 'text-red-700' : 'text-emerald-700'">
+                <p class="text-xs font-semibold uppercase text-stone-500">Weight</p>
+                <p class="mt-2 text-3xl font-semibold">{{ latest?.weight_kg ?? '--' }}<span class="text-sm text-stone-500"> kg</span></p>
+                <p class="mt-1 flex items-center gap-1 text-sm " :class="delta?.weight_kg > 0 ? 'text-red-700' : 'text-emerald-700'">
                     <component :is="delta?.weight_kg > 0 ? TrendingUp : TrendingDown" v-if="hasDelta" :size="15" />
                     {{ hasDelta ? deltaLabel(delta.weight_kg, ' kg') : 'First entry' }}
                 </p>
             </Card>
 
             <Card>
-                <p class="text-xs font-bold uppercase text-stone-500">Body fat</p>
-                <p class="mt-2 text-3xl font-bold">{{ latest?.body_fat_percent ?? '--' }}<span class="text-sm text-stone-500">%</span></p>
-                <p class="mt-1 flex items-center gap-1 text-sm font-semibold" :class="delta?.body_fat_percent > 0 ? 'text-red-700' : 'text-emerald-700'">
+                <p class="text-xs font-semibold uppercase text-stone-500">Body fat</p>
+                <p class="mt-2 text-3xl font-semibold">{{ latest?.body_fat_percent ?? '--' }}<span class="text-sm text-stone-500">%</span></p>
+                <p class="mt-1 flex items-center gap-1 text-sm " :class="delta?.body_fat_percent > 0 ? 'text-red-700' : 'text-emerald-700'">
                     <component :is="delta?.body_fat_percent > 0 ? TrendingUp : TrendingDown" v-if="hasDelta && delta.body_fat_percent !== null" :size="15" />
                     {{ hasDelta ? deltaLabel(delta.body_fat_percent, '%') : 'First entry' }}
                 </p>
             </Card>
 
             <Card>
-                <p class="text-xs font-bold uppercase text-stone-500">BMI</p>
-                <p class="mt-2 text-3xl font-bold">{{ currentBmi ?? '--' }}</p>
-                <p class="mt-1 text-sm font-semibold text-stone-500">{{ goals?.height_cm ? `${goals.height_cm} cm` : 'Set height' }}</p>
+                <p class="text-xs font-semibold uppercase text-stone-500">BMI</p>
+                <p class="mt-2 text-3xl font-semibold">{{ currentBmi ?? '--' }}</p>
+                <p class="mt-1 text-sm  text-stone-500">{{ goals?.height_cm ? `${goals.height_cm} cm` : 'Set height' }}</p>
             </Card>
         </article>
 
         <Card v-if="history.length">
-            <h2 class="font-bold">Trends</h2>
+            <h2 class="font-semibold">Trends</h2>
             <div class="mt-4 grid gap-5">
                 <div>
-                    <div class="mb-2 flex items-center justify-between text-xs font-bold uppercase text-stone-500">
+                    <div class="mb-2 flex items-center justify-between text-xs font-semibold uppercase text-stone-500">
                         <span>Weight</span>
                         <span v-if="goals?.target_weight_kg">Goal {{ goals.target_weight_kg }} kg</span>
                     </div>
@@ -149,7 +149,7 @@ function removeMetric(metric) {
                 </div>
 
                 <div>
-                    <div class="mb-2 flex items-center justify-between text-xs font-bold uppercase text-stone-500">
+                    <div class="mb-2 flex items-center justify-between text-xs font-semibold uppercase text-stone-500">
                         <span>Body fat</span>
                         <span v-if="goals?.target_body_fat_percent">Goal {{ goals.target_body_fat_percent }}%</span>
                     </div>
@@ -163,20 +163,20 @@ function removeMetric(metric) {
 
         <Card>
             <form class="space-y-3" @submit.prevent="saveHeight">
-                <h2 class="font-bold">Height</h2>
+                <h2 class="font-semibold">Height</h2>
                 <label class="block">
-                    <span class="text-xs font-bold uppercase text-stone-500">Height cm</span>
+                    <span class="text-xs font-semibold uppercase text-stone-500">Height cm</span>
                     <input
                         v-model.number="heightForm.height_cm"
                         type="number"
                         min="50"
                         max="260"
                         step="0.1"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                    <span v-if="heightForm.errors.height_cm" class="mt-1 block text-sm font-semibold text-red-700">{{ heightForm.errors.height_cm }}</span>
+                    <span v-if="heightForm.errors.height_cm" class="mt-1 block text-sm  text-red-700">{{ heightForm.errors.height_cm }}</span>
                 </label>
-                <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="heightForm.processing">
+                <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="heightForm.processing">
                     Save height
                 </button>
             </form>
@@ -184,71 +184,71 @@ function removeMetric(metric) {
 
         <Card>
         <form class="space-y-3" @submit.prevent="save">
-            <h2 class="font-bold">Log current</h2>
+            <h2 class="font-semibold">Log current</h2>
 
             <label class="block">
-                <span class="text-xs font-bold uppercase text-stone-500">Date</span>
+                <span class="text-xs font-semibold uppercase text-stone-500">Date</span>
                 <input
                     v-model="form.date"
                     type="date"
-                    class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                    class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                 >
-                <span v-if="form.errors.date" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.date }}</span>
+                <span v-if="form.errors.date" class="mt-1 block text-sm  text-red-700">{{ form.errors.date }}</span>
             </label>
 
             <div class="grid grid-cols-2 gap-3">
                 <label>
-                    <span class="text-xs font-bold uppercase text-stone-500">Weight kg</span>
+                    <span class="text-xs font-semibold uppercase text-stone-500">Weight kg</span>
                     <input
                         v-model="form.weight_kg"
                         type="number"
                         min="1"
                         max="1000"
                         step="0.1"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                    <span v-if="form.errors.weight_kg" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.weight_kg }}</span>
+                    <span v-if="form.errors.weight_kg" class="mt-1 block text-sm  text-red-700">{{ form.errors.weight_kg }}</span>
                 </label>
 
                 <label>
-                    <span class="text-xs font-bold uppercase text-stone-500">Body fat %</span>
+                    <span class="text-xs font-semibold uppercase text-stone-500">Body fat %</span>
                     <input
                         v-model="form.body_fat_percent"
                         type="number"
                         min="1"
                         max="80"
                         step="0.1"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                    <span v-if="form.errors.body_fat_percent" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.body_fat_percent }}</span>
+                    <span v-if="form.errors.body_fat_percent" class="mt-1 block text-sm  text-red-700">{{ form.errors.body_fat_percent }}</span>
                 </label>
             </div>
 
             <label class="block">
-                <span class="text-xs font-bold uppercase text-stone-500">Notes</span>
+                <span class="text-xs font-semibold uppercase text-stone-500">Notes</span>
                 <textarea
                     v-model="form.notes"
                     rows="3"
-                    class="mt-1 w-full resize-none rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                    class="mt-1 w-full resize-none rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                 />
-                <span v-if="form.errors.notes" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.notes }}</span>
+                <span v-if="form.errors.notes" class="mt-1 block text-sm  text-red-700">{{ form.errors.notes }}</span>
             </label>
 
-            <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="form.processing">
+            <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="form.processing">
                 Save progress
             </button>
         </form>
         </Card>
 
         <section class="space-y-3">
-            <h2 class="text-lg font-bold">Recent history</h2>
+            <h2 class="text-lg font-semibold">Recent history</h2>
 
             <Card v-if="history.length" class="divide-y divide-stone-100">
                 <div v-for="metric in history" :key="metric.id" class="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
                     <div class="min-w-0 flex-1">
                     <div class="flex items-center justify-between gap-3">
-                        <p class="font-bold">{{ metric.date }}</p>
-                        <p class="text-sm font-semibold text-stone-500">
+                        <p class="font-semibold">{{ metric.date }}</p>
+                        <p class="text-sm  text-stone-500">
                             {{ metric.weight_kg }} kg
                             <span v-if="metric.body_fat_percent !== null"> · {{ metric.body_fat_percent }}%</span>
                         </p>
@@ -261,7 +261,7 @@ function removeMetric(metric) {
                 </div>
             </Card>
 
-            <Card v-else class="text-sm font-semibold text-stone-500">No progress entries yet.</Card>
+            <Card v-else class="text-sm  text-stone-500">No progress entries yet.</Card>
         </section>
     </section>
 </template>

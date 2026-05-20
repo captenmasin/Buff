@@ -192,8 +192,8 @@ onBeforeUnmount(() => {
     <section class="space-y-5">
         <header class="flex items-start justify-between gap-3">
             <div>
-                <p class="text-sm font-semibold text-stone-500">Buff</p>
-                <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">{{ displayDate }}</h1>
+                <p class="text-sm  text-stone-500">Buff</p>
+                <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">{{ displayDate }}</h1>
             </div>
             <div class="relative">
                 <button class="rounded-md border border-stone-200 bg-white p-2 text-stone-600 active:bg-stone-100" aria-label="Select date" @click="datePickerOpen = !datePickerOpen">
@@ -203,7 +203,7 @@ onBeforeUnmount(() => {
                     v-if="datePickerOpen"
                     :value="summary.date"
                     type="date"
-                    class="absolute right-0 top-12 z-10 w-44 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-semibold shadow"
+                    class="absolute right-0 top-12 z-10 w-44 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm  shadow"
                     @change="selectDate"
                 >
             </div>
@@ -214,7 +214,7 @@ onBeforeUnmount(() => {
                 v-for="day in week"
                 :key="day.date"
                 :href="`/?date=${day.date}`"
-                class="relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border text-sm font-bold transition active:bg-stone-100"
+                class="relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border text-sm font-semibold transition active:bg-stone-100"
                 :class="day.is_selected ? 'border-[#253d2c] bg-[#dce8d4] text-[#17211b]' : 'border-transparent text-stone-600'"
                 :aria-label="`${day.date} ${day.status}`"
             >
@@ -230,15 +230,15 @@ onBeforeUnmount(() => {
 
         <div v-if="!hasGoal" class="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
             Set your daily calorie and macro goals before logging meals.
-            <Link href="/goals" class="font-bold underline">Set goals</Link>
+            <Link href="/goals" class="font-semibold underline">Set goals</Link>
         </div>
 
         <Card>
             <div class="flex items-start justify-between gap-4">
                 <div class="w-full">
-                    <p class="text-sm font-semibold text-stone-500">Calories</p>
+                    <p class="text-sm  text-stone-500">Calories</p>
                     <div class="mt-2.5 flex items-baseline gap-2">
-                        <span class="text-4xl font-semibold">{{ summary.totals.calories }}</span>
+                        <span class="text-4xl font-bold">{{ summary.totals.calories }}</span>
                         <span class="text-xs text-stone-500">/ {{ props.summary.goal?.calories ?? 0 }}</span>
                         <span class="text-xs text-stone-500 ml-auto" v-if="summary.log.burned_calories">{{ summary.log.burned_calories }} burned</span>
                     </div>
@@ -248,32 +248,32 @@ onBeforeUnmount(() => {
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
                 <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
             </div>
-            <p class="mt-2 text-xs font-semibold text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
+            <p class="mt-2 text-xs  text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
             <div class="grid grid-cols-3 mt-7 gap-5">
                 <div
                     v-for="macro in macros"
                     :key="macro.key"
                 >
-                    <p class="text-xs font-bold uppercase text-stone-500">{{ macro.label }}</p>
-                    <p class="mt-2 text-xl font-bold">
+                    <p class="text-xs font-semibold uppercase text-stone-500">{{ macro.label }}</p>
+                    <p class="mt-2 text-xl font-semibold">
                         {{ Math.round(macro.consumed ?? 0) }}g
-                        <span class="text-xs font-semibold text-stone-500">/ {{ Math.round(macro.goal ?? 0) }}g</span>
+                        <span class="text-xs  text-stone-500">/ {{ Math.round(macro.goal ?? 0) }}g</span>
                     </p>
                     <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
                         <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }" />
                     </div>
-                    <p class="text-xs font-semibold text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
+                    <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
                 </div>
             </div>
         </Card>
 
         <section class="space-y-1">
             <div>
-                <h2 class="text-lg font-bold">Meals</h2>
+                <h2 class="text-lg font-semibold">Meals</h2>
             </div>
 
             <Card v-for="mealType in mealTypes" :key="mealType">
-                <h3 class="font-bold">{{ mealLabels[mealType] }}</h3>
+                <h3 class="font-semibold">{{ mealLabels[mealType] }}</h3>
 
                 <div v-if="summary.entries[mealType]?.length" class="mt-0 divide-y divide-stone-100">
                     <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
@@ -287,7 +287,7 @@ onBeforeUnmount(() => {
                             <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
                                 <EllipsisVertical :size="18" />
                             </button>
-                            <div v-if="openMealActions === entry.id" class="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-md border border-stone-200 bg-white text-sm font-semibold shadow">
+                            <div v-if="openMealActions === entry.id" class="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-md border border-stone-200 bg-white text-sm  shadow">
                                 <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="openMeal(entry, mealType)">
                                     <Info :size="16" />
                                     Info
@@ -311,7 +311,7 @@ onBeforeUnmount(() => {
 
         <section class="space-y-4">
             <div>
-                <h2 class="text-lg font-bold">Workouts</h2>
+                <h2 class="text-lg font-semibold">Workouts</h2>
             </div>
 
             <Card>
@@ -320,7 +320,7 @@ onBeforeUnmount(() => {
                         <Link2 :size="18" />
                     </div>
                     <div class="min-w-0 flex-1">
-                        <p class="font-semibold">{{ healthConnectLabel }}</p>
+                        <p class="">{{ healthConnectLabel }}</p>
                         <p class="truncate text-sm text-stone-500">{{ healthConnectDetail }}</p>
                     </div>
                     <button
@@ -334,7 +334,7 @@ onBeforeUnmount(() => {
                     </button>
                     <button
                         v-else
-                        class="flex h-10 items-center rounded-md bg-[#253d2c] px-3 text-sm font-bold text-white disabled:opacity-60"
+                        class="flex h-10 items-center rounded-md bg-[#253d2c] px-3 text-sm font-semibold text-white disabled:opacity-60"
                         :disabled="healthConnectLoading || !healthConnectState.available"
                         @click="connectHealthConnect"
                     >
@@ -348,7 +348,7 @@ onBeforeUnmount(() => {
                             <Dumbbell :size="19" />
                         </div>
                         <div class="min-w-0 flex-1">
-                            <p class="truncate font-semibold">{{ workout.title }}</p>
+                            <p class="truncate ">{{ workout.title }}</p>
                             <p class="text-sm text-stone-500">
                                 {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}<span v-if="workout.source_type === 'health_connect'"> · Health Connect</span>
                             </p>
@@ -367,8 +367,8 @@ onBeforeUnmount(() => {
             <Card class="w-full max-w-md overflow-hidden">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
-                        <p class="text-xs font-bold uppercase text-stone-500">{{ mealLabels[selectedMeal.meal_type] }}</p>
-                        <h2 class="truncate text-xl font-bold">{{ selectedMeal.name }}</h2>
+                        <p class="text-xs font-semibold uppercase text-stone-500">{{ mealLabels[selectedMeal.meal_type] }}</p>
+                        <h2 class="truncate text-xl font-semibold">{{ selectedMeal.name }}</h2>
                     </div>
                     <button class="flex-none rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal details" @click="selectedMeal = null">
                         <X :size="20" />
@@ -376,7 +376,7 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="mt-4 flex min-w-0 gap-4">
                     <img v-if="selectedMeal.image_url" :src="selectedMeal.image_url" alt="" class="h-24 w-24 flex-none rounded-md object-cover">
-                    <div class="min-w-0 flex-1 text-sm font-semibold text-stone-600">
+                    <div class="min-w-0 flex-1 text-sm  text-stone-600">
                         <p v-if="selectedMeal.brand" class="truncate">{{ selectedMeal.brand }}</p>
                         <p v-if="selectedMeal.portion_quantity">{{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
 <!--                            <span v-if="selectedMeal.serving_label"> · {{ selectedMeal.serving_label }}</span>-->
@@ -390,9 +390,9 @@ onBeforeUnmount(() => {
                         ['Carbs', selectedMeal.carbs_g, summary.goal?.carbs_g],
                         ['Fat', selectedMeal.fat_g, summary.goal?.fat_g],
                     ]" :key="macro[0]" class="min-w-0 rounded-md bg-stone-50 p-3 max-[360px]:p-2">
-                        <p class="truncate text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
-                        <p class="mt-1 font-bold">{{ macro[1] }}g</p>
-                        <p class="truncate text-xs font-semibold text-stone-500">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
+                        <p class="truncate text-xs font-semibold uppercase text-stone-500">{{ macro[0] }}</p>
+                        <p class="mt-1 font-semibold">{{ macro[1] }}g</p>
+                        <p class="truncate text-xs  text-stone-500">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
                     </div>
                 </div>
             </Card>
@@ -401,7 +401,7 @@ onBeforeUnmount(() => {
         <div v-if="editingMeal" class="fixed inset-0 z-50 grid place-items-end bg-black/30 px-4 pb-4" @click.self="editingMeal = null">
             <Card class="w-full max-w-md">
                 <div class="mb-4 flex items-center justify-between gap-3">
-                    <h2 class="text-xl font-bold">Edit meal</h2>
+                    <h2 class="text-xl font-semibold">Edit meal</h2>
                     <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal editor" @click="editingMeal = null">
                         <X :size="20" />
                     </button>
@@ -409,8 +409,8 @@ onBeforeUnmount(() => {
 
                 <form class="space-y-4" @submit.prevent="saveMealEdit">
                     <label class="block">
-                        <span class="text-xs font-bold uppercase text-stone-500">Name</span>
-                        <input v-model="editMealForm.name" type="text" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]">
+                        <span class="text-xs font-semibold uppercase text-stone-500">Name</span>
+                        <input v-model="editMealForm.name" type="text" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]">
                     </label>
 
                     <div class="grid grid-cols-3 gap-2">
@@ -419,8 +419,8 @@ onBeforeUnmount(() => {
                             ['carbs_g', 'Carbs'],
                             ['fat_g', 'Fat'],
                         ]" :key="field[0]">
-                            <span class="text-xs font-bold uppercase text-stone-500">{{ field[1] }}</span>
-                            <input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-bold outline-none focus:border-[#6f9b58]">
+                            <span class="text-xs font-semibold uppercase text-stone-500">{{ field[1] }}</span>
+                            <input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]">
                         </label>
                     </div>
 
@@ -429,7 +429,7 @@ onBeforeUnmount(() => {
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-bold transition"
+                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
                             :class="editMealForm.meal_type === mealType ? 'bg-[#253d2c] text-white' : 'bg-stone-100 text-stone-600 active:bg-stone-200'"
                             @click="editMealForm.meal_type = mealType"
                         >
@@ -437,7 +437,7 @@ onBeforeUnmount(() => {
                         </button>
                     </div>
 
-                    <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="editMealForm.processing">
+                    <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="editMealForm.processing">
                         Save meal
                     </button>
                 </form>

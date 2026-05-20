@@ -442,8 +442,8 @@ onUnmounted(() => {
     <section class="space-y-5">
         <header>
             <div>
-                <p class="text-sm font-semibold text-stone-500">{{ displayDate }}</p>
-                <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">
+                <p class="text-sm  text-stone-500">{{ displayDate }}</p>
+                <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">
                     {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom meal' : mode === 'workout' ? 'Workout' : 'Add' }}
                 </h1>
             </div>
@@ -452,8 +452,8 @@ onUnmounted(() => {
         <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-[#17211b] text-white">
             <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
-                    <p class="text-sm font-semibold text-white/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
-                    <h2 class="truncate text-xl font-bold">{{ scannerStarting ? 'Opening camera...' : manualBarcodeOpen ? 'Enter barcode' : 'Point camera at barcode' }}</h2>
+                    <p class="text-sm  text-white/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
+                    <h2 class="truncate text-xl font-semibold">{{ scannerStarting ? 'Opening camera...' : manualBarcodeOpen ? 'Enter barcode' : 'Point camera at barcode' }}</h2>
                 </div>
                 <button class="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-white/10 active:bg-white/15" aria-label="Close scanner" @click="stopWebScan">
                     <X :size="22" />
@@ -466,16 +466,16 @@ onUnmounted(() => {
                 <div v-if="manualBarcodeOpen" class="flex h-full items-center px-4">
                     <div class="w-full rounded-md bg-white p-4 text-[#17211b]">
                         <label class="block">
-                            <span class="text-xs font-bold uppercase text-stone-500">Barcode</span>
+                            <span class="text-xs font-semibold uppercase text-stone-500">Barcode</span>
                             <input
                                 v-model="barcode"
                                 type="text"
                                 inputmode="numeric"
                                 placeholder="Enter barcode"
-                                class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base font-semibold outline-none focus:border-[#6f9b58]"
+                                class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base  outline-none focus:border-[#6f9b58]"
                             >
                         </label>
-                        <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="lookupLoading" @click="lookup(); stopWebScan()">
+                        <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="lookupLoading" @click="lookup(); stopWebScan()">
                             <Search :size="19" />
                             Look up barcode
                         </button>
@@ -484,7 +484,7 @@ onUnmounted(() => {
             </div>
 
             <div class="grid gap-2 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3">
-                <button v-if="!manualBarcodeOpen" class="w-full rounded-md bg-white px-4 py-3 font-bold text-[#17211b] active:bg-stone-100" @click="showManualBarcodeInput">
+                <button v-if="!manualBarcodeOpen" class="w-full rounded-md bg-white px-4 py-3 font-semibold text-[#17211b] active:bg-stone-100" @click="showManualBarcodeInput">
                     Enter barcode manually
                 </button>
             </div>
@@ -492,7 +492,7 @@ onUnmounted(() => {
 
         <article v-if="mode === 'choose'" class="grid gap-3">
             <div v-if="previousBreakfastMeals.length" class="rounded-md border border-stone-200 bg-white p-4">
-                <p class="text-xs font-bold uppercase text-stone-500">Repeat breakfast</p>
+                <p class="text-xs font-semibold uppercase text-stone-500">Repeat breakfast</p>
                 <div class="mt-3 grid gap-2">
                     <button
                         v-for="meal in previousBreakfastMeals"
@@ -506,8 +506,8 @@ onUnmounted(() => {
                             <Utensils :size="20" />
                         </span>
                         <span class="min-w-0 flex-1">
-                            <span class="block truncate font-bold">{{ meal.name }}</span>
-                            <span class="block truncate text-sm font-semibold text-stone-500">
+                            <span class="block truncate font-semibold">{{ meal.name }}</span>
+                            <span class="block truncate text-sm  text-stone-500">
                                 {{ meal.calories }} kcal · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
                             </span>
                         </span>
@@ -521,7 +521,7 @@ onUnmounted(() => {
                     <Utensils :size="22" />
                 </span>
                 <span>
-                    <span class="block font-bold">Food</span>
+                    <span class="block font-semibold">Food</span>
                     <span class="block text-sm font-medium text-stone-500">Search or scan</span>
                 </span>
             </Link>
@@ -531,7 +531,7 @@ onUnmounted(() => {
                     <Dumbbell :size="22" />
                 </span>
                 <span>
-                    <span class="block font-bold">Workout</span>
+                    <span class="block font-semibold">Workout</span>
                     <span class="block text-sm font-medium text-stone-500">Log calories burned</span>
                 </span>
             </Link>
@@ -540,7 +540,7 @@ onUnmounted(() => {
         <Card v-if="mode === 'food'">
             <div class="flex items-center gap-2">
                 <Search :size="21" class="text-[#b05252]" />
-                <h2 class="font-bold">Food</h2>
+                <h2 class="font-semibold">Food</h2>
             </div>
 
             <form class="mt-4 flex gap-2" @submit.prevent="searchFoodProducts">
@@ -548,7 +548,7 @@ onUnmounted(() => {
                     v-model="foodSearch"
                     type="search"
                     placeholder="Search..."
-                    class="min-w-0 flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base font-semibold outline-none focus:border-[#6f9b58]"
+                    class="min-w-0 flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base  outline-none focus:border-[#6f9b58]"
                     @input="searchFoodProducts"
                 >
                 <button class="grid aspect-square h-[50px] shrink-0 place-items-center rounded-md bg-[#253d2c] text-white active:bg-[#17211b] disabled:opacity-80" :disabled="foodSearchLoading" aria-label="Search">
@@ -557,15 +557,15 @@ onUnmounted(() => {
                 </button>
             </form>
 
-            <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="scannerStarting" @click="startScan">
+            <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="scannerStarting" @click="startScan">
                 <Camera :size="20" />
                 {{ scannerStarting ? 'Opening scanner...' : 'Scan barcode' }}
             </button>
 
-            <p v-if="nativeMessage" class="mt-3 rounded-md bg-stone-100 p-3 text-sm font-semibold text-stone-700">{{ nativeMessage }}</p>
-            <p v-if="lookupError" class="mt-3 rounded-md bg-red-50 p-3 text-sm font-semibold text-red-800">{{ lookupError }}</p>
+            <p v-if="nativeMessage" class="mt-3 rounded-md bg-stone-100 p-3 text-sm  text-stone-700">{{ nativeMessage }}</p>
+            <p v-if="lookupError" class="mt-3 rounded-md bg-red-50 p-3 text-sm  text-red-800">{{ lookupError }}</p>
 
-            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-md bg-stone-100 p-3 text-sm font-semibold text-stone-600" role="status" aria-live="polite">
+            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-md bg-stone-100 p-3 text-sm  text-stone-600" role="status" aria-live="polite">
                 <LoaderCircle :size="17" class="animate-spin text-[#253d2c]" />
                 Searching...
             </div>
@@ -585,7 +585,7 @@ onUnmounted(() => {
                     </span>
                     <span class="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
                         <History v-if="result.type === 'previous_meal'" :size="20" />
-                        <span class="block truncate font-bold">
+                        <span class="block truncate font-semibold">
                             {{ result.name }}
                         </span>
                     </span>
@@ -593,7 +593,7 @@ onUnmounted(() => {
             </div>
 
             <div v-else-if="!foodSearchQuery && previousFoodEntries.length" class="mt-4">
-                <p class="text-xs font-bold uppercase text-stone-500">Previous food entries</p>
+                <p class="text-xs font-semibold uppercase text-stone-500">Previous food entries</p>
                 <div class="mt-2 grid gap-2">
                     <button
                         v-for="entry in previousFoodEntries"
@@ -607,8 +607,8 @@ onUnmounted(() => {
                             <Utensils :size="20" />
                         </span>
                         <span class="min-w-0 flex-1 overflow-hidden">
-                            <span class="block truncate font-bold">{{ entry.name }}</span>
-                            <span class="block truncate text-sm font-semibold text-stone-500">
+                            <span class="block truncate font-semibold">{{ entry.name }}</span>
+                            <span class="block truncate text-sm  text-stone-500">
                                 {{ entry.calories }} kcal<span v-if="entry.portion_quantity"> · {{ entry.portion_quantity }}{{ entry.portion_unit }}</span> · P {{ entry.protein_g }}g · C {{ entry.carbs_g }}g · F {{ entry.fat_g }}g
                             </span>
                         </span>
@@ -616,7 +616,7 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-md bg-stone-100 p-3 text-sm font-semibold text-stone-600">
+            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-md bg-stone-100 p-3 text-sm  text-stone-600">
                 No products found.
             </p>
         </Card>
@@ -638,8 +638,8 @@ onUnmounted(() => {
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
             <div class="mb-4 flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                    <p class="text-sm font-semibold text-stone-500">{{ selectedPreviousMeal ? 'Previous food' : 'Food product' }}</p>
-                    <h2 class="truncate text-xl font-bold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</h2>
+                    <p class="text-sm  text-stone-500">{{ selectedPreviousMeal ? 'Previous food' : 'Food product' }}</p>
+                    <h2 class="truncate text-xl font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</h2>
                 </div>
                 <button class="grid h-10 w-10 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">
                     <X :size="21" />
@@ -653,9 +653,9 @@ onUnmounted(() => {
                         <Utensils :size="26" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate font-bold">{{ selectedPreviousMeal.name }}</p>
+                        <p class="truncate font-semibold">{{ selectedPreviousMeal.name }}</p>
                         <p class="truncate text-sm text-stone-500">{{ selectedPreviousMeal.brand || 'Previous item' }}</p>
-                        <p class="mt-1 text-sm font-semibold">
+                        <p class="mt-1 text-sm ">
                             {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ selectedPreviousMeal.portion_quantity }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ selectedPreviousMeal.protein_g }}g · C {{ selectedPreviousMeal.carbs_g }}g · F {{ selectedPreviousMeal.fat_g }}g
                         </p>
                     </div>
@@ -667,24 +667,24 @@ onUnmounted(() => {
                         type="number"
                         min="0.1"
                         step="0.1"
-                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
                     <select
                         v-model="previousMealPortionUnit"
-                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3  outline-none focus:border-[#6f9b58]"
                     >
                         <option :value="previousMealPortionUnit">{{ previousMealPortionUnit }}</option>
                     </select>
                 </div>
 
                 <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
-                    <p class="text-sm font-bold">When did you have it?</p>
+                    <p class="text-sm font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-bold transition"
+                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
                             :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
                             @click="setMealType(mealType)"
                         >
@@ -693,7 +693,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" @click="addPreviousMeal">
+                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" @click="addPreviousMeal">
                     <Plus :size="18" />
                     Add {{ previousMealCalories }} kcal
                 </button>
@@ -706,9 +706,9 @@ onUnmounted(() => {
                         <Barcode :size="26" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate font-bold">{{ product.name }}</p>
+                        <p class="truncate font-semibold">{{ product.name }}</p>
                         <p class="truncate text-sm text-stone-500">{{ product.brand || 'Saved product' }}</p>
-                        <p class="mt-1 text-sm font-semibold">
+                        <p class="mt-1 text-sm ">
                             {{ product.calories_per_100 }} kcal · P {{ product.protein_per_100 }}g · C {{ product.carbs_per_100 }}g · F {{ product.fat_per_100 }}g / 100{{ product.nutrition_unit }}
                         </p>
                     </div>
@@ -720,11 +720,11 @@ onUnmounted(() => {
                         type="number"
                         min="0.1"
                         step="0.1"
-                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
                     <select
                         v-model="barcodeMealForm.portion_unit"
-                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3  outline-none focus:border-[#6f9b58]"
                     >
                         <option value="g">g</option>
                         <option value="ml">ml</option>
@@ -732,13 +732,13 @@ onUnmounted(() => {
                 </div>
 
                 <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
-                    <p class="text-sm font-bold">When did you have it?</p>
+                    <p class="text-sm font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-bold transition"
+                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
                             :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
                             @click="setMealType(mealType)"
                         >
@@ -747,7 +747,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="barcodeMealForm.processing" @click="addBarcodeMeal">
+                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="barcodeMealForm.processing" @click="addBarcodeMeal">
                     <Plus :size="18" />
                     Add {{ barcodeCalories }} kcal
                 </button>
@@ -757,11 +757,11 @@ onUnmounted(() => {
         <Card v-if="mode === 'custom'">
             <div class="flex items-center gap-2">
                 <Utensils :size="21" class="text-[#d28a45]" />
-                <h2 class="font-bold">Custom meal</h2>
+                <h2 class="font-semibold">Custom meal</h2>
             </div>
 
             <div v-if="previousCustomMeals.length" class="mt-4">
-                <p class="text-xs font-bold uppercase text-stone-500">Previous custom meals</p>
+                <p class="text-xs font-semibold uppercase text-stone-500">Previous custom meals</p>
                 <div class="mt-2 grid gap-2">
                     <button
                         v-for="meal in previousCustomMeals"
@@ -770,8 +770,8 @@ onUnmounted(() => {
                         class="rounded-md border border-stone-200 bg-stone-50 p-3 text-left active:bg-stone-100"
                         @click="selectPreviousCustomMeal(meal)"
                     >
-                        <span class="block font-bold">{{ meal.name }}</span>
-                        <span class="block text-sm font-semibold text-stone-500">
+                        <span class="block font-semibold">{{ meal.name }}</span>
+                        <span class="block text-sm  text-stone-500">
                             {{ meal.calories }} kcal · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
                         </span>
                     </button>
@@ -780,13 +780,13 @@ onUnmounted(() => {
 
             <form class="mt-4 space-y-4" @submit.prevent="addCustomMeal">
                 <label class="block">
-                    <span class="text-xs font-bold uppercase text-stone-500">Name</span>
+                    <span class="text-xs font-semibold uppercase text-stone-500">Name</span>
                     <input
                         v-model="customMealForm.name"
                         type="text"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm font-semibold text-red-700">{{ customMealForm.errors.name }}</span>
+                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.name }}</span>
                 </label>
 
                 <div class="grid grid-cols-3 gap-2">
@@ -795,25 +795,25 @@ onUnmounted(() => {
                         ['carbs_g', 'Carbs'],
                         ['fat_g', 'Fat'],
                     ]" :key="field[0]">
-                        <span class="text-xs font-bold uppercase text-stone-500">{{ field[1] }}</span>
+                        <span class="text-xs font-semibold uppercase text-stone-500">{{ field[1] }}</span>
                         <input
                             v-model.number="customMealForm[field[0]]"
                             type="number"
                             min="0"
                             step="0.1"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-bold outline-none focus:border-[#6f9b58]"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
                         >
                     </label>
                 </div>
 
                 <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
-                    <p class="text-sm font-bold">When did you have it?</p>
+                    <p class="text-sm font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-bold transition"
+                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
                             :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
                             @click="setMealType(mealType)"
                         >
@@ -822,7 +822,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="customMealForm.processing">
+                <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="customMealForm.processing">
                     Add {{ customCalories }} kcal
                 </button>
             </form>
@@ -831,45 +831,45 @@ onUnmounted(() => {
         <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">
                 <Dumbbell :size="21" class="text-[#6f9b58]" />
-                <h2 class="font-bold">Workout</h2>
+                <h2 class="font-semibold">Workout</h2>
             </div>
 
             <form class="mt-4 space-y-4" @submit.prevent="addWorkout">
                 <label class="block">
-                    <span class="text-xs font-bold uppercase text-stone-500">Title</span>
+                    <span class="text-xs font-semibold uppercase text-stone-500">Title</span>
                     <input
                         v-model="workoutForm.title"
                         type="text"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.title }}</span>
+                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.title }}</span>
                 </label>
 
                 <div class="grid grid-cols-2 gap-2">
                     <label>
-                        <span class="text-xs font-bold uppercase text-stone-500">Calories burnt</span>
+                        <span class="text-xs font-semibold uppercase text-stone-500">Calories burnt</span>
                         <input
                             v-model.number="workoutForm.calories_burned"
                             type="number"
                             min="1"
                             step="1"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-bold outline-none focus:border-[#6f9b58]"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
                         >
-                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.calories_burned }}</span>
+                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.calories_burned }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-bold uppercase text-stone-500">Time</span>
+                        <span class="text-xs font-semibold uppercase text-stone-500">Time</span>
                         <input
                             v-model="workoutForm.time"
                             type="time"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-bold outline-none focus:border-[#6f9b58]"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
                         >
-                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm font-semibold text-red-700">{{ workoutForm.errors.time }}</span>
+                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.time }}</span>
                     </label>
                 </div>
 
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="workoutForm.processing">
+                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="workoutForm.processing">
                     <Plus :size="18" />
                     Add workout
                 </button>
