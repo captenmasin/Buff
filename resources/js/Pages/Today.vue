@@ -203,7 +203,7 @@ const healthConnectDetail = computed(() => {
         return healthConnectState.value.last_error;
     }
 
-    return 'Automatically imports workouts with calories.';
+    return 'Automatically imports workouts.';
 });
 
 async function refreshHealthConnectStatus() {
@@ -470,9 +470,26 @@ onBeforeUnmount(() => {
             </Card>
         </section>
 
-        <section class="space-y-4">
-            <div>
+        <section class="space-y-2">
+            <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Workouts</h2>
+                <button
+                    v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
+                    class="grid h-10 w-10 place-items-center rounded-md border border-stone-200 bg-white text-stone-700 disabled:opacity-60"
+                    :disabled="healthConnectLoading"
+                    aria-label="Sync Health Connect"
+                    @click="syncHealthConnect"
+                >
+                    <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
+                </button>
+                <button
+                    v-else
+                    class="flex h-8 items-center rounded-md bg-[#253d2c] px-3 text-sm font-semibold text-white disabled:opacity-60"
+                    :disabled="healthConnectLoading || !healthConnectState.available"
+                    @click="connectHealthConnect"
+                >
+                    Connect
+                </button>
             </div>
 
             <Card>
@@ -484,23 +501,6 @@ onBeforeUnmount(() => {
                         <p class="">{{ healthConnectLabel }}</p>
                         <p class="truncate text-sm text-stone-500">{{ healthConnectDetail }}</p>
                     </div>
-                    <button
-                        v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
-                        class="grid h-10 w-10 place-items-center rounded-md border border-stone-200 bg-white text-stone-700 disabled:opacity-60"
-                        :disabled="healthConnectLoading"
-                        aria-label="Sync Health Connect"
-                        @click="syncHealthConnect"
-                    >
-                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
-                    </button>
-                    <button
-                        v-else
-                        class="flex h-10 items-center rounded-md bg-[#253d2c] px-3 text-sm font-semibold text-white disabled:opacity-60"
-                        :disabled="healthConnectLoading || !healthConnectState.available"
-                        @click="connectHealthConnect"
-                    >
-                        Connect
-                    </button>
                 </div>
 
                 <div v-if="summary.workouts?.length" class="divide-y divide-stone-100">
@@ -511,7 +511,8 @@ onBeforeUnmount(() => {
                         <div class="min-w-0 flex-1">
                             <p class="truncate ">{{ workout.title }}</p>
                             <p class="text-sm text-stone-500">
-                                {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}<span v-if="workout.source_type === 'health_connect'"> · Health Connect</span>
+                                {{ workout.calories_burned }} kcal burned · {{ workout.logged_time }}
+<!--                                <span v-if="workout.source_type === 'health_connect'"> · Health Connect</span>-->
                             </p>
                         </div>
                         <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Remove workout" @click="removeWorkout(workout.id)">
