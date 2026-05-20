@@ -1,6 +1,7 @@
 <script setup>
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
+import Card from "../Components/Card.vue";
 
 const props = defineProps({
     goal: { type: Object, required: true },
@@ -143,7 +144,7 @@ onMounted(() => {
         </header>
 
         <form class="space-y-4" @submit.prevent="save">
-            <article class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card>
                 <label>
                     <span class="text-xs font-bold uppercase text-stone-500">Calories</span>
                     <input
@@ -154,9 +155,9 @@ onMounted(() => {
                     >
                 </label>
                 <p v-if="form.errors.calories" class="mt-1 text-sm font-semibold text-red-700">{{ form.errors.calories }}</p>
-            </article>
+            </Card>
 
-            <article class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card>
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <div>
                         <h2 class="font-bold">Macros</h2>
@@ -221,7 +222,7 @@ onMounted(() => {
                 <p v-for="macro in macroFields" :key="`${macro.key}-error`" v-show="form.errors[macro.key]" class="mt-2 text-sm font-semibold text-red-700">
                     {{ form.errors[macro.key] }}
                 </p>
-            </article>
+            </Card>
 
             <button
                 class="w-full rounded-md bg-[#253d2c] px-4 py-4 text-base font-bold text-white active:bg-[#17211b] disabled:cursor-not-allowed disabled:bg-stone-300"

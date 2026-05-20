@@ -165,7 +165,7 @@ onBeforeUnmount(() => {
                     <p class="text-sm font-semibold text-stone-500">Calories</p>
                     <div class="mt-2.5 flex items-baseline gap-2">
                         <span class="text-4xl font-semibold">{{ summary.totals.calories }}</span>
-                        <span class="text-xs text-stone-500">/ {{ summary.totals.calories_remaining ?? 0 }}</span>
+                        <span class="text-xs text-stone-500">/ {{ props.summary.goal.calories ?? 0 }}</span>
                         <span class="text-xs text-stone-500 ml-auto" v-if="summary.log.burned_calories">{{ summary.log.burned_calories }} burned</span>
                     </div>
                 </div>
@@ -193,7 +193,7 @@ onBeforeUnmount(() => {
             </div>
         </Card>
 
-        <section class="space-y-4">
+        <section class="space-y-1">
             <div>
                 <h2 class="text-lg font-bold">Meals</h2>
             </div>
@@ -201,8 +201,8 @@ onBeforeUnmount(() => {
             <Card v-for="mealType in mealTypes" :key="mealType">
                 <h3 class="font-bold">{{ mealLabels[mealType] }}</h3>
 
-                <div v-if="summary.entries[mealType]?.length" class="mt-3 divide-y divide-stone-100">
-                    <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex items-center gap-3 py-3">
+                <div v-if="summary.entries[mealType]?.length" class="mt-0 divide-y divide-stone-100">
+                    <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex items-center gap-3 py-2">
                         <div class="min-w-0 flex-1">
                             <p class="truncate font-semibold">{{ entry.name }}</p>
                             <p class="text-sm text-stone-500">
@@ -215,7 +215,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <p v-else class="mt-3 text-sm text-stone-500">No entries yet.</p>
+                <p v-else class="mt-2 text-sm text-stone-500">No entries yet.</p>
             </Card>
         </section>
 

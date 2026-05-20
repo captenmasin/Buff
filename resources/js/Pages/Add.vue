@@ -4,6 +4,7 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Barcode, Camera, ChevronLeft, Dumbbell, Plus, Utensils, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
+import Card from "../Components/Card.vue";
 
 const props = defineProps({
     date: { type: String, required: true },
@@ -308,7 +309,7 @@ onUnmounted(() => {
         </header>
 
         <article v-if="mode === 'choose'" class="grid gap-3">
-            <Link :href="addModeUrl('barcode', { scan: '1' })" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+            <Link :href="addModeUrl('barcode', { scan: '1' })" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
                     <Barcode :size="22" />
                 </span>
@@ -318,7 +319,7 @@ onUnmounted(() => {
                 </span>
             </Link>
 
-            <Link :href="addModeUrl('custom')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+            <Link :href="addModeUrl('custom')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#d28a45] text-white">
                     <Utensils :size="22" />
                 </span>
@@ -328,7 +329,7 @@ onUnmounted(() => {
                 </span>
             </Link>
 
-            <Link :href="addModeUrl('workout')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm active:bg-stone-50">
+            <Link :href="addModeUrl('workout')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
                 <span class="grid h-11 w-11 place-items-center rounded-md bg-[#6f9b58] text-white">
                     <Dumbbell :size="22" />
                 </span>
@@ -339,7 +340,7 @@ onUnmounted(() => {
             </Link>
         </article>
 
-        <article v-if="mode === 'barcode'" class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <Card v-if="mode === 'barcode'">
             <div class="flex items-center gap-2">
                 <Barcode :size="21" class="text-[#253d2c]" />
                 <h2 class="font-bold">Barcode</h2>
@@ -438,9 +439,9 @@ onUnmounted(() => {
                     Add {{ barcodeCalories }} kcal
                 </button>
             </div>
-        </article>
+        </Card>
 
-        <article v-if="mode === 'custom'" class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <Card v-if="mode === 'custom'">
             <div class="flex items-center gap-2">
                 <Utensils :size="21" class="text-[#d28a45]" />
                 <h2 class="font-bold">Custom meal</h2>
@@ -512,9 +513,9 @@ onUnmounted(() => {
                     Add {{ customCalories }} kcal
                 </button>
             </form>
-        </article>
+        </Card>
 
-        <article v-if="mode === 'workout'" class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+        <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">
                 <Dumbbell :size="21" class="text-[#6f9b58]" />
                 <h2 class="font-bold">Workout</h2>
@@ -560,6 +561,6 @@ onUnmounted(() => {
                     Add workout
                 </button>
             </form>
-        </article>
+        </Card>
     </section>
 </template>

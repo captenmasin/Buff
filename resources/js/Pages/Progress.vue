@@ -2,6 +2,7 @@
 import { Head, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { TrendingDown, TrendingUp } from '@lucide/vue';
+import Card from "../Components/Card.vue";
 
 const props = defineProps({
     today: { type: String, required: true },
@@ -42,26 +43,27 @@ function save() {
         </header>
 
         <article class="grid grid-cols-2 gap-3">
-            <div class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card>
                 <p class="text-xs font-bold uppercase text-stone-500">Weight</p>
                 <p class="mt-2 text-3xl font-bold">{{ latest?.weight_kg ?? '--' }}<span class="text-sm text-stone-500"> kg</span></p>
                 <p class="mt-1 flex items-center gap-1 text-sm font-semibold" :class="delta?.weight_kg > 0 ? 'text-red-700' : 'text-emerald-700'">
                     <component :is="delta?.weight_kg > 0 ? TrendingUp : TrendingDown" v-if="hasDelta" :size="15" />
                     {{ hasDelta ? deltaLabel(delta.weight_kg, ' kg') : 'First entry' }}
                 </p>
-            </div>
+            </Card>
 
-            <div class="rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card>
                 <p class="text-xs font-bold uppercase text-stone-500">Body fat</p>
                 <p class="mt-2 text-3xl font-bold">{{ latest?.body_fat_percent ?? '--' }}<span class="text-sm text-stone-500">%</span></p>
                 <p class="mt-1 flex items-center gap-1 text-sm font-semibold" :class="delta?.body_fat_percent > 0 ? 'text-red-700' : 'text-emerald-700'">
                     <component :is="delta?.body_fat_percent > 0 ? TrendingUp : TrendingDown" v-if="hasDelta && delta.body_fat_percent !== null" :size="15" />
                     {{ hasDelta ? deltaLabel(delta.body_fat_percent, '%') : 'First entry' }}
                 </p>
-            </div>
+            </Card>
         </article>
 
-        <form class="space-y-3 rounded-md border border-stone-200 bg-white p-4 shadow-sm" @submit.prevent="save">
+        <Card>
+        <form class="space-y-3" @submit.prevent="save">
             <h2 class="font-bold">Log current</h2>
 
             <label class="block">
@@ -116,11 +118,12 @@ function save() {
                 Save progress
             </button>
         </form>
+        </Card>
 
         <section class="space-y-3">
             <h2 class="text-lg font-bold">Recent history</h2>
 
-            <article v-if="history.length" class="divide-y divide-stone-100 rounded-md border border-stone-200 bg-white p-4 shadow-sm">
+            <Card v-if="history.length" class="divide-y divide-stone-100">
                 <div v-for="metric in history" :key="metric.id" class="py-3 first:pt-0 last:pb-0">
                     <div class="flex items-center justify-between gap-3">
                         <p class="font-bold">{{ metric.date }}</p>
@@ -131,9 +134,9 @@ function save() {
                     </div>
                     <p v-if="metric.notes" class="mt-1 text-sm text-stone-500">{{ metric.notes }}</p>
                 </div>
-            </article>
+            </Card>
 
-            <p v-else class="rounded-md border border-stone-200 bg-white p-4 text-sm font-semibold text-stone-500 shadow-sm">No progress entries yet.</p>
+            <Card v-else class="text-sm font-semibold text-stone-500">No progress entries yet.</Card>
         </section>
     </section>
 </template>
