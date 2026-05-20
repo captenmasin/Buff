@@ -26,11 +26,14 @@ class MealController extends Controller
             default => $mode,
         };
 
+        $meal = $request->string('meal')->toString();
+
         return Inertia::render('Add', [
             'date' => $request->filled('date')
                 ? Carbon::parse($request->string('date')->toString())->toDateString()
                 : today()->toDateString(),
             'mealTypes' => MealEntry::MEAL_TYPES,
+            'meal' => $meal,
             'mode' => in_array($mode, ['food', 'custom', 'workout'], true) ? $mode : 'choose',
             'autoScan' => $request->boolean('scan'),
             'previousFoodEntries' => $this->previousFoodEntries(),

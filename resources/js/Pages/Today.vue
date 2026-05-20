@@ -1,16 +1,16 @@
 <script setup>
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Calendar, Dumbbell, EllipsisVertical, Info, Link2, Pencil, RefreshCw, Trash2, X } from '@lucide/vue';
-import { formatDisplayDate } from '../dateFormat';
+import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
+import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, Trash2, X} from '@lucide/vue';
+import {formatDisplayDate} from '../dateFormat';
 import Card from "../Components/Card.vue";
 
 const props = defineProps({
-    summary: { type: Object, required: true },
-    week: { type: Array, required: true },
-    mealTypes: { type: Array, required: true },
-    healthConnect: { type: Object, required: true },
+    summary: {type: Object, required: true},
+    week: {type: Array, required: true},
+    mealTypes: {type: Array, required: true},
+    healthConnect: {type: Object, required: true},
 });
 
 const mealLabels = {
@@ -20,9 +20,16 @@ const mealLabels = {
     snacks: 'Snacks',
 };
 
+const mealIcons = {
+    breakfast: Coffee,
+    lunch: Sandwich,
+    dinner: Drumstick,
+    snacks: Apple,
+}
+
 const hasGoal = computed(() => Boolean(props.summary.goal));
-const displayDate = computed(() => formatDisplayDate(props.summary.date, { weekday: 'short' }));
-const healthConnectState = ref({ ...props.healthConnect });
+const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
+const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const datePickerOpen = ref(false);
 const selectedMeal = ref(null);
@@ -34,9 +41,9 @@ const calorieProgress = computed(() => {
 });
 
 const macros = computed(() => [
-    { key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-[#5b7fbd]' },
-    { key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-[#d28a45]' },
-    { key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-[#b05252]' },
+    {key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-[#5b7fbd]'},
+    {key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-[#d28a45]'},
+    {key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-[#b05252]'},
 ]);
 
 const editMealForm = useForm({
@@ -57,12 +64,12 @@ function removeEntry(id) {
     openMealActions.value = null;
 
     if (window.confirm('Delete this meal?')) {
-        router.delete(`/meals/${id}`, { preserveScroll: true });
+        router.delete(`/meals/${id}`, {preserveScroll: true});
     }
 }
 
 function removeWorkout(id) {
-    router.delete(`/workouts/${id}`, { preserveScroll: true });
+    router.delete(`/workouts/${id}`, {preserveScroll: true});
 }
 
 const healthConnectLabel = computed(() => {
@@ -79,7 +86,7 @@ const healthConnectDetail = computed(() => {
             return 'Last sync found no workouts in Health Connect.';
         }
 
-        return `Last synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}`;
+        return `Last synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
     }
 
     if (healthConnectState.value.last_error) {
@@ -91,10 +98,10 @@ const healthConnectDetail = computed(() => {
 
 async function refreshHealthConnectStatus() {
     try {
-        const { data } = await axios.get('/health-connect/status');
-        healthConnectState.value = { ...healthConnectState.value, ...data };
+        const {data} = await axios.get('/health-connect/status');
+        healthConnectState.value = {...healthConnectState.value, ...data};
     } catch {
-        healthConnectState.value = { ...healthConnectState.value, last_error: 'Could not check Health Connect.' };
+        healthConnectState.value = {...healthConnectState.value, last_error: 'Could not check Health Connect.'};
     }
 }
 
@@ -102,8 +109,8 @@ async function connectHealthConnect() {
     healthConnectLoading.value = true;
 
     try {
-        const { data } = await axios.post('/health-connect/connect');
-        healthConnectState.value = { ...healthConnectState.value, ...data, ...(data.native || {}) };
+        const {data} = await axios.post('/health-connect/connect');
+        healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
     } finally {
         healthConnectLoading.value = false;
     }
@@ -113,8 +120,8 @@ async function syncHealthConnect() {
     healthConnectLoading.value = true;
 
     try {
-        const { data } = await axios.post('/health-connect/sync');
-        healthConnectState.value = { ...healthConnectState.value, ...data, ...(data.native || {}) };
+        const {data} = await axios.post('/health-connect/sync');
+        healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
     } finally {
         healthConnectLoading.value = false;
     }
@@ -136,17 +143,17 @@ function dayStatusClass(status) {
 }
 
 function selectDate(event) {
-    router.visit(`/?date=${event.target.value}`, { preserveScroll: true });
+    router.visit(`/?date=${event.target.value}`, {preserveScroll: true});
 }
 
 function openMeal(entry, mealType) {
     openMealActions.value = null;
-    selectedMeal.value = { ...entry, meal_type: mealType };
+    selectedMeal.value = {...entry, meal_type: mealType};
 }
 
 function startEditingMeal(entry, mealType) {
     openMealActions.value = null;
-    editingMeal.value = { ...entry, meal_type: mealType };
+    editingMeal.value = {...entry, meal_type: mealType};
     editMealForm.defaults({
         date: props.summary.date,
         meal_type: mealType,
@@ -187,7 +194,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-    <Head title="Today" />
+    <Head title="Today"/>
 
     <section class="space-y-5">
         <header class="flex items-start justify-between gap-3">
@@ -197,7 +204,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="relative">
                 <button class="rounded-md border border-stone-200 bg-white p-2 text-stone-600 active:bg-stone-100" aria-label="Select date" @click="datePickerOpen = !datePickerOpen">
-                    <Calendar :size="21" />
+                    <Calendar :size="21"/>
                 </button>
                 <input
                     v-if="datePickerOpen"
@@ -224,7 +231,7 @@ onBeforeUnmount(() => {
                     aria-label="Today"
                 />
                 <span>{{ day.label }}</span>
-                <span class="h-2.5 w-2.5 rounded-full" :class="dayStatusClass(day.status)" />
+                <span class="h-2.5 w-2.5 rounded-full" :class="dayStatusClass(day.status)"/>
             </Link>
         </nav>
 
@@ -246,7 +253,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
-                <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
+                <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }"/>
             </div>
             <p class="mt-2 text-xs  text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
             <div class="grid grid-cols-3 mt-7 gap-5">
@@ -260,7 +267,7 @@ onBeforeUnmount(() => {
                         <span class="text-xs  text-stone-500">/ {{ Math.round(macro.goal ?? 0) }}g</span>
                     </p>
                     <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
-                        <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }" />
+                        <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }"/>
                     </div>
                     <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
                 </div>
@@ -273,9 +280,20 @@ onBeforeUnmount(() => {
             </div>
 
             <Card v-for="mealType in mealTypes" :key="mealType">
-                <h3 class="font-semibold">{{ mealLabels[mealType] }}</h3>
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <component :is="mealIcons[mealType]" class="w-4"></component>
+                        <h3 class="font-semibold">{{ mealLabels[mealType] }}</h3>
+                    </div>
+                    <Link
+                        class="flex h-7 gap-1 items-center rounded-md bg-[#253d2c] px-2 text-sm text-white disabled:opacity-60"
+                        :href="`/add?mode=food&meal=${mealType}`">
+                        <Plus class="w-4"/>
+                        Add
+                    </Link>
+                </div>
 
-                <div v-if="summary.entries[mealType]?.length" class="mt-0 divide-y divide-stone-100">
+                <div v-if="summary.entries[mealType]?.length" class="mt-2 divide-y divide-stone-100">
                     <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
                         <button class="min-w-0 flex-1 text-left" @click="openMeal(entry, mealType)">
                             <p class="truncate">{{ entry.name }}</p>
@@ -285,19 +303,19 @@ onBeforeUnmount(() => {
                         </button>
                         <div class="relative flex-none">
                             <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
-                                <EllipsisVertical :size="18" />
+                                <EllipsisVertical :size="18"/>
                             </button>
                             <div v-if="openMealActions === entry.id" class="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-md border border-stone-200 bg-white text-sm  shadow">
                                 <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="openMeal(entry, mealType)">
-                                    <Info :size="16" />
+                                    <Info :size="16"/>
                                     Info
                                 </button>
                                 <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="startEditingMeal(entry, mealType)">
-                                    <Pencil :size="16" />
+                                    <Pencil :size="16"/>
                                     Edit
                                 </button>
                                 <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-red-700 active:bg-red-50" @click="removeEntry(entry.id)">
-                                    <Trash2 :size="16" />
+                                    <Trash2 :size="16"/>
                                     Delete
                                 </button>
                             </div>
@@ -305,7 +323,9 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <p v-else class="mt-2 text-sm text-stone-500">No entries yet.</p>
+                <div v-else>
+                    <p class="mt-2 text-sm text-center text-stone-500">No entries yet.</p>
+                </div>
             </Card>
         </section>
 
@@ -317,7 +337,7 @@ onBeforeUnmount(() => {
             <Card>
                 <div v-if="healthConnectState.supported" class="mb-3 flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-3">
                     <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-[#253d2c] text-white">
-                        <Link2 :size="18" />
+                        <Link2 :size="18"/>
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="">{{ healthConnectLabel }}</p>
@@ -330,7 +350,7 @@ onBeforeUnmount(() => {
                         aria-label="Sync Health Connect"
                         @click="syncHealthConnect"
                     >
-                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }" />
+                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
                     </button>
                     <button
                         v-else
@@ -345,7 +365,7 @@ onBeforeUnmount(() => {
                 <div v-if="summary.workouts?.length" class="divide-y divide-stone-100">
                     <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
                         <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-[#dce8d4] text-[#253d2c]">
-                            <Dumbbell :size="19" />
+                            <Dumbbell :size="19"/>
                         </div>
                         <div class="min-w-0 flex-1">
                             <p class="truncate ">{{ workout.title }}</p>
@@ -354,7 +374,7 @@ onBeforeUnmount(() => {
                             </p>
                         </div>
                         <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Remove workout" @click="removeWorkout(workout.id)">
-                            <Trash2 :size="18" />
+                            <Trash2 :size="18"/>
                         </button>
                     </div>
                 </div>
@@ -371,7 +391,7 @@ onBeforeUnmount(() => {
                         <h2 class="truncate text-xl font-semibold">{{ selectedMeal.name }}</h2>
                     </div>
                     <button class="flex-none rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal details" @click="selectedMeal = null">
-                        <X :size="20" />
+                        <X :size="20"/>
                     </button>
                 </div>
                 <div class="mt-4 flex min-w-0 gap-4">
@@ -380,7 +400,7 @@ onBeforeUnmount(() => {
                         <p v-if="selectedMeal.brand" class="truncate">{{ selectedMeal.brand }}</p>
                         <div>
                             {{ selectedMeal.calories }} kcal
-                        <span v-if="selectedMeal.portion_quantity">
+                            <span v-if="selectedMeal.portion_quantity">
                              · {{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
                         </span>
                         </div>
@@ -405,7 +425,7 @@ onBeforeUnmount(() => {
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 class="text-xl font-semibold">Edit meal</h2>
                     <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal editor" @click="editingMeal = null">
-                        <X :size="20" />
+                        <X :size="20"/>
                     </button>
                 </div>
 

@@ -10,6 +10,7 @@ const props = defineProps({
     date: { type: String, required: true },
     mealTypes: { type: Array, required: true },
     mode: { type: String, required: true },
+    meal: { type: String, required: false, default: null },
     autoScan: { type: Boolean, default: false },
     previousFoodEntries: { type: Array, default: () => [] },
     previousCustomMeals: { type: Array, default: () => [] },
@@ -418,6 +419,10 @@ onMounted(async () => {
     if (props.mode === 'food' && props.autoScan) {
         startScan();
     }
+
+    if (props.meal){
+        selectedMealType.value = props.meal;
+    }
 });
 
 onUnmounted(() => {
@@ -438,6 +443,9 @@ onUnmounted(() => {
                 <p class="text-sm  text-stone-500">{{ displayDate }}</p>
                 <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">
                     {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom meal' : mode === 'workout' ? 'Workout' : 'Add' }}
+                    <span v-if="meal">
+                         - {{ meal }}
+                    </span>
                 </h1>
             </div>
         </header>
