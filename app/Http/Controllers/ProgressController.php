@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\BodyMetric;
+use App\Models\DailyGoal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -20,10 +21,16 @@ class ProgressController extends Controller
 
         $latest = $metrics->first();
         $previous = $metrics->skip(1)->first();
+        $goal = DailyGoal::query()->latest('updated_at')->first();
 
         return Inertia::render('Progress', [
             'today' => today()->toDateString(),
             'latest' => $latest ? $this->metricPayload($latest) : null,
+            'goals' => $goal ? [
+                'height_cm' => $goal->height_cm !== null ? (float) $goal->height_cm : null,
+                'target_weight_kg' => $goal->target_weight_kg !== null ? (float) $goal->target_weight_kg : null,
+                'target_body_fat_percent' => $goal->target_body_fat_percent !== null ? (float) $goal->target_body_fat_percent : null,
+            ] : null,
             'delta' => $latest && $previous ? [
                 'weight_kg' => round((float) $latest->weight_kg - (float) $previous->weight_kg, 2),
                 'body_fat_percent' => $latest->body_fat_percent !== null && $previous->body_fat_percent !== null
@@ -53,6 +60,35 @@ class ProgressController extends Controller
         );
 
         return back()->with('message', 'Progress updated.');
+    }
+
+    public function updateHeight(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'height_cm' => ['nullable', 'numeric', 'min:50', 'max:260'],
+        ]);
+
+        $goal = DailyGoal::query()->first();
+
+        $goal
+            ? $goal->update(['height_cm' => $validated['height_cm'] ?? null])
+            : DailyGoal::query()->create([
+                'calories' => 2000,
+                'protein_g' => 170,
+                'carbs_g' => 195,
+                'fat_g' => 60,
+                'macro_calories' => 2000,
+                'height_cm' => $validated['height_cm'] ?? null,
+            ]);
+
+        return back()->with('message', 'Height updated.');
+    }
+
+    public function destroy(BodyMetric $bodyMetric): RedirectResponse
+    {
+        $bodyMetric->delete();
+
+        return back()->with('message', 'Progress item removed.');
     }
 
     private function metricPayload(BodyMetric $metric): array

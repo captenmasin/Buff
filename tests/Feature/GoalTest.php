@@ -17,11 +17,15 @@ class GoalTest extends TestCase
             'protein_g' => 170,
             'carbs_g' => 195,
             'fat_g' => 60,
+            'target_weight_kg' => 80,
+            'target_body_fat_percent' => 15,
         ])->assertRedirect('/');
 
         $goal = DailyGoal::query()->first();
 
         $this->assertSame(2000, $goal->macro_calories);
+        $this->assertSame(80.0, (float) $goal->target_weight_kg);
+        $this->assertSame(15.0, (float) $goal->target_body_fat_percent);
     }
 
     public function test_it_updates_the_existing_goal(): void

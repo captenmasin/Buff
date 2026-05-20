@@ -1,0 +1,24 @@
+{
+    "namespace": "CameraPermissions",
+    "hooks": {
+        "post_compile": "camera-permissions:install-webview-camera-access"
+    },
+    "android": {
+        "min_version": 33,
+        "permissions": [
+            "android.permission.CAMERA"
+        ],
+        "features": [
+            {
+                "name": "android.hardware.camera",
+                "required": false
+            }
+        ]
+    },
+    "ios": {
+        "min_version": 18,
+        "info_plist": {
+            "NSCameraUsageDescription": "Buff uses the camera to scan food barcodes."
+        }
+    }
+}

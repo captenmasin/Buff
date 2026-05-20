@@ -5,12 +5,19 @@ const dateFormatter = new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
 });
 
-export function formatDisplayDate(value) {
+const shortDayDateFormatter = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+});
+
+export function formatDisplayDate(value, options = {}) {
     const [year, month, day] = String(value).split('-').map(Number);
 
     if (!year || !month || !day) {
         return value;
     }
 
-    return dateFormatter.format(new Date(year, month - 1, day));
+    return (options.weekday === 'short' ? shortDayDateFormatter : dateFormatter).format(new Date(year, month - 1, day));
 }

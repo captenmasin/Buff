@@ -3,8 +3,10 @@
 namespace App\Services;
 
 use App\Models\FoodProduct;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class OpenFoodFactsService
@@ -55,6 +57,62 @@ class OpenFoodFactsService
         return $this->storeProduct($barcode, $payload['product'], $payload);
     }
 
+    public function search(string $query, int $limit = 20): array
+    {
+        $query = trim($query);
+
+        if (mb_strlen($query) < 2) {
+            return [];
+        }
+
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'BuffCalorieTracker/1.0 (local NativePHP app)',
+            ])->timeout(10)->get('https://world.openfoodfacts.org/cgi/search.pl', [
+                'search_terms' => $query,
+                'search_simple' => 1,
+                'action' => 'process',
+                'json' => 1,
+                'page_size' => $limit,
+                'fields' => implode(',', [
+                    'code',
+                    'product_name',
+                    'brands',
+                    'image_url',
+                    'serving_size',
+                    'serving_quantity',
+                    'serving_quantity_unit',
+                    'quantity',
+                    'product_quantity',
+                    'product_quantity_unit',
+                    'nutrition_data_per',
+                    'nutriments',
+                ]),
+            ])->throw();
+        } catch (ConnectionException|RequestException) {
+            return [];
+        }
+
+        return collect($response->json('products', []))
+            ->map(function (array $product): ?FoodProduct {
+                $barcode = preg_replace('/\D+/', '', (string) ($product['code'] ?? '')) ?? '';
+
+                if ($barcode === '' || ! filled($product['product_name'] ?? null)) {
+                    return null;
+                }
+
+                try {
+                    return $this->storeProduct($barcode, $product, ['product' => $product, 'status' => 1]);
+                } catch (ValidationException) {
+                    return null;
+                }
+            })
+            ->filter()
+            ->unique('id')
+            ->values()
+            ->all();
+    }
+
     public function storeProduct(string $barcode, array $product, array $payload = []): FoodProduct
     {
         $nutriments = $product['nutriments'] ?? [];
@@ -93,8 +151,8 @@ class OpenFoodFactsService
         return FoodProduct::query()->updateOrCreate(
             ['barcode' => $barcode],
             [
-                'name' => filled($product['product_name'] ?? null) ? $product['product_name'] : "Barcode {$barcode}",
-                'brand' => $product['brands'] ?? null,
+                'name' => filled($product['product_name'] ?? null) ? Str::limit($product['product_name'], 255, '') : "Barcode {$barcode}",
+                'brand' => filled($product['brands'] ?? null) ? Str::limit($product['brands'], 255, '') : null,
                 'image_url' => $product['image_url'] ?? null,
                 'serving_label' => $serving['label'] ?? null,
                 'serving_quantity' => $serving['quantity'] ?? null,

@@ -1,0 +1,24 @@
+{
+    "name": "buff/camera-permissions",
+    "description": "Camera permission declarations for Buff's barcode scanner.",
+    "version": "1.0.0",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Buff\\CameraPermissions\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Buff\\CameraPermissions\\CameraPermissionsServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

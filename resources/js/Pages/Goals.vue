@@ -16,13 +16,19 @@ const macroFields = [
 const percentageOptions = Array.from({ length: 21 }, (_, index) => index * 5);
 const scrollerItemHeight = 40;
 const macroScrollerElements = {};
+const foodGoalReminderStorageKey = 'buff.foodGoalReminder';
 
 const form = useForm({
     calories: props.goal.calories,
     protein_g: props.goal.protein_g,
     carbs_g: props.goal.carbs_g,
     fat_g: props.goal.fat_g,
+    target_weight_kg: props.goal.target_weight_kg ?? '',
+    target_body_fat_percent: props.goal.target_body_fat_percent ?? '',
 });
+
+const reminder = ref(loadReminderSettings());
+const notificationPermission = ref('Notification' in window ? Notification.permission : 'unsupported');
 
 const macroCalories = computed(() => {
     return Math.round((Number(form.protein_g) * 4) + (Number(form.carbs_g) * 4) + (Number(form.fat_g) * 9));
@@ -119,6 +125,27 @@ function handleScrollerScroll(field, event) {
 
 function save() {
     form.put('/goals', { preserveScroll: true });
+}
+
+function loadReminderSettings() {
+    try {
+        return {
+            enabled: false,
+            time: '20:00',
+            ...JSON.parse(window.localStorage.getItem(foodGoalReminderStorageKey) || '{}'),
+        };
+    } catch {
+        return { enabled: false, time: '20:00' };
+    }
+}
+
+async function saveReminderSettings() {
+    if (reminder.value.enabled && 'Notification' in window && Notification.permission === 'default') {
+        notificationPermission.value = await Notification.requestPermission();
+    }
+
+    window.localStorage.setItem(foodGoalReminderStorageKey, JSON.stringify(reminder.value));
+    window.dispatchEvent(new CustomEvent('buff-food-goal-reminder-updated'));
 }
 
 watch(() => form.calories, () => {
@@ -221,6 +248,64 @@ onMounted(() => {
 
                 <p v-for="macro in macroFields" :key="`${macro.key}-error`" v-show="form.errors[macro.key]" class="mt-2 text-sm font-semibold text-red-700">
                     {{ form.errors[macro.key] }}
+                </p>
+            </Card>
+
+            <Card>
+                <h2 class="font-bold">Body targets</h2>
+
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                    <label>
+                        <span class="text-xs font-bold uppercase text-stone-500">Weight kg</span>
+                        <input
+                            v-model.number="form.target_weight_kg"
+                            type="number"
+                            min="1"
+                            max="1000"
+                            step="0.1"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-bold outline-none focus:border-[#6f9b58]"
+                        >
+                        <span v-if="form.errors.target_weight_kg" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.target_weight_kg }}</span>
+                    </label>
+
+                    <label>
+                        <span class="text-xs font-bold uppercase text-stone-500">Body fat %</span>
+                        <input
+                            v-model.number="form.target_body_fat_percent"
+                            type="number"
+                            min="1"
+                            max="80"
+                            step="0.1"
+                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-bold outline-none focus:border-[#6f9b58]"
+                        >
+                        <span v-if="form.errors.target_body_fat_percent" class="mt-1 block text-sm font-semibold text-red-700">{{ form.errors.target_body_fat_percent }}</span>
+                    </label>
+                </div>
+            </Card>
+
+            <Card>
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="font-bold">Food reminder</h2>
+                        <p class="text-sm font-semibold text-stone-500">{{ reminder.enabled ? `Daily at ${reminder.time}` : 'Off' }}</p>
+                    </div>
+                    <label class="relative inline-flex h-7 w-12 items-center rounded-full transition" :class="reminder.enabled ? 'bg-[#253d2c]' : 'bg-stone-300'">
+                        <input v-model="reminder.enabled" type="checkbox" class="sr-only" @change="saveReminderSettings">
+                        <span class="h-5 w-5 rounded-full bg-white transition" :class="reminder.enabled ? 'translate-x-6' : 'translate-x-1'" />
+                    </label>
+                </div>
+
+                <label class="mt-4 block">
+                    <span class="text-xs font-bold uppercase text-stone-500">Time</span>
+                    <input
+                        v-model="reminder.time"
+                        type="time"
+                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                        @change="saveReminderSettings"
+                    >
+                </label>
+                <p v-if="notificationPermission === 'denied'" class="mt-2 text-sm font-semibold text-red-700">
+                    Notifications are blocked for this app.
                 </p>
             </Card>
 

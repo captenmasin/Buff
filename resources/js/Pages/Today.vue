@@ -1,8 +1,8 @@
 <script setup>
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Dumbbell, Link2, RefreshCw, Trash2 } from '@lucide/vue';
+import { Calendar, Dumbbell, EllipsisVertical, Info, Link2, Pencil, RefreshCw, Trash2, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import Card from "../Components/Card.vue";
 
@@ -21,12 +21,31 @@ const mealLabels = {
 };
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
-const displayDate = computed(() => formatDisplayDate(props.summary.date));
+const displayDate = computed(() => formatDisplayDate(props.summary.date, { weekday: 'short' }));
 const healthConnectState = ref({ ...props.healthConnect });
 const healthConnectLoading = ref(false);
+const datePickerOpen = ref(false);
+const selectedMeal = ref(null);
+const editingMeal = ref(null);
+const openMealActions = ref(null);
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
     return Math.min(100, Math.round((props.summary.totals.calories / props.summary.goal.calories) * 100));
+});
+
+const macros = computed(() => [
+    { key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-[#5b7fbd]' },
+    { key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-[#d28a45]' },
+    { key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-[#b05252]' },
+]);
+
+const editMealForm = useForm({
+    date: props.summary.date,
+    meal_type: '',
+    name: '',
+    protein_g: 0,
+    carbs_g: 0,
+    fat_g: 0,
 });
 
 function macroProgress(consumed, goal) {
@@ -35,7 +54,11 @@ function macroProgress(consumed, goal) {
 }
 
 function removeEntry(id) {
-    router.delete(`/meals/${id}`, { preserveScroll: true });
+    openMealActions.value = null;
+
+    if (window.confirm('Delete this meal?')) {
+        router.delete(`/meals/${id}`, { preserveScroll: true });
+    }
 }
 
 function removeWorkout(id) {
@@ -112,6 +135,45 @@ function dayStatusClass(status) {
     }[status] || 'bg-stone-300';
 }
 
+function selectDate(event) {
+    router.visit(`/?date=${event.target.value}`, { preserveScroll: true });
+}
+
+function openMeal(entry, mealType) {
+    openMealActions.value = null;
+    selectedMeal.value = { ...entry, meal_type: mealType };
+}
+
+function startEditingMeal(entry, mealType) {
+    openMealActions.value = null;
+    editingMeal.value = { ...entry, meal_type: mealType };
+    editMealForm.defaults({
+        date: props.summary.date,
+        meal_type: mealType,
+        name: entry.name,
+        protein_g: entry.protein_g,
+        carbs_g: entry.carbs_g,
+        fat_g: entry.fat_g,
+    });
+    editMealForm.reset();
+    editMealForm.clearErrors();
+}
+
+function saveMealEdit() {
+    editMealForm.put(`/meals/${editingMeal.value.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            editingMeal.value = null;
+        },
+    });
+}
+
+function macroPercent(consumed, goal) {
+    if (!goal) return 0;
+
+    return Math.round((Number(consumed) / Number(goal)) * 100);
+}
+
 onMounted(() => {
     if (healthConnectState.value.supported) {
         refreshHealthConnectStatus();
@@ -128,10 +190,22 @@ onBeforeUnmount(() => {
     <Head title="Today" />
 
     <section class="space-y-5">
-        <header>
+        <header class="flex items-start justify-between gap-3">
             <div>
                 <p class="text-sm font-semibold text-stone-500">Buff</p>
                 <h1 class="text-3xl font-bold tracking-normal text-[#17211b]">{{ displayDate }}</h1>
+            </div>
+            <div class="relative">
+                <button class="rounded-md border border-stone-200 bg-white p-2 text-stone-600 active:bg-stone-100" aria-label="Select date" @click="datePickerOpen = !datePickerOpen">
+                    <Calendar :size="21" />
+                </button>
+                <input
+                    v-if="datePickerOpen"
+                    :value="summary.date"
+                    type="date"
+                    class="absolute right-0 top-12 z-10 w-44 rounded-md border border-stone-200 bg-white px-3 py-2 text-sm font-semibold shadow"
+                    @change="selectDate"
+                >
             </div>
         </header>
 
@@ -165,7 +239,7 @@ onBeforeUnmount(() => {
                     <p class="text-sm font-semibold text-stone-500">Calories</p>
                     <div class="mt-2.5 flex items-baseline gap-2">
                         <span class="text-4xl font-semibold">{{ summary.totals.calories }}</span>
-                        <span class="text-xs text-stone-500">/ {{ props.summary.goal.calories ?? 0 }}</span>
+                        <span class="text-xs text-stone-500">/ {{ props.summary.goal?.calories ?? 0 }}</span>
                         <span class="text-xs text-stone-500 ml-auto" v-if="summary.log.burned_calories">{{ summary.log.burned_calories }} burned</span>
                     </div>
                 </div>
@@ -174,21 +248,21 @@ onBeforeUnmount(() => {
             <div class="mt-1 h-3 overflow-hidden rounded bg-stone-100">
                 <div class="h-full rounded bg-[#6f9b58]" :style="{ width: `${calorieProgress}%` }" />
             </div>
+            <p class="mt-2 text-xs font-semibold text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
             <div class="grid grid-cols-3 mt-7 gap-5">
                 <div
-                    v-for="macro in [
-                    ['Protein', summary.totals.protein_g, summary.goal?.protein_g, summary.totals.protein_remaining],
-                    ['Carbs', summary.totals.carbs_g, summary.goal?.carbs_g, summary.totals.carbs_remaining],
-                    ['Fat', summary.totals.fat_g, summary.goal?.fat_g, summary.totals.fat_remaining],
-                ]"
-                    :key="macro[0]"
+                    v-for="macro in macros"
+                    :key="macro.key"
                 >
-                    <p class="text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
-                    <p class="mt-2 text-xl font-bold">{{ Math.round(macro[3] ?? 0) }}g</p>
-                    <p class="text-xs font-semibold text-stone-500">left</p>
+                    <p class="text-xs font-bold uppercase text-stone-500">{{ macro.label }}</p>
+                    <p class="mt-2 text-xl font-bold">
+                        {{ Math.round(macro.consumed ?? 0) }}g
+                        <span class="text-xs font-semibold text-stone-500">/ {{ Math.round(macro.goal ?? 0) }}g</span>
+                    </p>
                     <div class="mt-3 h-2 overflow-hidden rounded bg-stone-100">
-                        <div class="h-full rounded bg-[#d28a45]" :style="{ width: `${macroProgress(macro[1], macro[2])}%` }" />
+                        <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }" />
                     </div>
+                    <p class="text-xs font-semibold text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
                 </div>
             </div>
         </Card>
@@ -202,16 +276,32 @@ onBeforeUnmount(() => {
                 <h3 class="font-bold">{{ mealLabels[mealType] }}</h3>
 
                 <div v-if="summary.entries[mealType]?.length" class="mt-0 divide-y divide-stone-100">
-                    <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex items-center gap-3 py-2">
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate font-semibold">{{ entry.name }}</p>
-                            <p class="text-sm text-stone-500">
-                                {{ entry.calories }} kcal · P {{ entry.protein_g }}g · C {{ entry.carbs_g }}g · F {{ entry.fat_g }}g
-                            </p>
-                        </div>
-                        <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Remove meal" @click="removeEntry(entry.id)">
-                            <Trash2 :size="18" />
+                    <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
+                        <button class="min-w-0 flex-1 text-left" @click="openMeal(entry, mealType)">
+                            <p class="truncate">{{ entry.name }} <span class="ml-2">&bull; {{ entry.portion_quantity }}{{ entry.portion_unit }}</span></p>
+<!--                            <p class="text-sm text-stone-500">-->
+<!--                                {{ entry.calories }} kcal · P {{ entry.protein_g }}g · C {{ entry.carbs_g }}g · F {{ entry.fat_g }}g-->
+<!--                            </p>-->
                         </button>
+                        <div class="relative flex-none">
+                            <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
+                                <EllipsisVertical :size="18" />
+                            </button>
+                            <div v-if="openMealActions === entry.id" class="absolute right-0 top-10 z-20 w-36 overflow-hidden rounded-md border border-stone-200 bg-white text-sm font-semibold shadow">
+                                <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="openMeal(entry, mealType)">
+                                    <Info :size="16" />
+                                    Info
+                                </button>
+                                <button class="flex w-full items-center gap-2 px-3 py-2 text-left active:bg-stone-100" @click="startEditingMeal(entry, mealType)">
+                                    <Pencil :size="16" />
+                                    Edit
+                                </button>
+                                <button class="flex w-full items-center gap-2 px-3 py-2 text-left text-red-700 active:bg-red-50" @click="removeEntry(entry.id)">
+                                    <Trash2 :size="16" />
+                                    Delete
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -272,5 +362,86 @@ onBeforeUnmount(() => {
                 <p v-else class="text-sm text-stone-500">No workouts yet.</p>
             </Card>
         </section>
+
+        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-black/30 px-4 pb-4" @click.self="selectedMeal = null">
+            <Card class="w-full max-w-md overflow-hidden">
+                <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0 flex-1">
+                        <p class="text-xs font-bold uppercase text-stone-500">{{ mealLabels[selectedMeal.meal_type] }}</p>
+                        <h2 class="truncate text-xl font-bold">{{ selectedMeal.name }}</h2>
+                    </div>
+                    <button class="flex-none rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal details" @click="selectedMeal = null">
+                        <X :size="20" />
+                    </button>
+                </div>
+                <div class="mt-4 flex min-w-0 gap-4">
+                    <img v-if="selectedMeal.image_url" :src="selectedMeal.image_url" alt="" class="h-24 w-24 flex-none rounded-md object-cover">
+                    <div class="min-w-0 flex-1 text-sm font-semibold text-stone-600">
+                        <p v-if="selectedMeal.brand" class="truncate">{{ selectedMeal.brand }}</p>
+                        <p v-if="selectedMeal.portion_quantity">{{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
+<!--                            <span v-if="selectedMeal.serving_label"> · {{ selectedMeal.serving_label }}</span>-->
+                        </p>
+                        <p>{{ selectedMeal.calories }} kcal</p>
+                    </div>
+                </div>
+                <div class="mt-4 grid min-w-0 grid-cols-3 gap-2">
+                    <div v-for="macro in [
+                        ['Protein', selectedMeal.protein_g, summary.goal?.protein_g],
+                        ['Carbs', selectedMeal.carbs_g, summary.goal?.carbs_g],
+                        ['Fat', selectedMeal.fat_g, summary.goal?.fat_g],
+                    ]" :key="macro[0]" class="min-w-0 rounded-md bg-stone-50 p-3 max-[360px]:p-2">
+                        <p class="truncate text-xs font-bold uppercase text-stone-500">{{ macro[0] }}</p>
+                        <p class="mt-1 font-bold">{{ macro[1] }}g</p>
+                        <p class="truncate text-xs font-semibold text-stone-500">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
+                    </div>
+                </div>
+            </Card>
+        </div>
+
+        <div v-if="editingMeal" class="fixed inset-0 z-50 grid place-items-end bg-black/30 px-4 pb-4" @click.self="editingMeal = null">
+            <Card class="w-full max-w-md">
+                <div class="mb-4 flex items-center justify-between gap-3">
+                    <h2 class="text-xl font-bold">Edit meal</h2>
+                    <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close meal editor" @click="editingMeal = null">
+                        <X :size="20" />
+                    </button>
+                </div>
+
+                <form class="space-y-4" @submit.prevent="saveMealEdit">
+                    <label class="block">
+                        <span class="text-xs font-bold uppercase text-stone-500">Name</span>
+                        <input v-model="editMealForm.name" type="text" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]">
+                    </label>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <label v-for="field in [
+                            ['protein_g', 'Protein'],
+                            ['carbs_g', 'Carbs'],
+                            ['fat_g', 'Fat'],
+                        ]" :key="field[0]">
+                            <span class="text-xs font-bold uppercase text-stone-500">{{ field[1] }}</span>
+                            <input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-bold outline-none focus:border-[#6f9b58]">
+                        </label>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <button
+                            v-for="mealType in mealTypes"
+                            :key="mealType"
+                            type="button"
+                            class="min-h-11 rounded px-3 text-sm font-bold transition"
+                            :class="editMealForm.meal_type === mealType ? 'bg-[#253d2c] text-white' : 'bg-stone-100 text-stone-600 active:bg-stone-200'"
+                            @click="editMealForm.meal_type = mealType"
+                        >
+                            {{ mealLabels[mealType] }}
+                        </button>
+                    </div>
+
+                    <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-bold text-white active:bg-[#17211b]" :disabled="editMealForm.processing">
+                        Save meal
+                    </button>
+                </form>
+            </Card>
+        </div>
     </section>
 </template>

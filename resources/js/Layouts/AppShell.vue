@@ -1,7 +1,7 @@
 <script setup>
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
+import { Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
 
 const page = usePage();
 const addDrawerOpen = ref(false);
@@ -9,6 +9,9 @@ const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
 const toastTimer = ref(null);
 let removeFlashToastListener = null;
+let foodGoalReminderTimer = null;
+
+const foodGoalReminderStorageKey = 'buff.foodGoalReminder';
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home, match: '/' },
@@ -78,10 +81,6 @@ function openAddMode(mode) {
         params.set('date', selectedDate);
     }
 
-    if (mode === 'barcode') {
-        params.set('scan', '1');
-    }
-
     router.visit(`/add?${params.toString()}`);
 }
 
@@ -117,9 +116,71 @@ async function showFlashToast(message) {
     }
 }
 
+function foodGoalReminderSettings() {
+    try {
+        return JSON.parse(window.localStorage.getItem(foodGoalReminderStorageKey) || '{}');
+    } catch {
+        return {};
+    }
+}
+
+function nextReminderDelay(time) {
+    const [hours, minutes] = String(time || '20:00').split(':').map(Number);
+    const next = new Date();
+
+    next.setHours(Number.isFinite(hours) ? hours : 20, Number.isFinite(minutes) ? minutes : 0, 0, 0);
+
+    if (next <= new Date()) {
+        next.setDate(next.getDate() + 1);
+    }
+
+    return next.getTime() - Date.now();
+}
+
+function sendFoodGoalReminder() {
+    const title = 'Complete your food goals';
+    const body = 'Open Buff and finish today\'s food log.';
+
+    if ('Notification' in window && Notification.permission === 'granted') {
+        const notification = new Notification(title, {
+            body,
+            tag: 'buff-food-goals',
+        });
+
+        notification.onclick = () => {
+            window.focus();
+            router.visit('/');
+            notification.close();
+        };
+    } else {
+        showFallbackToast(body);
+    }
+}
+
+function scheduleFoodGoalReminder() {
+    if (foodGoalReminderTimer) {
+        window.clearTimeout(foodGoalReminderTimer);
+        foodGoalReminderTimer = null;
+    }
+
+    const settings = foodGoalReminderSettings();
+
+    if (!settings.enabled) {
+        return;
+    }
+
+    foodGoalReminderTimer = window.setTimeout(() => {
+        sendFoodGoalReminder();
+        scheduleFoodGoalReminder();
+    }, nextReminderDelay(settings.time));
+}
+
 onMounted(() => {
     window.addEventListener('popstate', handlePopState);
+    window.addEventListener('buff-food-goal-reminder-updated', scheduleFoodGoalReminder);
+    window.addEventListener('storage', scheduleFoodGoalReminder);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
+    scheduleFoodGoalReminder();
 
     showFlashToast(page.props.flash?.message);
 
@@ -130,7 +191,14 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('popstate', handlePopState);
+    window.removeEventListener('buff-food-goal-reminder-updated', scheduleFoodGoalReminder);
+    window.removeEventListener('storage', scheduleFoodGoalReminder);
     clearFallbackToast();
+
+    if (foodGoalReminderTimer) {
+        window.clearTimeout(foodGoalReminderTimer);
+        foodGoalReminderTimer = null;
+    }
 
     if (window.__buffHandleAndroidBack === handleNativeAndroidBack) {
         delete window.__buffHandleAndroidBack;
@@ -189,23 +257,13 @@ onUnmounted(() => {
             </div>
 
             <div class="grid gap-3">
-                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('barcode')">
+                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('food')">
                     <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
-                        <Barcode :size="22" />
-                    </span>
-                    <span>
-                        <span class="block font-bold">Barcode</span>
-                        <span class="block text-sm font-medium text-stone-500">Open scanner</span>
-                    </span>
-                </button>
-
-                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('custom')">
-                    <span class="grid h-11 w-11 place-items-center rounded-md bg-[#d28a45] text-white">
                         <Utensils :size="22" />
                     </span>
                     <span>
-                        <span class="block font-bold">Custom meal</span>
-                        <span class="block text-sm font-medium text-stone-500">Enter macros</span>
+                        <span class="block font-bold">Food</span>
+                        <span class="block text-sm font-medium text-stone-500">Search or scan</span>
                     </span>
                 </button>
 

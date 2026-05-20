@@ -1,0 +1,24 @@
+{
+    "name": "buff/native-refresh",
+    "description": "Native pull-to-refresh integration for Buff's NativePHP shell.",
+    "version": "1.0.0",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Buff\\NativeRefresh\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Buff\\NativeRefresh\\NativeRefreshServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

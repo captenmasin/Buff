@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use Buff\CameraPermissions\CameraPermissionsServiceProvider;
 use Buff\HealthConnect\HealthConnectServiceProvider;
+use Buff\NativeRefresh\NativeRefreshServiceProvider;
 use Illuminate\Support\ServiceProvider;
 
 class NativeServiceProvider extends ServiceProvider
@@ -18,12 +20,14 @@ class NativeServiceProvider extends ServiceProvider
     }
 
     /**
-     * @return array<int, class-string<\Illuminate\Support\ServiceProvider>>
+     * @return array<int, class-string<ServiceProvider>>
      */
     public function plugins(): array
     {
         return [
+            CameraPermissionsServiceProvider::class,
             HealthConnectServiceProvider::class,
+            NativeRefreshServiceProvider::class,
         ];
     }
 }
