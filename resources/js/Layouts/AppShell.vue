@@ -1,7 +1,8 @@
-<script setup>
+<script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
+import { hapticImpact } from '../haptics';
 
 const page = usePage();
 const addDrawerOpen = ref(false);
@@ -27,6 +28,7 @@ function openAddDrawer() {
         return;
     }
 
+    hapticImpact();
     window.history.pushState({ ...(window.history.state || {}), buffAddDrawer: true }, '');
     drawerHistoryActive.value = true;
     addDrawerOpen.value = true;
@@ -72,6 +74,7 @@ function handleNativeAndroidBack() {
 }
 
 function openAddMode(mode) {
+    hapticImpact();
     closeDrawerImmediately();
 
     const params = new URLSearchParams({ mode });

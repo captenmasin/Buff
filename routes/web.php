@@ -3,12 +3,14 @@
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
+use App\Http\Controllers\MacroController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\WorkoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', DashboardController::class);
+Route::get('/macros/{macro}', MacroController::class);
 
 Route::get('/goals', [GoalController::class, 'edit']);
 Route::put('/goals', [GoalController::class, 'update']);

@@ -1,9 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils, History, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
+import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
 
 const props = defineProps({
@@ -151,7 +152,7 @@ async function lookup(scannedBarcode = null) {
         barcode.value = response.data.product.barcode;
         barcodeMealForm.food_product_id = response.data.product.id;
         barcodeMealForm.portion_unit = response.data.product.nutrition_unit || 'g';
-        buzz();
+        hapticImpact();
 
         if (portionOptions.value.length > 0) {
             selectPortion(portionOptions.value[0], 0);
@@ -206,7 +207,7 @@ function selectFoodProduct(foodProduct) {
     barcodeMealForm.food_product_id = foodProduct.id;
     barcodeMealForm.portion_unit = foodProduct.nutrition_unit || 'g';
     selectPortion(portionOptions.value[0], 0);
-    buzz();
+    hapticImpact();
 }
 
 function selectPreviousMeal(meal) {
@@ -214,7 +215,7 @@ function selectPreviousMeal(meal) {
     product.value = null;
     previousMealPortionQuantity.value = meal.portion_quantity;
     previousMealPortionUnit.value = meal.portion_unit || 'g';
-    buzz();
+    hapticImpact();
 }
 
 function selectFoodResult(result) {
@@ -224,19 +225,6 @@ function selectFoodResult(result) {
     }
 
     selectFoodProduct(result);
-}
-
-async function buzz() {
-    if (navigator.vibrate) {
-        navigator.vibrate(35);
-    }
-
-    try {
-        const native = nativeBridge.value || await import('#nativephp');
-        await native.Haptics?.impact?.('medium');
-    } catch {
-        // Browser vibration is enough when the native haptics bridge is unavailable.
-    }
 }
 
 async function startScan() {
@@ -366,11 +354,14 @@ function handleScan(payload) {
 
 function addBarcodeMeal() {
     barcodeMealForm.meal_type = selectedMealType.value;
+    hapticImpact();
     barcodeMealForm.post('/meals/barcode');
 }
 
 function addPreviousMeal() {
     if (!selectedPreviousMeal.value) return;
+
+    hapticImpact();
 
     const payload = {
         date: props.date,
@@ -394,10 +385,12 @@ function closeFoodAddSheet() {
 
 function addCustomMeal() {
     customMealForm.meal_type = selectedMealType.value;
+    hapticImpact();
     customMealForm.post('/meals/custom');
 }
 
 function addWorkout() {
+    hapticImpact();
     workoutForm.post('/workouts');
 }
 

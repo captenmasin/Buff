@@ -120,4 +120,41 @@ class OpenFoodFactsLookupTest extends TestCase
             'name' => 'Example Bar',
         ]);
     }
+
+    public function test_it_uses_cached_open_food_facts_search_results(): void
+    {
+        Http::fake([
+            'world.openfoodfacts.org/cgi/search.pl*' => Http::response([
+                'products' => [
+                    [
+                        'code' => '737628064502',
+                        'product_name' => 'Example Bar',
+                        'brands' => 'Buff Foods',
+                        'serving_size' => '38g',
+                        'nutriments' => [
+                            'energy-kcal_100g' => 420,
+                            'proteins_100g' => 20,
+                            'carbohydrates_100g' => 48,
+                            'fat_100g' => 12,
+                        ],
+                    ],
+                ],
+            ]),
+        ]);
+
+        $this->getJson('/food-products/search?q=Example')
+            ->assertOk()
+            ->assertJsonPath('products.0.name', 'Example Bar');
+
+        $this->getJson('/food-products/search?q=example')
+            ->assertOk()
+            ->assertJsonPath('products.0.name', 'Example Bar');
+
+        Http::assertSentCount(1);
+
+        $this->assertDatabaseHas('open_food_facts_search_results', [
+            'query' => 'example',
+            'limit' => 20,
+        ]);
+    }
 }

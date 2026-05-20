@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\FoodProduct;
+use App\Models\OpenFoodFactsSearchResult;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -60,9 +61,16 @@ class OpenFoodFactsService
     public function search(string $query, int $limit = 20): array
     {
         $query = trim($query);
+        $limit = min(max($limit, 1), 50);
 
         if (mb_strlen($query) < 2) {
             return [];
+        }
+
+        $cachedSearch = $this->cachedSearch($query, $limit);
+
+        if ($cachedSearch !== null) {
+            return $cachedSearch;
         }
 
         try {
@@ -93,7 +101,7 @@ class OpenFoodFactsService
             return [];
         }
 
-        return collect($response->json('products', []))
+        $products = collect($response->json('products', []))
             ->map(function (array $product): ?FoodProduct {
                 $barcode = preg_replace('/\D+/', '', (string) ($product['code'] ?? '')) ?? '';
 
@@ -111,6 +119,10 @@ class OpenFoodFactsService
             ->unique('id')
             ->values()
             ->all();
+
+        $this->storeSearchCache($query, $limit, $products);
+
+        return $products;
     }
 
     public function storeProduct(string $barcode, array $product, array $payload = []): FoodProduct
@@ -207,5 +219,58 @@ class OpenFoodFactsService
         }
 
         return $portion;
+    }
+
+    /**
+     * @return array<int, FoodProduct>|null
+     */
+    private function cachedSearch(string $query, int $limit): ?array
+    {
+        $cache = OpenFoodFactsSearchResult::query()
+            ->where('query_hash', $this->searchCacheKey($query, $limit))
+            ->where('expires_at', '>', now())
+            ->first();
+
+        if ($cache === null) {
+            return null;
+        }
+
+        $ids = $cache->food_product_ids;
+
+        if ($ids === []) {
+            return [];
+        }
+
+        $products = FoodProduct::query()
+            ->whereIn('id', $ids)
+            ->get()
+            ->keyBy('id');
+
+        return collect($ids)
+            ->map(fn (string $id): ?FoodProduct => $products->get($id))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, FoodProduct>  $products
+     */
+    private function storeSearchCache(string $query, int $limit, array $products): void
+    {
+        OpenFoodFactsSearchResult::query()->updateOrCreate(
+            ['query_hash' => $this->searchCacheKey($query, $limit)],
+            [
+                'query' => mb_strtolower($query),
+                'limit' => $limit,
+                'food_product_ids' => collect($products)->pluck('id')->values()->all(),
+                'expires_at' => now()->addDays(7),
+            ],
+        );
+    }
+
+    private function searchCacheKey(string $query, int $limit): string
+    {
+        return hash('sha256', mb_strtolower(trim($query)).':'.$limit);
     }
 }

@@ -1,9 +1,10 @@
-<script setup>
+<script setup lang="ts">
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
 import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
+import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
 
 const props = defineProps({
@@ -41,9 +42,9 @@ const calorieProgress = computed(() => {
 });
 
 const macros = computed(() => [
-    {key: 'protein_g', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-sky-500'},
-    {key: 'carbs_g', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-orange-500'},
-    {key: 'fat_g', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-red-500'},
+    {key: 'protein_g', slug: 'protein', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-sky-500'},
+    {key: 'carbs_g', slug: 'carbs', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-orange-500'},
+    {key: 'fat_g', slug: 'fat', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-red-500'},
 ]);
 
 const editMealForm = useForm({
@@ -64,11 +65,13 @@ function removeEntry(id) {
     openMealActions.value = null;
 
     if (window.confirm('Delete this meal?')) {
+        hapticImpact();
         router.delete(`/meals/${id}`, {preserveScroll: true});
     }
 }
 
 function removeWorkout(id) {
+    hapticImpact();
     router.delete(`/workouts/${id}`, {preserveScroll: true});
 }
 
@@ -148,11 +151,13 @@ function selectDate(event) {
 
 function openMeal(entry, mealType) {
     openMealActions.value = null;
+    hapticImpact();
     selectedMeal.value = {...entry, meal_type: mealType};
 }
 
 function startEditingMeal(entry, mealType) {
     openMealActions.value = null;
+    hapticImpact();
     editingMeal.value = {...entry, meal_type: mealType};
     editMealForm.defaults({
         date: props.summary.date,
@@ -167,6 +172,7 @@ function startEditingMeal(entry, mealType) {
 }
 
 function saveMealEdit() {
+    hapticImpact();
     editMealForm.put(`/meals/${editingMeal.value.id}`, {
         preserveScroll: true,
         onSuccess: () => {
@@ -181,7 +187,24 @@ function macroPercent(consumed, goal) {
     return Math.round((Number(consumed) / Number(goal)) * 100);
 }
 
+function toggleMealActions(entryId) {
+    openMealActions.value = openMealActions.value === entryId ? null : entryId;
+    hapticImpact(18);
+}
+
+function closeMealActionsOnOutsideClick(event) {
+    if (!(event.target instanceof Element)) {
+        return;
+    }
+
+    if (!event.target.closest('[data-meal-actions]')) {
+        openMealActions.value = null;
+    }
+}
+
 onMounted(() => {
+    document.addEventListener('click', closeMealActionsOnOutsideClick);
+
     if (healthConnectState.value.supported) {
         refreshHealthConnectStatus();
         window.addEventListener('focus', handleWindowFocus);
@@ -189,6 +212,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+    document.removeEventListener('click', closeMealActionsOnOutsideClick);
     window.removeEventListener('focus', handleWindowFocus);
 });
 </script>
@@ -257,9 +281,11 @@ onBeforeUnmount(() => {
             </div>
             <p class="mt-2 text-xs  text-stone-500">{{ summary.totals.calories_remaining }} calories remaining</p>
             <div class="grid grid-cols-3 mt-7 gap-5">
-                <div
+                <Link
                     v-for="macro in macros"
                     :key="macro.key"
+                    :href="`/macros/${macro.slug}?date=${summary.date}`"
+                    class="block rounded-md active:bg-stone-50"
                 >
                     <p class="text-xs font-semibold uppercase text-stone-500">{{ macro.label }}</p>
                     <p class="mt-2 text-xl font-semibold">
@@ -270,7 +296,7 @@ onBeforeUnmount(() => {
                         <div class="h-full rounded" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }"/>
                     </div>
                     <p class="text-xs  text-stone-500">{{ macroPercent(macro.consumed, macro.goal) }}%</p>
-                </div>
+                </Link>
             </div>
         </Card>
 
@@ -301,8 +327,8 @@ onBeforeUnmount(() => {
                                 {{ entry.calories }} kcal · {{ entry.portion_quantity }}{{ entry.portion_unit }}
                             </p>
                         </button>
-                        <div class="relative flex-none">
-                            <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="openMealActions = openMealActions === entry.id ? null : entry.id">
+                        <div class="relative flex-none" data-meal-actions>
+                            <button class="rounded p-2 text-stone-400 active:bg-stone-100" aria-label="Meal actions" @click="toggleMealActions(entry.id)">
                                 <EllipsisVertical :size="18"/>
                             </button>
                             <Card v-if="openMealActions === entry.id" class="absolute p-2 right-0 top-10 z-20 w-36 overflow-hidden">

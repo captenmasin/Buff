@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import { Trash2, TrendingDown, TrendingUp } from '@lucide/vue';

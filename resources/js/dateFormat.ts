@@ -12,7 +12,11 @@ const shortDayDateFormatter = new Intl.DateTimeFormat('en-GB', {
     year: 'numeric',
 });
 
-export function formatDisplayDate(value, options = {}) {
+type FormatDisplayDateOptions = {
+    weekday?: 'short' | 'long';
+};
+
+export function formatDisplayDate(value: string, options: FormatDisplayDateOptions = {}): string {
     const [year, month, day] = String(value).split('-').map(Number);
 
     if (!year || !month || !day) {

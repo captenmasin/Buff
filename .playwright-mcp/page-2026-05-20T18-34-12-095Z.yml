@@ -1,0 +1,37 @@
+- generic [active] [ref=e1]:
+  - link "Laravel Herd" [ref=e4] [cursor=pointer]:
+    - /url: https://herd.laravel.com/
+    - img [ref=e5]
+    - generic [ref=e12]: Laravel Herd
+  - generic [ref=e13]:
+    - img [ref=e14]
+    - generic [ref=e16]:
+      - heading "404" [level=1] [ref=e17]
+      - paragraph [ref=e18]: Site not found
+      - paragraph [ref=e19]:
+        - text: The site "localhost" could not be found in your parked or linked sites.
+        - text: Please ensure that the folder is within your parked paths.
+      - paragraph [ref=e20]:
+        - text: Need some help? Check out the
+        - link "docs" [ref=e21] [cursor=pointer]:
+          - /url: https://herd.laravel.com/docs
+        - text: .
+    - generic [ref=e23]:
+      - heading "Helpful tools right at your hands" [level=2] [ref=e24]
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - img [ref=e28]
+          - heading "Tinkerwell" [level=3] [ref=e29]
+          - paragraph [ref=e30]: Thousands of developers use Tinkerwell to run code snippets and write complex Eloquent queries without switching between their IDE and browser.
+          - paragraph [ref=e31]: Tinkerwell uses the same PHP binaries as Herd, making it the perfect companion.
+          - link "Get Tinkerwell" [ref=e32] [cursor=pointer]:
+            - /url: https://tinkerwell.app/?ref=herd-not-found
+            - generic [ref=e34]: Get Tinkerwell
+        - generic [ref=e35]:
+          - img [ref=e37]
+          - heading "Expose" [level=3] [ref=e38]
+          - paragraph [ref=e39]: Create public URLs for local sites through any firewall and VPN. Receive webhooks on your machine, test local sites on mobile devices or share them with others.
+          - paragraph [ref=e40]: Herd integrates with Expose natively and works great with a free account.
+          - link "Get Expose" [ref=e41] [cursor=pointer]:
+            - /url: https://expose.dev
+            - generic [ref=e43]: Get Expose
