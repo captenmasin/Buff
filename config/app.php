@@ -54,6 +54,8 @@ return [
 
     'url' => env('APP_URL', 'http://localhost'),
 
+    'allow_remote_http' => env('BUFF_ALLOW_REMOTE_HTTP', false),
+
     /*
     |--------------------------------------------------------------------------
     | Application Timezone

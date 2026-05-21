@@ -1,6 +1,7 @@
 package com.buff.healthconnect
 
 import android.content.Context
+import android.util.Base64
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
@@ -15,6 +16,7 @@ import com.nativephp.mobile.bridge.PHPBridge
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -89,7 +91,7 @@ class HealthConnectSyncWorker(
 
         if (!appKeyFile.exists() || !appKeyFile.readText().trim().startsWith("base64:")) {
             appKeyFile.parentFile?.mkdirs()
-            appKeyFile.writeText("base64:3a3I14QgnAhKUHROy1bn6A/UpTeELNI2flsl+Ud0bF4=")
+            appKeyFile.writeText(generateLaravelAppKey())
         }
 
         copyPhpIniAssets()
@@ -134,6 +136,13 @@ class HealthConnectSyncWorker(
             "REQUEST_SCHEME" to "http",
             "SESSION_SAVE_PATH" to phpSessionDir.absolutePath,
         )
+    }
+
+    private fun generateLaravelAppKey(): String {
+        val key = ByteArray(32)
+        SecureRandom().nextBytes(key)
+
+        return "base64:${Base64.encodeToString(key, Base64.NO_WRAP)}"
     }
 
     private fun copyPhpIniAssets() {
