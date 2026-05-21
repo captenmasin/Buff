@@ -175,6 +175,26 @@ const barcodeCalories = computed(() => {
     return Math.round(Number(product.value.calories_per_100) * (Number(barcodeMealForm.portion_quantity) / 100));
 });
 
+const barcodePortionMacros = computed(() => {
+    if (!product.value) {
+        return {
+            calories: 0,
+            protein_g: 0,
+            carbs_g: 0,
+            fat_g: 0,
+        };
+    }
+
+    const factor = Math.max(Number(barcodeMealForm.portion_quantity) || 0, 0) / 100;
+
+    return {
+        calories: barcodeCalories.value,
+        protein_g: roundMacro(Number(product.value.protein_per_100) * factor),
+        carbs_g: roundMacro(Number(product.value.carbs_per_100) * factor),
+        fat_g: roundMacro(Number(product.value.fat_per_100) * factor),
+    };
+});
+
 const previousMealHasPortion = computed(() => {
     return selectedPreviousMeal.value?.portion_quantity !== null && selectedPreviousMeal.value?.portion_quantity !== undefined;
 });
@@ -203,6 +223,18 @@ function selectPortion(option: PortionOption, index: number) {
     selectedPortionKey.value = String(index);
     barcodeMealForm.portion_quantity = option.quantity;
     barcodeMealForm.portion_unit = option.unit;
+}
+
+function roundMacro(value: number) {
+    return Math.round(value * 10) / 10;
+}
+
+function formatMacro(value: number) {
+    return Number.isInteger(value) ? String(value) : value.toFixed(1);
+}
+
+function portionOptionLabel(option: PortionOption) {
+    return option.label || `${option.quantity}${option.unit}`;
 }
 
 async function lookup(scannedBarcode: string | null = null) {
@@ -773,19 +805,32 @@ onUnmounted(() => {
                 </div>
 
                 <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
+                    <div v-if="portionOptions.length" class="col-span-2 flex gap-2 overflow-x-auto pb-1">
+                        <button
+                            v-for="(option, index) in portionOptions"
+                            :key="`${option.quantity}-${option.unit}-${index}`"
+                            type="button"
+                            class="shrink-0 rounded-md border px-3 py-2 text-sm font-semibold transition"
+                            :class="selectedPortionKey === String(index) ? 'border-[#253d2c] bg-[#253d2c] text-white' : 'border-stone-200 bg-stone-50 text-stone-700 active:bg-stone-100'"
+                            @click="selectPortion(option, index)"
+                        >
+                            {{ portionOptionLabel(option) }}
+                        </button>
+                    </div>
+
                     <input
                         v-model.number="barcodeMealForm.portion_quantity"
                         type="number"
                         min="0.1"
                         step="0.1"
                         class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
+                        @input="selectedPortionKey = ''"
                     >
                     <select
                         v-model="barcodeMealForm.portion_unit"
                         class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3  outline-none focus:border-[#6f9b58]"
                     >
-                        <option value="g">g</option>
-                        <option value="ml">ml</option>
+                        <option :value="product.nutrition_unit || barcodeMealForm.portion_unit">{{ product.nutrition_unit || barcodeMealForm.portion_unit }}</option>
                     </select>
                 </div>
 
@@ -802,6 +847,25 @@ onUnmounted(() => {
                         >
                             {{ mealLabels[mealType] }}
                         </button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-4 gap-2 rounded-md border border-stone-200 bg-stone-50 p-3 text-center">
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-stone-500">Kcal</p>
+                        <p class="mt-1 font-semibold text-[#17211b]">{{ barcodePortionMacros.calories }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-stone-500">Protein</p>
+                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.protein_g) }}g</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-stone-500">Carbs</p>
+                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.carbs_g) }}g</p>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold uppercase text-stone-500">Fat</p>
+                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.fat_g) }}g</p>
                     </div>
                 </div>
 
