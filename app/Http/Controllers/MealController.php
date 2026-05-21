@@ -46,6 +46,10 @@ class MealController extends Controller
 
     public function lookupBarcode(Request $request, OpenFoodFactsService $openFoodFacts, PortionParser $portionParser): JsonResponse
     {
+        $request->merge([
+            'barcode' => preg_replace('/\s+/', '', (string) $request->input('barcode', '')) ?? '',
+        ]);
+
         $validated = $request->validate([
             'barcode' => ['required', 'string', 'max:32'],
         ]);

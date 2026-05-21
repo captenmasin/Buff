@@ -36,6 +36,35 @@ it('fetches and normalizes a barcode product', function (): void {
     ]);
 });
 
+it('removes whitespace from barcode before lookup validation and search', function (): void {
+    Http::fake([
+        'world.openfoodfacts.org/api/v2/product/737628064502.json*' => Http::response([
+            'status' => 1,
+            'product' => [
+                'code' => '737628064502',
+                'product_name' => 'Example Bar',
+                'brands' => 'Buff Foods',
+                'serving_size' => '38g',
+                'quantity' => '152g',
+                'image_url' => 'https://example.com/bar.jpg',
+                'nutriments' => [
+                    'energy-kcal_100g' => 420,
+                    'proteins_100g' => 20,
+                    'carbohydrates_100g' => 48,
+                    'fat_100g' => 12,
+                ],
+            ],
+        ]),
+    ]);
+
+    $this->postJson('/barcode/lookup', [
+        'barcode' => "737 628 064 502 \n  ",
+    ])->assertOk()
+        ->assertJsonPath('product.barcode', '737628064502');
+
+    Http::assertSent(fn ($request): bool => str_starts_with($request->url(), 'https://world.openfoodfacts.org/api/v2/product/737628064502.json'));
+});
+
 it('uses millilitres for liquid packaged products', function (): void {
     Http::fake([
         'world.openfoodfacts.org/api/v2/product/5000181036312.json*' => Http::response([
