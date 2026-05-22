@@ -209,6 +209,88 @@ const previousMealCalories = computed(() => {
     return Math.round(Number(selectedPreviousMeal.value.calories) * (Number(previousMealPortionQuantity.value) / Number(selectedPreviousMeal.value.portion_quantity)));
 });
 
+const previousMealPortionMacros = computed(() => {
+    if (!selectedPreviousMeal.value) {
+        return {
+            calories: 0,
+            protein_g: 0,
+            carbs_g: 0,
+            fat_g: 0,
+        };
+    }
+
+    if (!previousMealHasPortion.value || !previousMealPortionQuantity.value) {
+        return {
+            calories: selectedPreviousMeal.value.calories,
+            protein_g: Number(selectedPreviousMeal.value.protein_g),
+            carbs_g: Number(selectedPreviousMeal.value.carbs_g),
+            fat_g: Number(selectedPreviousMeal.value.fat_g),
+        };
+    }
+
+    const factor = Number(previousMealPortionQuantity.value) / Number(selectedPreviousMeal.value.portion_quantity);
+
+    return {
+        calories: previousMealCalories.value,
+        protein_g: roundMacro(Number(selectedPreviousMeal.value.protein_g) * factor),
+        carbs_g: roundMacro(Number(selectedPreviousMeal.value.carbs_g) * factor),
+        fat_g: roundMacro(Number(selectedPreviousMeal.value.fat_g) * factor),
+    };
+});
+
+const activeFoodMacros = computed(() => {
+    if (selectedPreviousMeal.value) {
+        return previousMealPortionMacros.value;
+    }
+
+    return barcodePortionMacros.value;
+});
+
+const activeFoodCalories = computed(() => activeFoodMacros.value.calories);
+const activeFoodUnit = computed(() => product.value?.nutrition_unit || previousMealPortionUnit.value || 'g');
+const activeFoodHasPortion = computed(() => Boolean(product.value || previousMealHasPortion.value));
+const activeFoodPortionQuantity = computed({
+    get() {
+        return selectedPreviousMeal.value ? previousMealPortionQuantity.value : barcodeMealForm.portion_quantity;
+    },
+    set(value: number | null) {
+        if (selectedPreviousMeal.value) {
+            previousMealPortionQuantity.value = value;
+            return;
+        }
+
+        barcodeMealForm.portion_quantity = value ?? 0;
+    },
+});
+const activeFoodPortionUnit = computed({
+    get() {
+        return selectedPreviousMeal.value ? previousMealPortionUnit.value : barcodeMealForm.portion_unit;
+    },
+    set(value: string) {
+        if (selectedPreviousMeal.value) {
+            previousMealPortionUnit.value = value;
+            return;
+        }
+
+        barcodeMealForm.portion_unit = value;
+    },
+});
+const activeFoodPortionOptions = computed<PortionOption[]>(() => {
+    if (product.value) {
+        return portionOptions.value;
+    }
+
+    if (!selectedPreviousMeal.value || !previousMealHasPortion.value || selectedPreviousMeal.value.portion_quantity === null) {
+        return [];
+    }
+
+    return [{
+        label: `${formatMacro(Number(selectedPreviousMeal.value.portion_quantity))}${selectedPreviousMeal.value.portion_unit || previousMealPortionUnit.value}`,
+        quantity: selectedPreviousMeal.value.portion_quantity,
+        unit: selectedPreviousMeal.value.portion_unit || previousMealPortionUnit.value,
+    }];
+});
+
 const displayDate = computed(() => formatDisplayDate(props.date));
 const foodSearchQuery = computed(() => foodSearch.value.trim());
 const foodAddSheetOpen = computed(() => Boolean(product.value || selectedPreviousMeal.value));
@@ -221,8 +303,8 @@ function setMealType(mealType: MealType) {
 
 function selectPortion(option: PortionOption, index: number) {
     selectedPortionKey.value = String(index);
-    barcodeMealForm.portion_quantity = option.quantity;
-    barcodeMealForm.portion_unit = option.unit;
+    activeFoodPortionQuantity.value = option.quantity;
+    activeFoodPortionUnit.value = option.unit;
 }
 
 function roundMacro(value: number) {
@@ -315,6 +397,7 @@ function selectPreviousMeal(meal: PreviousMeal) {
     product.value = null;
     previousMealPortionQuantity.value = meal.portion_quantity;
     previousMealPortionUnit.value = meal.portion_unit || 'g';
+    selectedPortionKey.value = meal.portion_quantity ? '0' : '';
     hapticImpact();
 }
 
@@ -490,6 +573,7 @@ function closeFoodAddSheet() {
     previousMealPortionQuantity.value = null;
     previousMealPortionUnit.value = 'g';
     product.value = null;
+    selectedPortionKey.value = '';
 }
 
 function addCustomMeal() {
@@ -719,98 +803,52 @@ onUnmounted(() => {
 
         <section
             v-if="foodAddSheetOpen"
-            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-white px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3 shadow-[0_-18px_50px_rgba(23,33,27,0.22)] transition-transform duration-200"
+            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-white px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-[0_-18px_50px_rgba(23,33,27,0.22)] transition-transform duration-200"
             :class="foodAddSheetOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!foodAddSheetOpen"
             :inert="!foodAddSheetOpen"
             aria-label="Add food"
         >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
-            <div class="mb-4 flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                    <p class="text-sm  text-stone-500">{{ selectedPreviousMeal ? 'Previous food' : 'Food product' }}</p>
-                    <h2 class="truncate text-xl font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</h2>
-                </div>
-                <button class="grid h-10 w-10 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">
-                    <X :size="21" />
-                </button>
-            </div>
+<!--            <div class="mb-8 flex items-start justify-between gap-3">-->
+<!--                <div class="min-w-0">-->
+<!--&lt;!&ndash;                    <p class="text-xl text-stone-500">Food product</p>&ndash;&gt;-->
+<!--&lt;!&ndash;                    <h2 class="truncate text-4xl font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</h2>&ndash;&gt;-->
+<!--                </div>-->
+<!--                <button class="grid h-10 w-10 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">-->
+<!--                    <X :size="32" />-->
+<!--                </button>-->
+<!--            </div>-->
 
-            <div v-if="selectedPreviousMeal" class="space-y-5">
+            <button class="grid h-10 w-10 absolute top-4 right-4 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">
+                <X :size="24" />
+            </button>
+
+            <div v-if="selectedPreviousMeal || product" class="space-y-5">
                 <div class="flex gap-4">
-                    <img v-if="selectedPreviousMeal.image_url" :src="selectedPreviousMeal.image_url" alt="" class="h-20 w-20 rounded-md object-cover">
-                    <span v-else class="grid h-20 w-20 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
-                        <Utensils :size="26" />
+                    <img v-if="(selectedPreviousMeal || product)?.image_url" :src="(selectedPreviousMeal || product)?.image_url || ''" alt="" class="h-20 w-20 rounded-md object-cover">
+                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
+                        <Utensils v-if="selectedPreviousMeal" :size="26" />
+                        <Barcode v-else :size="26" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate font-semibold">{{ selectedPreviousMeal.name }}</p>
-                        <p class="truncate text-sm text-stone-500">{{ selectedPreviousMeal.brand || 'Previous item' }}</p>
-                        <p class="mt-1 text-sm ">
-                            {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ selectedPreviousMeal.portion_quantity }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ selectedPreviousMeal.protein_g }}g · C {{ selectedPreviousMeal.carbs_g }}g · F {{ selectedPreviousMeal.fat_g }}g
+                        <p class="truncate text-lg font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
+                        <p class="truncate text-base text-stone-500">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>
+                        <p v-if="selectedPreviousMeal" class="mt-1 text-sm text-[#17211b]">
+                            {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ formatMacro(Number(selectedPreviousMeal.portion_quantity)) }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ formatMacro(Number(selectedPreviousMeal.protein_g)) }}g · C {{ formatMacro(Number(selectedPreviousMeal.carbs_g)) }}g · F {{ formatMacro(Number(selectedPreviousMeal.fat_g)) }}g
+                        </p>
+                        <p v-else-if="product" class="mt-1 text-sm text-[#17211b]">
+                            {{ product.calories_per_100 }} kcal · P {{ formatMacro(Number(product.protein_per_100)) }}g · C {{ formatMacro(Number(product.carbs_per_100)) }}g · F {{ formatMacro(Number(product.fat_per_100)) }}g / 100{{ product.nutrition_unit || 'g' }}
                         </p>
                     </div>
                 </div>
 
-                <div v-if="previousMealHasPortion" class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
-                    <input
-                        v-model.number="previousMealPortionQuantity"
-                        type="number"
-                        min="0.1"
-                        step="0.1"
-                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
-                    >
-                    <select
-                        v-model="previousMealPortionUnit"
-                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3  outline-none focus:border-[#6f9b58]"
-                    >
-                        <option :value="previousMealPortionUnit">{{ previousMealPortionUnit }}</option>
-                    </select>
-                </div>
-
-                <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
-                    <p class="text-sm font-semibold">When did you have it?</p>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
+                <div v-if="activeFoodHasPortion" class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
+                    <div v-if="activeFoodPortionOptions.length" class="col-span-2 flex gap-2 overflow-x-auto pb-1">
                         <button
-                            v-for="mealType in mealTypes"
-                            :key="mealType"
-                            type="button"
-                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
-                            :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
-                            @click="setMealType(mealType)"
-                        >
-                            {{ mealLabels[mealType] }}
-                        </button>
-                    </div>
-                </div>
-
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" @click="addPreviousMeal">
-                    <Plus :size="18" />
-                    Add {{ previousMealCalories }} kcal
-                </button>
-            </div>
-
-            <div v-if="product" class="space-y-5">
-                <div class="flex gap-4">
-                    <img v-if="product.image_url" :src="product.image_url" alt="" class="h-20 w-20 rounded-md object-cover">
-                    <span v-else class="grid h-20 w-20 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
-                        <Barcode :size="26" />
-                    </span>
-                    <div class="min-w-0 flex-1">
-                        <p class="truncate font-semibold">{{ product.name }}</p>
-                        <p class="truncate text-sm text-stone-500">{{ product.brand || 'Saved product' }}</p>
-                        <p class="mt-1 text-sm ">
-                            {{ product.calories_per_100 }} kcal · P {{ product.protein_per_100 }}g · C {{ product.carbs_per_100 }}g · F {{ product.fat_per_100 }}g / 100{{ product.nutrition_unit }}
-                        </p>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
-                    <div v-if="portionOptions.length" class="col-span-2 flex gap-2 overflow-x-auto pb-1">
-                        <button
-                            v-for="(option, index) in portionOptions"
+                            v-for="(option, index) in activeFoodPortionOptions"
                             :key="`${option.quantity}-${option.unit}-${index}`"
                             type="button"
-                            class="shrink-0 rounded-md border px-3 py-2 text-sm font-semibold transition"
+                            class="shrink-0 rounded-md border px-4 py-1.5 text-lg font-semibold transition"
                             :class="selectedPortionKey === String(index) ? 'border-[#253d2c] bg-[#253d2c] text-white' : 'border-stone-200 bg-stone-50 text-stone-700 active:bg-stone-100'"
                             @click="selectPortion(option, index)"
                         >
@@ -819,29 +857,29 @@ onUnmounted(() => {
                     </div>
 
                     <input
-                        v-model.number="barcodeMealForm.portion_quantity"
+                        v-model.number="activeFoodPortionQuantity"
                         type="number"
                         min="0.1"
                         step="0.1"
-                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
+                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-lg outline-none focus:border-[#6f9b58]"
                         @input="selectedPortionKey = ''"
                     >
                     <select
-                        v-model="barcodeMealForm.portion_unit"
-                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3  outline-none focus:border-[#6f9b58]"
+                        v-model="activeFoodPortionUnit"
+                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-lg outline-none focus:border-[#6f9b58]"
                     >
-                        <option :value="product.nutrition_unit || barcodeMealForm.portion_unit">{{ product.nutrition_unit || barcodeMealForm.portion_unit }}</option>
+                        <option :value="activeFoodUnit">{{ activeFoodUnit }}</option>
                     </select>
                 </div>
 
                 <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
-                    <p class="text-sm font-semibold">When did you have it?</p>
+                    <p class="text-base font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
+                            class="min-h-11 rounded px-3 text-base font-semibold transition"
                             :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
                             @click="setMealType(mealType)"
                         >
@@ -853,25 +891,29 @@ onUnmounted(() => {
                 <div class="grid grid-cols-4 gap-2 rounded-md border border-stone-200 bg-stone-50 p-3 text-center">
                     <div>
                         <p class="text-xs font-semibold uppercase text-stone-500">Kcal</p>
-                        <p class="mt-1 font-semibold text-[#17211b]">{{ barcodePortionMacros.calories }}</p>
+                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ activeFoodMacros.calories }}</p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase text-stone-500">Protein</p>
-                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.protein_g) }}g</p>
+                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.protein_g) }}g</p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase text-stone-500">Carbs</p>
-                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.carbs_g) }}g</p>
+                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.carbs_g) }}g</p>
                     </div>
                     <div>
                         <p class="text-xs font-semibold uppercase text-stone-500">Fat</p>
-                        <p class="mt-1 font-semibold text-[#17211b]">{{ formatMacro(barcodePortionMacros.fat_g) }}g</p>
+                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.fat_g) }}g</p>
                     </div>
                 </div>
 
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="barcodeMealForm.processing" @click="addBarcodeMeal">
+                <button
+                    class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-4 text-lg font-semibold text-white active:bg-[#17211b] disabled:opacity-60"
+                    :disabled="barcodeMealForm.processing"
+                    @click="selectedPreviousMeal ? addPreviousMeal() : addBarcodeMeal()"
+                >
                     <Plus :size="18" />
-                    Add {{ barcodeCalories }} kcal
+                    Add {{ activeFoodCalories }} kcal
                 </button>
             </div>
         </section>
