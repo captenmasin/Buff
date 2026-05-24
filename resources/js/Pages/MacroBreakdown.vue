@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import { computed } from 'vue';
 import Card from '../Components/Card.vue';
+import Button from '../Components/ui/button/Button.vue';
 import { formatDisplayDate } from '../dateFormat';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -46,9 +47,9 @@ const mealLabels: Record<MealType, string> = {
 };
 
 const macroColors: Record<MacroKey, string> = {
-    protein_g: 'bg-sky-500',
-    carbs_g: 'bg-orange-500',
-    fat_g: 'bg-red-500',
+    protein_g: 'bg-protein',
+    carbs_g: 'bg-carbs',
+    fat_g: 'bg-fat',
 };
 
 const displayDate = computed(() => formatDisplayDate(props.date, { weekday: 'short' }));
@@ -64,30 +65,30 @@ function grams(value: number | string | null | undefined) {
 
     <section class="space-y-5">
         <header class="flex items-start gap-3">
-            <Link :href="`/?date=${date}`" class="mt-1 grid h-10 w-10 flex-none place-items-center rounded-md border border-stone-200 bg-white text-stone-600 active:bg-stone-100" aria-label="Back to today">
+            <Button :as="Link" :href="`/?date=${date}`" variant="outline" size="icon" class="mt-1 flex-none" aria-label="Back to today">
                 <ArrowLeft :size="20" />
-            </Link>
+            </Button>
             <div class="min-w-0">
-                <p class="text-sm text-stone-500">{{ displayDate }}</p>
-                <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">{{ macro.label }}</h1>
+                <p class="text-sm text-muted-foreground">{{ displayDate }}</p>
+                <h1 class="text-3xl font-semibold tracking-normal text-foreground">{{ macro.label }}</h1>
             </div>
         </header>
 
         <Card>
             <div class="flex items-start justify-between gap-4">
                 <div>
-                    <p class="text-sm text-stone-500">Current split</p>
+                    <p class="text-sm text-muted-foreground">Current split</p>
                     <p class="mt-2 text-4xl font-bold">{{ macro.current_percentage }}%</p>
                 </div>
                 <div class="text-right">
-                    <p class="text-sm text-stone-500">Goal split</p>
-                    <p class="mt-2 text-2xl font-semibold text-[#253d2c]">{{ macro.goal_percentage }}%</p>
+                    <p class="text-sm text-muted-foreground">Goal split</p>
+                    <p class="mt-2 text-2xl font-semibold text-primary">{{ macro.goal_percentage }}%</p>
                 </div>
             </div>
-            <div class="mt-4 h-3 overflow-hidden rounded bg-stone-100">
+            <div class="mt-4 h-3 overflow-hidden rounded bg-muted">
                 <div class="h-full rounded" :class="macroColors[macro.key]" :style="{ width: `${progressWidth}%` }" />
             </div>
-            <p class="mt-2 text-xs text-stone-500">
+            <p class="mt-2 text-xs text-muted-foreground">
                 {{ grams(macro.consumed_g) }} eaten<span v-if="macro.goal_g"> · {{ grams(macro.goal_g) }} daily goal</span>
             </p>
         </Card>
@@ -96,7 +97,7 @@ function grams(value: number | string | null | undefined) {
             <h2 class="text-lg font-semibold">Foods</h2>
 
             <Card v-if="!entries.length">
-                <p class="text-sm text-stone-500">No food logged for this day.</p>
+                <p class="text-sm text-muted-foreground">No food logged for this day.</p>
             </Card>
 
             <Card v-for="entry in entries" :key="entry.id">
@@ -106,7 +107,7 @@ function grams(value: number | string | null | undefined) {
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <p class="truncate font-semibold">{{ entry.name }}</p>
-                                <p class="truncate text-xs text-stone-500">
+                                <p class="truncate text-xs text-muted-foreground">
                                     {{ mealLabels[entry.meal_type] ?? entry.meal_type }}<span v-if="entry.portion_quantity"> · {{ entry.portion_quantity }}{{ entry.portion_unit }}</span>
                                 </p>
                             </div>
@@ -114,16 +115,16 @@ function grams(value: number | string | null | undefined) {
                         </div>
 
                         <div class="mt-3 grid grid-cols-3 gap-2">
-                            <div class="rounded-md bg-stone-50 p-2">
-                                <p class="text-[11px] font-semibold uppercase text-stone-500">Protein</p>
+                            <div class="rounded-md bg-muted p-2">
+                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Protein</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.protein_g) }}</p>
                             </div>
-                            <div class="rounded-md bg-stone-50 p-2">
-                                <p class="text-[11px] font-semibold uppercase text-stone-500">Carbs</p>
+                            <div class="rounded-md bg-muted p-2">
+                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Carbs</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.carbs_g) }}</p>
                             </div>
-                            <div class="rounded-md bg-stone-50 p-2">
-                                <p class="text-[11px] font-semibold uppercase text-stone-500">Fat</p>
+                            <div class="rounded-md bg-muted p-2">
+                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Fat</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.fat_g) }}</p>
                             </div>
                         </div>

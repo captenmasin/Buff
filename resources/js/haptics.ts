@@ -10,6 +10,8 @@ type NativeBridge = {
 export async function hapticImpact(duration = 25): Promise<void> {
     if (navigator.vibrate) {
         navigator.vibrate(duration);
+
+        return;
     }
 
     try {

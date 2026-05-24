@@ -10,7 +10,7 @@ const props = defineProps({
 </script>
 
 <template>
-    <article :class="cn('rounded-md border border-stone-200 bg-white p-4', props.class)">
+    <article :class="cn('rounded-md border border-border bg-card p-4 text-foreground', props.class)">
         <slot />
     </article>
 </template>

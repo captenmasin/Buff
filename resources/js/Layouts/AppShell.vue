@@ -3,6 +3,7 @@ import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
+import Button from '../Components/ui/button/Button.vue';
 
 const page = usePage<{
     summary?: { date: string };
@@ -220,7 +221,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="app-shell mx-auto flex max-w-md flex-col bg-[#f6f7f4]">
+    <div class="app-shell mx-auto flex max-w-md flex-col bg-background">
         <main class="app-main flex-1 px-4">
             <slot />
         </main>
@@ -235,7 +236,7 @@ onUnmounted(() => {
         >
             <div
                 v-if="fallbackToast"
-                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-md bg-[#253d2c] px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_40px_rgba(23,33,27,0.24)]"
+                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl"
                 role="status"
                 aria-live="polite"
             >
@@ -245,86 +246,93 @@ onUnmounted(() => {
 
         <div
             v-if="addDrawerOpen"
-            class="fixed inset-0 z-30 bg-black/30"
+            class="fixed inset-0 z-30 bg-foreground/30"
             @click="closeAddDrawer"
         />
 
         <section
-            class="bottom-drawer fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md transform rounded-t-lg bg-white px-4 pt-3 shadow-[0_-18px_50px_rgba(23,33,27,0.22)] transition-transform duration-200"
+            class="bottom-drawer fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md transform rounded-t-lg bg-card px-4 pt-3 shadow-2xl transition-transform duration-200"
             :class="addDrawerOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!addDrawerOpen"
             :inert="!addDrawerOpen"
             aria-label="Add"
         >
-            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-stone-300" />
+            <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/35" />
             <div class="mb-4 flex items-center justify-between">
                 <h2 class="text-lg font-bold">Add</h2>
-                <button class="rounded-md p-2 text-stone-500 active:bg-stone-100" aria-label="Close add drawer" @click="closeAddDrawer">
+                <Button variant="ghost" size="icon" aria-label="Close add drawer" @click="closeAddDrawer">
                     <X :size="20" />
-                </button>
+                </Button>
             </div>
 
             <div class="grid gap-3">
-                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('food')">
-                    <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
+                <Button variant="surface" class="h-auto justify-start p-4 text-left" @click="openAddMode('food')">
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-primary text-primary-foreground">
                         <Utensils :size="22" />
                     </span>
                     <span>
                         <span class="block font-bold">Food</span>
-                        <span class="block text-sm font-medium text-stone-500">Search or scan</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Search or scan</span>
                     </span>
-                </button>
+                </Button>
 
-                <button class="flex items-center gap-3 rounded-md border border-stone-200 bg-stone-50 p-4 text-left active:bg-stone-100" @click="openAddMode('workout')">
-                    <span class="grid h-11 w-11 place-items-center rounded-md bg-[#6f9b58] text-white">
+                <Button variant="surface" class="h-auto justify-start p-4 text-left" @click="openAddMode('workout')">
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-workout text-primary-foreground">
                         <Dumbbell :size="22" />
                     </span>
                     <span>
                         <span class="block font-bold">Workout</span>
-                        <span class="block text-sm font-medium text-stone-500">Log calories burned</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
                     </span>
-                </button>
+                </Button>
             </div>
         </section>
 
-        <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-stone-200 bg-white/95 shadow-[0_-10px_28px_rgba(23,33,27,0.08)] backdrop-blur">
+        <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-lg backdrop-blur">
             <div class="mx-auto grid max-w-md grid-cols-4 gap-1 px-3 pt-2">
-                <Link
+                <Button
+                    :as="Link"
                     :href="navItems[0].href"
-                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
-                    :class="path === navItems[0].match ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500 active:bg-stone-100'"
+                    size="nav"
+                    :variant="path === navItems[0].match ? 'secondary' : 'ghost'"
+                    class="flex"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[0].label }}</span>
-                </Link>
+                </Button>
 
-                <Link
+                <Button
+                    :as="Link"
                     :href="navItems[1].href"
-                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
-                    :class="path === navItems[1].match ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500 active:bg-stone-100'"
+                    size="nav"
+                    :variant="path === navItems[1].match ? 'secondary' : 'ghost'"
+                    class="flex"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[1].label }}</span>
-                </Link>
+                </Button>
 
-                <Link
+                <Button
+                    :as="Link"
                     :href="navItems[2].href"
-                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
-                    :class="path === navItems[2].match ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500 active:bg-stone-100'"
+                    size="nav"
+                    :variant="path === navItems[2].match ? 'secondary' : 'ghost'"
+                    class="flex"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[2].label }}</span>
-                </Link>
+                </Button>
 
-                <button
-                    class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-md text-[11px] font-semibold transition"
-                    :class="isAddActive ? 'bg-[#dce8d4] text-[#17211b]' : 'text-stone-500'"
+                <Button
+                    size="nav"
+                    :variant="isAddActive ? 'secondary' : 'ghost'"
+                    class="flex"
                     aria-label="Add"
                     @click="openAddDrawer"
                 >
                     <Plus :size="20" stroke-width="2.2" />
                     <span class="text-[11px] font-semibold">Add</span>
-                </button>
+                </Button>
             </div>
         </nav>
     </div>

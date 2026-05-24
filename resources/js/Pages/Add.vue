@@ -6,6 +6,9 @@ import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
+import Button from '../Components/ui/button/Button.vue';
+import Input from '../Components/ui/input/Input.vue';
+import Select from '../Components/ui/select/Select.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroField = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -630,8 +633,8 @@ onUnmounted(() => {
     <section class="space-y-5">
         <header>
             <div>
-                <p class="text-sm  text-stone-500">{{ displayDate }}</p>
-                <h1 class="text-3xl font-semibold tracking-normal text-[#17211b]">
+                <p class="text-sm  text-muted-foreground">{{ displayDate }}</p>
+                <h1 class="text-3xl font-semibold tracking-normal text-foreground">
                     {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'workout' ? 'Workout' : 'Add' }}
                     <span v-if="meal">
                          - {{ meal }}
@@ -640,120 +643,122 @@ onUnmounted(() => {
             </div>
         </header>
 
-        <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-[#17211b] text-white">
+        <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-primary-foreground">
             <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
-                    <p class="text-sm  text-white/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
+                    <p class="text-sm  text-primary-foreground/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
                     <h2 class="truncate text-xl font-semibold">{{ scannerStarting ? 'Opening camera...' : manualBarcodeOpen ? 'Enter barcode' : 'Point camera at barcode' }}</h2>
                 </div>
-                <button class="grid h-11 w-11 shrink-0 place-items-center rounded-md bg-white/10 active:bg-white/15" aria-label="Close scanner" @click="stopWebScan">
+                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-primary-foreground/10 text-primary-foreground active:bg-primary-foreground/15" aria-label="Close scanner" @click="stopWebScan">
                     <X :size="22" />
-                </button>
+                </Button>
             </div>
 
             <div class="relative min-h-0 flex-1">
-                <video v-show="!manualBarcodeOpen" ref="webScannerVideo" class="h-full w-full bg-black object-cover" muted playsinline />
+                <video v-show="!manualBarcodeOpen" ref="webScannerVideo" class="h-full w-full bg-foreground object-cover" muted playsinline />
 
                 <div v-if="manualBarcodeOpen" class="flex h-full items-center px-4">
-                    <div class="w-full rounded-md bg-white p-4 text-[#17211b]">
+                    <div class="w-full rounded-md bg-card p-4 text-foreground">
                         <label class="block">
-                            <span class="text-xs font-semibold uppercase text-stone-500">Barcode</span>
-                            <input
+                            <span class="text-xs font-semibold uppercase text-muted-foreground">Barcode</span>
+                            <Input
                                 v-model="barcode"
                                 type="text"
                                 inputmode="numeric"
                                 placeholder="Enter barcode"
-                                class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base  outline-none focus:border-[#6f9b58]"
-                            >
+                                class="mt-1"
+                            />
                         </label>
-                        <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="lookupLoading" @click="lookup(); stopWebScan()">
+                        <Button class="mt-3 w-full" :disabled="lookupLoading" @click="lookup(); stopWebScan()">
                             <Search :size="19" />
                             Look up barcode
-                        </button>
+                        </Button>
                     </div>
                 </div>
             </div>
 
             <div class="grid gap-2 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3">
-                <button v-if="!manualBarcodeOpen" class="w-full rounded-md bg-white px-4 py-3 font-semibold text-[#17211b] active:bg-stone-100" @click="showManualBarcodeInput">
+                <Button v-if="!manualBarcodeOpen" variant="inverse" class="w-full" @click="showManualBarcodeInput">
                     Enter barcode manually
-                </button>
+                </Button>
             </div>
         </div>
 
         <article v-if="mode === 'choose'" class="grid gap-3">
-            <Link :href="addModeUrl('food')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
-                <span class="grid h-11 w-11 place-items-center rounded-md bg-[#253d2c] text-white">
+            <Button :as="Link" :href="addModeUrl('food')" variant="outline" class="h-auto justify-start p-4 text-left">
+                <span class="grid h-11 w-11 place-items-center rounded-md bg-primary text-primary-foreground">
                     <Utensils :size="22" />
                 </span>
                 <span>
                     <span class="block font-semibold">Food</span>
-                    <span class="block text-sm font-medium text-stone-500">Search or scan</span>
+                    <span class="block text-sm font-medium text-muted-foreground">Search or scan</span>
                 </span>
-            </Link>
+            </Button>
 
-            <Link :href="addModeUrl('workout')" class="flex items-center gap-3 rounded-md border border-stone-200 bg-white p-4 active:bg-stone-50">
-                <span class="grid h-11 w-11 place-items-center rounded-md bg-[#6f9b58] text-white">
+            <Button :as="Link" :href="addModeUrl('workout')" variant="outline" class="h-auto justify-start p-4 text-left">
+                <span class="grid h-11 w-11 place-items-center rounded-md bg-workout text-primary-foreground">
                     <Dumbbell :size="22" />
                 </span>
                 <span>
                     <span class="block font-semibold">Workout</span>
-                    <span class="block text-sm font-medium text-stone-500">Log calories burned</span>
+                    <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
                 </span>
-            </Link>
+            </Button>
         </article>
 
         <Card v-if="mode === 'food'">
             <div class="flex items-center gap-2">
-                <Search :size="21" class="text-[#b05252]" />
+                <Search :size="21" class="text-fat" />
                 <h2 class="font-semibold">Food</h2>
             </div>
 
             <form class="mt-4 flex gap-2" @submit.prevent="searchFoodProducts">
-                <input
+                <Input
                     v-model="foodSearch"
                     type="search"
                     placeholder="Search..."
-                    class="min-w-0 flex-1 rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-base  outline-none focus:border-[#6f9b58]"
+                    class="min-w-0 flex-1"
                     @input="searchFoodProducts"
-                >
-                <button class="grid aspect-square h-[50px] shrink-0 place-items-center rounded-md bg-[#253d2c] text-white active:bg-[#17211b] disabled:opacity-80" :disabled="foodSearchLoading" aria-label="Search">
+                />
+                <Button class="aspect-square h-[50px] shrink-0 px-0 py-0" :disabled="foodSearchLoading" aria-label="Search">
                     <LoaderCircle v-if="foodSearchLoading" :size="21" class="animate-spin" />
                     <Search v-else :size="21" />
-                </button>
+                </Button>
             </form>
 
             <div class="flex gap-2">
-            <button class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="scannerStarting" @click="startScan">
+            <Button class="mt-3 w-full" :disabled="scannerStarting" @click="startScan">
                 <Camera :size="20" />
                 {{ scannerStarting ? 'Opening...' : 'Scan' }}
-            </button>
-            <Link
+            </Button>
+            <Button
+                :as="Link"
                 :href="`/add?date=${date}&mode=custom`"
-                class="mt-3 flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3  text-white active:bg-[#17211b]">
+                class="mt-3 w-full">
                 <Pencil :size="20" />
                 Custom
-            </Link>
+            </Button>
             </div>
 
-            <p v-if="nativeMessage" class="mt-3 rounded-md bg-stone-100 p-3 text-sm  text-stone-700">{{ nativeMessage }}</p>
-            <p v-if="lookupError" class="mt-3 rounded-md bg-red-50 p-3 text-sm  text-red-800">{{ lookupError }}</p>
+            <p v-if="nativeMessage" class="mt-3 rounded-md bg-muted p-3 text-sm  text-foreground/80">{{ nativeMessage }}</p>
+            <p v-if="lookupError" class="mt-3 rounded-md bg-danger-soft p-3 text-sm  text-danger-soft-foreground">{{ lookupError }}</p>
 
-            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-md bg-stone-100 p-3 text-sm  text-stone-600" role="status" aria-live="polite">
-                <LoaderCircle :size="17" class="animate-spin text-[#253d2c]" />
+            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-md bg-muted p-3 text-sm  text-muted-foreground" role="status" aria-live="polite">
+                <LoaderCircle :size="17" class="animate-spin text-primary" />
                 Searching...
             </div>
 
             <div v-else-if="foodSearchResults.length" class="mt-4 grid gap-2">
-                <button
+                <Button
                     v-for="result in foodSearchResults"
                     :key="result.id"
                     type="button"
-                    class="flex w-full min-w-0 items-center gap-3 overflow-hidden rounded-md border border-stone-200 bg-stone-50 p-3 text-left active:bg-stone-100"
+                    variant="surface"
+                    class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                     @click="selectFoodResult(result)"
                 >
                     <img v-if="result.image_url" :src="result.image_url" alt="" class="h-12 w-12 shrink-0 rounded-md object-cover">
-                    <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
+                    <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                         <Utensils v-if="result.type === 'previous_meal'" :size="20" />
                         <Barcode v-else :size="20" />
                     </span>
@@ -763,80 +768,71 @@ onUnmounted(() => {
                             {{ result.name }}
                         </span>
                     </span>
-                </button>
+                </Button>
             </div>
 
             <div v-else-if="!foodSearchQuery && previousFoodEntries.length" class="mt-4">
-                <p class="text-xs font-semibold uppercase text-stone-500">Previous food entries</p>
+                <p class="text-xs font-semibold uppercase text-muted-foreground">Previous food entries</p>
                 <div class="mt-2 grid gap-2">
-                    <button
+                    <Button
                         v-for="entry in previousFoodEntries"
                         :key="entry.id"
                         type="button"
-                        class="flex w-full min-w-0 items-center gap-3 overflow-hidden rounded-md border border-stone-200 bg-stone-50 p-3 text-left active:bg-stone-100"
+                        variant="surface"
+                        class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                         @click="selectPreviousMeal(entry)"
                     >
                         <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-12 w-12 shrink-0 rounded-md object-cover">
-                        <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
+                        <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                             <Utensils :size="20" />
                         </span>
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ entry.name }}</span>
-                            <span class="block truncate text-sm text-stone-500">
+                            <span class="block truncate text-sm text-muted-foreground">
                                 <span v-if="entry.portion_quantity">{{ entry.portion_quantity }}{{ entry.portion_unit }}</span>
                             </span>
                         </span>
-                    </button>
+                    </Button>
                 </div>
             </div>
 
-            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-md bg-stone-100 p-3 text-sm  text-stone-600">
+            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-md bg-muted p-3 text-sm  text-muted-foreground">
                 No products found.
             </p>
         </Card>
 
         <div
             v-if="foodAddSheetOpen"
-            class="fixed inset-0 z-40 bg-black/30"
+            class="fixed inset-0 z-40 bg-foreground/30"
             @click="closeFoodAddSheet"
         />
 
         <section
             v-if="foodAddSheetOpen"
-            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-white px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-[0_-18px_50px_rgba(23,33,27,0.22)] transition-transform duration-200"
+            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-card px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-2xl transition-transform duration-200"
             :class="foodAddSheetOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!foodAddSheetOpen"
             :inert="!foodAddSheetOpen"
             aria-label="Add food"
         >
-<!--            <div class="mb-8 flex items-start justify-between gap-3">-->
-<!--                <div class="min-w-0">-->
-<!--&lt;!&ndash;                    <p class="text-xl text-stone-500">Food product</p>&ndash;&gt;-->
-<!--&lt;!&ndash;                    <h2 class="truncate text-4xl font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</h2>&ndash;&gt;-->
-<!--                </div>-->
-<!--                <button class="grid h-10 w-10 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">-->
-<!--                    <X :size="32" />-->
-<!--                </button>-->
-<!--            </div>-->
-
-            <button class="grid h-10 w-10 absolute top-4 right-4 shrink-0 place-items-center rounded-md text-stone-500 active:bg-stone-100" aria-label="Close add food" @click="closeFoodAddSheet">
+            <Button variant="ghost" size="icon" class="absolute right-4 top-4 h-10 w-10 shrink-0" aria-label="Close add food" @click="closeFoodAddSheet">
                 <X :size="24" />
-            </button>
+            </Button>
 
             <div v-if="selectedPreviousMeal || product" class="space-y-5">
                 <div class="flex gap-4">
                     <img v-if="(selectedPreviousMeal || product)?.image_url" :src="(selectedPreviousMeal || product)?.image_url || ''" alt="" class="h-20 w-20 rounded-md object-cover">
-                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-md bg-stone-200 text-stone-500">
+                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
                         <Utensils v-if="selectedPreviousMeal" :size="26" />
                         <Barcode v-else :size="26" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-lg font-semibold text-[#17211b]">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
-                        <p class="truncate text-base text-stone-500">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>
-                        <p v-if="selectedPreviousMeal" class="mt-1 text-sm text-[#17211b]">
+                        <p class="truncate text-lg font-semibold text-foreground">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
+                        <p class="truncate text-base text-muted-foreground">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>
+                        <p v-if="selectedPreviousMeal" class="mt-1 text-sm text-foreground">
                             {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ formatMacro(Number(selectedPreviousMeal.portion_quantity)) }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ formatMacro(Number(selectedPreviousMeal.protein_g)) }}g · C {{ formatMacro(Number(selectedPreviousMeal.carbs_g)) }}g · F {{ formatMacro(Number(selectedPreviousMeal.fat_g)) }}g
                         </p>
-                        <p v-else-if="product" class="mt-1 text-sm text-[#17211b]">
+                        <p v-else-if="product" class="mt-1 text-sm text-foreground">
                             {{ product.calories_per_100 }} kcal · P {{ formatMacro(Number(product.protein_per_100)) }}g · C {{ formatMacro(Number(product.carbs_per_100)) }}g · F {{ formatMacro(Number(product.fat_per_100)) }}g / 100{{ product.nutrition_unit || 'g' }}
                         </p>
                     </div>
@@ -844,221 +840,223 @@ onUnmounted(() => {
 
                 <div v-if="activeFoodHasPortion" class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
                     <div v-if="activeFoodPortionOptions.length" class="col-span-2 flex gap-2 overflow-x-auto pb-1">
-                        <button
+                        <Button
                             v-for="(option, index) in activeFoodPortionOptions"
                             :key="`${option.quantity}-${option.unit}-${index}`"
                             type="button"
-                            class="shrink-0 rounded-md border px-4 py-1.5 text-lg font-semibold transition"
-                            :class="selectedPortionKey === String(index) ? 'border-[#253d2c] bg-[#253d2c] text-white' : 'border-stone-200 bg-stone-50 text-stone-700 active:bg-stone-100'"
+                            class="h-auto shrink-0 px-4 py-1.5 text-lg"
+                            :variant="selectedPortionKey === String(index) ? 'default' : 'surface'"
                             @click="selectPortion(option, index)"
                         >
                             {{ portionOptionLabel(option) }}
-                        </button>
+                        </Button>
                     </div>
 
-                    <input
+                    <Input
                         v-model.number="activeFoodPortionQuantity"
                         type="number"
                         min="0.1"
                         step="0.1"
-                        class="rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-lg outline-none focus:border-[#6f9b58]"
+                        class="py-2.5 text-lg"
                         @input="selectedPortionKey = ''"
-                    >
-                    <select
+                    />
+                    <Select
                         v-model="activeFoodPortionUnit"
-                        class="w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-2.5 text-lg outline-none focus:border-[#6f9b58]"
+                        class="py-2.5 text-lg"
                     >
                         <option :value="activeFoodUnit">{{ activeFoodUnit }}</option>
-                    </select>
+                    </Select>
                 </div>
 
-                <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
+                <div class="rounded-md border border-border bg-muted p-3">
                     <p class="text-base font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
-                        <button
+                        <Button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-base font-semibold transition"
-                            :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
+                            class="min-h-11 px-3 text-base"
+                            :variant="selectedMealType === mealType ? 'default' : 'inverse'"
                             @click="setMealType(mealType)"
                         >
                             {{ mealLabels[mealType] }}
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-4 gap-2 rounded-md border border-stone-200 bg-stone-50 p-3 text-center">
+                <div class="grid grid-cols-4 gap-2 rounded-md border border-border bg-muted p-3 text-center">
                     <div>
-                        <p class="text-xs font-semibold uppercase text-stone-500">Kcal</p>
-                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ activeFoodMacros.calories }}</p>
+                        <p class="text-xs font-semibold uppercase text-muted-foreground">Kcal</p>
+                        <p class="mt-1 text-lg font-semibold text-foreground">{{ activeFoodMacros.calories }}</p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase text-stone-500">Protein</p>
-                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.protein_g) }}g</p>
+                        <p class="text-xs font-semibold uppercase text-muted-foreground">Protein</p>
+                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.protein_g) }}g</p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase text-stone-500">Carbs</p>
-                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.carbs_g) }}g</p>
+                        <p class="text-xs font-semibold uppercase text-muted-foreground">Carbs</p>
+                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.carbs_g) }}g</p>
                     </div>
                     <div>
-                        <p class="text-xs font-semibold uppercase text-stone-500">Fat</p>
-                        <p class="mt-1 text-lg font-semibold text-[#17211b]">{{ formatMacro(activeFoodMacros.fat_g) }}g</p>
+                        <p class="text-xs font-semibold uppercase text-muted-foreground">Fat</p>
+                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.fat_g) }}g</p>
                     </div>
                 </div>
 
-                <button
-                    class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-4 text-lg font-semibold text-white active:bg-[#17211b] disabled:opacity-60"
+                <Button
+                    class="w-full text-lg"
+                    size="lg"
                     :disabled="barcodeMealForm.processing"
                     @click="selectedPreviousMeal ? addPreviousMeal() : addBarcodeMeal()"
                 >
                     <Plus :size="18" />
                     Add {{ activeFoodCalories }} kcal
-                </button>
+                </Button>
             </div>
         </section>
 
         <Card v-if="mode === 'custom'">
             <div class="flex items-center gap-2">
-                <Utensils :size="21" class="text-[#d28a45]" />
+                <Utensils :size="21" class="text-food" />
                 <h2 class="font-semibold">Custom food</h2>
             </div>
 
             <div v-if="previousCustomMeals.length" class="mt-4">
-                <p class="text-xs font-semibold uppercase text-stone-500">Previous custom foods</p>
+                <p class="text-xs font-semibold uppercase text-muted-foreground">Previous custom foods</p>
                 <div class="mt-2 grid gap-2">
-                    <button
+                    <Button
                         v-for="meal in previousCustomMeals"
                         :key="meal.id"
                         type="button"
-                        class="rounded-md border border-stone-200 bg-stone-50 p-3 text-left active:bg-stone-100"
+                        variant="surface"
+                        class="h-auto justify-start p-3 text-left"
                         @click="selectPreviousCustomMeal(meal)"
                     >
                         <span class="block font-semibold">{{ meal.name }}</span>
-                        <span class="block text-sm  text-stone-500">
+                        <span class="block text-sm  text-muted-foreground">
                             {{ meal.calories }} kcal<span v-if="meal.portion_quantity"> · {{ meal.portion_quantity }}{{ meal.portion_unit }}</span> · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
                         </span>
-                    </button>
+                    </Button>
                 </div>
             </div>
 
             <form class="mt-4 space-y-4" @submit.prevent="addCustomMeal">
                 <label class="block">
-                    <span class="text-xs font-semibold uppercase text-stone-500">Name</span>
-                    <input
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                    <Input
                         v-model="customMealForm.name"
                         type="text"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
-                    >
-                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.name }}</span>
+                        class="mt-1"
+                    />
+                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.name }}</span>
                 </label>
 
                 <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-stone-500">Portion</span>
-                        <input
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Portion</span>
+                        <Input
                             v-model.number="customMealForm.portion_quantity"
                             type="number"
                             min="0.1"
                             step="0.1"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
-                        >
-                        <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.portion_quantity }}</span>
+                            class="mt-1 text-right font-semibold"
+                        />
+                        <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.portion_quantity }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-semibold uppercase text-stone-500">Unit</span>
-                        <select
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Unit</span>
+                        <Select
                             v-model="customMealForm.portion_unit"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 font-semibold outline-none focus:border-[#6f9b58]"
+                            class="mt-1 px-2 font-semibold"
                         >
                             <option value="g">g</option>
                             <option value="ml">ml</option>
-                        </select>
-                        <span v-if="customMealForm.errors.portion_unit" class="mt-1 block text-sm  text-red-700">{{ customMealForm.errors.portion_unit }}</span>
+                        </Select>
+                        <span v-if="customMealForm.errors.portion_unit" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.portion_unit }}</span>
                     </label>
                 </div>
 
                 <div class="grid grid-cols-3 gap-2">
                     <label v-for="field in customMealMacroFields" :key="field[0]">
-                        <span class="text-xs font-semibold uppercase text-stone-500">{{ field[1] }}</span>
-                        <input
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">{{ field[1] }}</span>
+                        <Input
                             v-model.number="customMealForm[field[0]]"
                             type="number"
                             min="0"
                             step="0.1"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-2 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
-                        >
+                            class="mt-1 px-2 text-right font-semibold"
+                        />
                     </label>
                 </div>
 
-                <div class="rounded-md border border-stone-200 bg-stone-50 p-3">
+                <div class="rounded-md border border-border bg-muted p-3">
                     <p class="text-sm font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
-                        <button
+                        <Button
                             v-for="mealType in mealTypes"
                             :key="mealType"
                             type="button"
-                            class="min-h-11 rounded px-3 text-sm font-semibold transition"
-                            :class="selectedMealType === mealType ? 'bg-[#253d2c] text-white' : 'bg-white text-stone-600 active:bg-stone-100'"
+                            class="min-h-11 px-3 text-sm"
+                            :variant="selectedMealType === mealType ? 'default' : 'inverse'"
                             @click="setMealType(mealType)"
                         >
                             {{ mealLabels[mealType] }}
-                        </button>
+                        </Button>
                     </div>
                 </div>
 
-                <button class="w-full rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="customMealForm.processing">
+                <Button class="w-full" :disabled="customMealForm.processing">
                     Add {{ customCalories }} kcal
-                </button>
+                </Button>
             </form>
         </Card>
 
         <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">
-                <Dumbbell :size="21" class="text-[#6f9b58]" />
+                <Dumbbell :size="21" class="text-workout" />
                 <h2 class="font-semibold">Workout</h2>
             </div>
 
             <form class="mt-4 space-y-4" @submit.prevent="addWorkout">
                 <label class="block">
-                    <span class="text-xs font-semibold uppercase text-stone-500">Title</span>
-                    <input
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Title</span>
+                    <Input
                         v-model="workoutForm.title"
                         type="text"
-                        class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3  outline-none focus:border-[#6f9b58]"
-                    >
-                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.title }}</span>
+                        class="mt-1"
+                    />
+                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.title }}</span>
                 </label>
 
                 <div class="grid grid-cols-2 gap-2">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-stone-500">Calories burnt</span>
-                        <input
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Calories burnt</span>
+                        <Input
                             v-model.number="workoutForm.calories_burned"
                             type="number"
                             min="1"
                             step="1"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 text-right font-semibold outline-none focus:border-[#6f9b58]"
-                        >
-                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.calories_burned }}</span>
+                            class="mt-1 text-right font-semibold"
+                        />
+                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.calories_burned }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-semibold uppercase text-stone-500">Time</span>
-                        <input
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Time</span>
+                        <Input
                             v-model="workoutForm.time"
                             type="time"
-                            class="mt-1 w-full rounded-md border border-stone-200 bg-stone-50 px-3 py-3 font-semibold outline-none focus:border-[#6f9b58]"
-                        >
-                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm  text-red-700">{{ workoutForm.errors.time }}</span>
+                            class="mt-1 font-semibold"
+                        />
+                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.time }}</span>
                     </label>
                 </div>
 
-                <button class="flex w-full items-center justify-center gap-2 rounded-md bg-[#253d2c] px-4 py-3 font-semibold text-white active:bg-[#17211b]" :disabled="workoutForm.processing">
+                <Button class="w-full" :disabled="workoutForm.processing">
                     <Plus :size="18" />
                     Add workout
-                </button>
+                </Button>
             </form>
         </Card>
     </section>
