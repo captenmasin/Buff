@@ -21,7 +21,7 @@ const component = computed(() => props.as || 'button');
 const variants: Record<ButtonVariant, string> = {
     default: 'bg-primary text-primary-foreground shadow-sm active:bg-foreground disabled:bg-muted-foreground/35 disabled:text-primary-foreground',
     secondary: 'bg-secondary text-secondary-foreground active:bg-secondary/80',
-    outline: 'border border-border bg-card text-foreground/80 shadow-sm active:bg-muted',
+    outline: 'border border-border bg-card text-foreground/80 active:bg-muted',
     ghost: 'text-muted-foreground active:bg-muted',
     destructive: 'text-destructive active:bg-danger-soft',
     inverse: 'bg-card text-foreground active:bg-muted',

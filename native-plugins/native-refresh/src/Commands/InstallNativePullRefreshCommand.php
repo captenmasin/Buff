@@ -17,11 +17,6 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
             $this->installAndroidAddShortcut();
         }
 
-        if ($this->isIos()) {
-            $this->installIosRefresh();
-            $this->installIosAddShortcut();
-        }
-
         return self::SUCCESS;
     }
 
@@ -103,65 +98,63 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
     {
         $this->patchFile(
             $this->buildPath().'/app/src/main/res/xml/shortcuts.xml',
-            fn (string $content): string => str_replace(
-                'android:data="nativephp://add"',
-                'android:data="nativephp:///?add=1"',
-                $content
-            )
+            fn (string $content): string => <<<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="add"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_add_short"
+        android:shortcutLongLabel="@string/shortcut_add_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="nativephp:///?add=1" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="scan"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_scan_short"
+        android:shortcutLongLabel="@string/shortcut_scan_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="nativephp://add?mode=food&amp;scan=1" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="workout"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher"
+        android:shortcutShortLabel="@string/shortcut_workout_short"
+        android:shortcutLongLabel="@string/shortcut_workout_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="nativephp://add?mode=workout" />
+    </shortcut>
+</shortcuts>
+XML
         );
 
-        $this->info('Installed Android Add shortcut drawer target.');
-    }
-
-    private function installIosRefresh(): void
-    {
         $this->patchFile(
-            $this->buildPath().'/NativePHP/ContentView.swift',
+            $this->buildPath().'/app/src/main/res/values/strings.xml',
             function (string $content): string {
-                if (! str_contains($content, 'var refreshControl: UIRefreshControl?')) {
-                    $content = str_replace(
-                        "        var webView: WKWebView?\n        var hasCompletedInitialLoad = false\n",
-                        "        var webView: WKWebView?\n        var refreshControl: UIRefreshControl?\n        var hasCompletedInitialLoad = false\n",
-                        $content
-                    );
-                }
+                $strings = [
+                    'shortcut_add_short' => 'Add',
+                    'shortcut_add_long' => 'Add to Buff',
+                    'shortcut_scan_short' => 'Scan',
+                    'shortcut_scan_long' => 'Scan barcode',
+                    'shortcut_workout_short' => 'Add workout',
+                    'shortcut_workout_long' => 'Add workout',
+                ];
 
-                if (! str_contains($content, 'refreshControl?.endRefreshing()')) {
-                    $content = str_replace(
-                        "            // Re-inject safe area insets to ensure they're set (like Android does)\n            injectSafeAreaInsets(webView)\n",
-                        "            refreshControl?.endRefreshing()\n\n            // Re-inject safe area insets to ensure they're set (like Android does)\n            injectSafeAreaInsets(webView)\n",
-                        $content
-                    );
-                }
+                foreach ($strings as $name => $value) {
+                    if (str_contains($content, "name=\"{$name}\"")) {
+                        continue;
+                    }
 
-                if (! str_contains($content, 'func refreshWebView()')) {
                     $content = str_replace(
-                        "        @objc func reloadWebView() {\n            // Views are already cleared during persistent runtime reboot — just reload\n            self.webView?.reload()\n        }\n",
-                        "        @objc func reloadWebView() {\n            // Views are already cleared during persistent runtime reboot — just reload\n            self.webView?.reload()\n        }\n\n        @objc func refreshWebView() {\n            self.webView?.reload()\n        }\n",
-                        $content
-                    );
-                }
-
-                if (! str_contains($content, 'func addPullToRefresh')) {
-                    $content = str_replace(
-                        "    func addSwipeGestureSupport(webView: WKWebView, context: Context) {\n",
-                        "    func addPullToRefresh(webView: WKWebView, coordinator: Coordinator) {\n        if coordinator.refreshControl != nil {\n            return\n        }\n\n        let refreshControl = UIRefreshControl()\n        refreshControl.addTarget(coordinator, action: #selector(Coordinator.refreshWebView), for: .valueChanged)\n        webView.scrollView.refreshControl = refreshControl\n        coordinator.refreshControl = refreshControl\n    }\n\n    func addSwipeGestureSupport(webView: WKWebView, context: Context) {\n",
-                        $content
-                    );
-                }
-
-                if (! str_contains($content, 'addPullToRefresh(webView: existingWebView')) {
-                    $content = str_replace(
-                        "            existingWebView.alpha = 1.0\n\n            // Observers are still registered",
-                        "            existingWebView.alpha = 1.0\n            addPullToRefresh(webView: existingWebView, coordinator: coordinator)\n\n            // Observers are still registered",
-                        $content
-                    );
-                }
-
-                if (! str_contains($content, 'addPullToRefresh(webView: webView')) {
-                    $content = str_replace(
-                        "        addNativeHelper(webView: webView)\n\n        addSwipeGestureSupport(webView: webView, context: context)\n",
-                        "        addNativeHelper(webView: webView)\n\n        addPullToRefresh(webView: webView, coordinator: coordinator)\n\n        addSwipeGestureSupport(webView: webView, context: context)\n",
+                        '</resources>',
+                        "    <string name=\"{$name}\">{$value}</string>\n</resources>",
                         $content
                     );
                 }
@@ -170,21 +163,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
             }
         );
 
-        $this->info('Installed iOS native pull-to-refresh.');
-    }
-
-    private function installIosAddShortcut(): void
-    {
-        $this->patchFile(
-            $this->buildPath().'/NativePHP/AppDelegate.swift',
-            fn (string $content): string => str_replace(
-                'URL(string: "nativephp://add")',
-                'URL(string: "nativephp:///?add=1")',
-                $content
-            )
-        );
-
-        $this->info('Installed iOS Add shortcut drawer target.');
+        $this->info('Installed Android Add, Scan, and Add workout shortcut targets.');
     }
 
     private function patchFile(string $path, callable $patch): void

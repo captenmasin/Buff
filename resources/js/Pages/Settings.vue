@@ -6,7 +6,6 @@ import { applyAppearance, saveAppearance, storedAppearance, type Appearance } fr
 import Card from '../Components/Card.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
-import Switch from '../Components/ui/switch/Switch.vue';
 
 const props = defineProps<{
     settings: {
@@ -15,8 +14,6 @@ const props = defineProps<{
         target_body_fat_percent: number | null;
     };
 }>();
-
-const foodGoalReminderStorageKey = 'buff.foodGoalReminder';
 
 const bodyTargetForm = useForm({
     target_weight_kg: props.settings.target_weight_kg ?? '',
@@ -27,8 +24,6 @@ const heightForm = useForm({
     height_cm: props.settings.height_cm ?? '',
 });
 
-const reminder = ref(loadReminderSettings());
-const notificationPermission = ref('Notification' in window ? Notification.permission : 'unsupported');
 const appearance = ref<Appearance>(storedAppearance());
 
 const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof Sun }> = [
@@ -43,27 +38,6 @@ function saveBodyTargets() {
 
 function saveHeight() {
     heightForm.put('/settings/height', { preserveScroll: true });
-}
-
-function loadReminderSettings() {
-    try {
-        return {
-            enabled: false,
-            time: '20:00',
-            ...JSON.parse(window.localStorage.getItem(foodGoalReminderStorageKey) || '{}'),
-        };
-    } catch {
-        return { enabled: false, time: '20:00' };
-    }
-}
-
-async function saveReminderSettings() {
-    if (reminder.value.enabled && 'Notification' in window && Notification.permission === 'default') {
-        notificationPermission.value = await Notification.requestPermission();
-    }
-
-    window.localStorage.setItem(foodGoalReminderStorageKey, JSON.stringify(reminder.value));
-    window.dispatchEvent(new CustomEvent('buff-food-goal-reminder-updated'));
 }
 
 function selectAppearance(value: Appearance) {
@@ -155,29 +129,6 @@ function selectAppearance(value: Appearance) {
                     Save height
                 </Button>
             </form>
-        </Card>
-
-        <Card>
-            <div class="flex items-center justify-between gap-4">
-                <div>
-                    <h2 class="font-semibold">Food reminder</h2>
-                    <p class="text-sm text-muted-foreground">{{ reminder.enabled ? `Daily at ${reminder.time}` : 'Off' }}</p>
-                </div>
-                <Switch v-model="reminder.enabled" @change="saveReminderSettings" />
-            </div>
-
-            <label class="mt-4 block">
-                <span class="text-xs font-semibold uppercase text-muted-foreground">Time</span>
-                <Input
-                    v-model="reminder.time"
-                    type="time"
-                    class="mt-1"
-                    @change="saveReminderSettings"
-                />
-            </label>
-            <p v-if="notificationPermission === 'denied'" class="mt-2 text-sm text-destructive">
-                Notifications are blocked for this app.
-            </p>
         </Card>
     </section>
 </template>

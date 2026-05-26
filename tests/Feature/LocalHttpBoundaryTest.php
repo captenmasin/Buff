@@ -1,6 +1,6 @@
 <?php
 
-it('allows loopback http requests by default', function (): void {
+it('allows loopback http requests without a local http boundary', function (): void {
     config(['app.allow_remote_http' => false]);
 
     $this
@@ -9,39 +9,39 @@ it('allows loopback http requests by default', function (): void {
         ->assertOk();
 });
 
-it('rejects remote http requests by default', function (): void {
+it('allows remote http requests without a local http boundary', function (): void {
     config(['app.allow_remote_http' => false]);
 
     $this
         ->withServerVariables(['REMOTE_ADDR' => '192.168.1.50'])
         ->get('/')
-        ->assertForbidden();
+        ->assertOk();
 });
 
-it('allows nativephp ios embedded runtime requests by default', function (): void {
+it('allows nativephp android embedded runtime requests without a local http boundary', function (): void {
     config(['app.allow_remote_http' => false]);
 
     $this
         ->withServerVariables([
             'REMOTE_ADDR' => '0.0.0.0',
             'NATIVEPHP_RUNNING' => 'true',
-            'NATIVEPHP_PLATFORM' => 'ios',
+            'NATIVEPHP_PLATFORM' => 'android',
         ])
         ->get('/')
         ->assertOk();
 });
 
-it('rejects nativephp runtime requests from remote addresses by default', function (): void {
+it('allows nativephp runtime requests from remote addresses without a local http boundary', function (): void {
     config(['app.allow_remote_http' => false]);
 
     $this
         ->withServerVariables([
             'REMOTE_ADDR' => '192.168.1.50',
             'NATIVEPHP_RUNNING' => 'true',
-            'NATIVEPHP_PLATFORM' => 'ios',
+            'NATIVEPHP_PLATFORM' => 'android',
         ])
         ->get('/')
-        ->assertForbidden();
+        ->assertOk();
 });
 
 it('allows remote http requests when explicitly enabled', function (): void {

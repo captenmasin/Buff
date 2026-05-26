@@ -82,41 +82,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Development Team (iOS)
-    |--------------------------------------------------------------------------
-    |
-    | The Apple Developer Team ID to use for code signing iOS apps. This is
-    | automatically detected from your installed certificates, but you can
-    | override it here if needed. Find your Team ID in your Apple Developer
-    | account under Membership details.
-    |
-    */
-    'development_team' => env('NATIVEPHP_DEVELOPMENT_TEAM'),
-
-    /*
-    |--------------------------------------------------------------------------
-    | iOS Permission Strings (Info.plist Overrides)
-    |--------------------------------------------------------------------------
-    |
-    | Override iOS Info.plist usage descriptions provided by plugins. Anything
-    | you set here is applied AFTER all plugin manifests are merged, so it
-    | always wins — useful when multiple plugins claim the same key (e.g.
-    | mobile-camera and mobile-scanner both set NSCameraUsageDescription) and
-    | you want a single explicit string for App Store review.
-    |
-    | Android has no equivalent: permission rationale is shown by app code at
-    | runtime, not declared in the manifest, so this block is iOS-only.
-    |
-    */
-
-    'permissions' => [
-        'NSCameraUsageDescription' => 'Buff uses the camera to scan food barcodes.',
-        // 'NSMicrophoneUsageDescription' => 'Used to record audio with your videos.',
-        // 'NSPhotoLibraryUsageDescription' => 'Used to select photos for your post.',
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
     | Environment Keys to Clean Up
     |--------------------------------------------------------------------------
     |
@@ -313,62 +278,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | App Store Connect API Configuration
-    |--------------------------------------------------------------------------
-    |
-    | Configuration for uploading apps to App Store Connect using the API.
-    | These values are used for automated uploads during the package process.
-    | Store sensitive data in environment variables for security.
-    |
-    */
-    'app_store_connect' => [
-        'api_key' => env('APP_STORE_API_KEY'),
-        'api_key_id' => env('APP_STORE_API_KEY_ID'),
-        'api_issuer_id' => env('APP_STORE_API_ISSUER_ID'),
-        'app_name' => env('APP_STORE_APP_NAME'),
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | iPad Support
-    |--------------------------------------------------------------------------
-    |
-    | Enable or disable iPad support for your iOS app. When enabled, your app
-    | will support iPad devices and all iPad orientations (portrait, upside down,
-    | landscape left, and landscape right) as required by Apple's App Store
-    | guidelines. When disabled, your app will be iPhone-only.
-    |
-    | Note: Once an app is deployed to the App Store with iPad
-    | support you cannot revoke this action.
-    |
-    */
-    'ipad' => false,
-
-    /*
-    |--------------------------------------------------------------------------
     | Device Orientation Support
     |--------------------------------------------------------------------------
     |
     | Configure which orientations your app supports on different devices.
     | This will be applied during the build process to set appropriate
-    | constraints in Info.plist (iOS) and AndroidManifest.xml (Android).
+    | constraints in AndroidManifest.xml.
     |
-    | For iPhone and Android, you can configure specific orientations.
-    | For iPad, when enabled above, all orientations are automatically supported
-    | as required by Apple's App Store guidelines.
-    |
-    | If all orientations are false for iPhone, the build will fail with a
-    | helpful error message. If all orientations are false for Android, the
-    | build will fail with a helpful error message.
+    | If all orientations are false for Android, the build will fail with a
+    | helpful error message.
     |
     */
     'orientation' => [
-        'iphone' => [
-            'portrait' => true,
-            'upside_down' => false,
-            'landscape_left' => false,
-            'landscape_right' => false,
-        ],
         'android' => [
             'portrait' => true,
             'upside_down' => false,

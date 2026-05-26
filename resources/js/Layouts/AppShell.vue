@@ -14,9 +14,6 @@ const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
 const toastTimer = ref<number | null>(null);
 let removeFlashToastListener: (() => void) | null = null;
-let foodGoalReminderTimer: number | null = null;
-
-const foodGoalReminderStorageKey = 'buff.foodGoalReminder';
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home, match: '/' },
@@ -139,71 +136,9 @@ async function showFlashToast(message?: string) {
     }
 }
 
-function foodGoalReminderSettings(): { enabled?: boolean; time?: string } {
-    try {
-        return JSON.parse(window.localStorage.getItem(foodGoalReminderStorageKey) || '{}');
-    } catch {
-        return {};
-    }
-}
-
-function nextReminderDelay(time?: string) {
-    const [hours, minutes] = String(time || '20:00').split(':').map(Number);
-    const next = new Date();
-
-    next.setHours(Number.isFinite(hours) ? hours : 20, Number.isFinite(minutes) ? minutes : 0, 0, 0);
-
-    if (next <= new Date()) {
-        next.setDate(next.getDate() + 1);
-    }
-
-    return next.getTime() - Date.now();
-}
-
-function sendFoodGoalReminder() {
-    const title = 'Complete your food goals';
-    const body = 'Open Buff and finish today\'s food log.';
-
-    if ('Notification' in window && Notification.permission === 'granted') {
-        const notification = new Notification(title, {
-            body,
-            tag: 'buff-food-goals',
-        });
-
-        notification.onclick = () => {
-            window.focus();
-            router.visit('/');
-            notification.close();
-        };
-    } else {
-        showFallbackToast(body);
-    }
-}
-
-function scheduleFoodGoalReminder() {
-    if (foodGoalReminderTimer) {
-        window.clearTimeout(foodGoalReminderTimer);
-        foodGoalReminderTimer = null;
-    }
-
-    const settings = foodGoalReminderSettings();
-
-    if (!settings.enabled) {
-        return;
-    }
-
-    foodGoalReminderTimer = window.setTimeout(() => {
-        sendFoodGoalReminder();
-        scheduleFoodGoalReminder();
-    }, nextReminderDelay(settings.time));
-}
-
 onMounted(() => {
     window.addEventListener('popstate', handlePopState);
-    window.addEventListener('buff-food-goal-reminder-updated', scheduleFoodGoalReminder);
-    window.addEventListener('storage', scheduleFoodGoalReminder);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
-    scheduleFoodGoalReminder();
     handleShortcutDrawerFlag();
 
     showFlashToast(page.props.flash?.message);
@@ -218,14 +153,7 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('popstate', handlePopState);
-    window.removeEventListener('buff-food-goal-reminder-updated', scheduleFoodGoalReminder);
-    window.removeEventListener('storage', scheduleFoodGoalReminder);
     clearFallbackToast();
-
-    if (foodGoalReminderTimer) {
-        window.clearTimeout(foodGoalReminderTimer);
-        foodGoalReminderTimer = null;
-    }
 
     if (window.__buffHandleAndroidBack === handleNativeAndroidBack) {
         delete window.__buffHandleAndroidBack;
@@ -290,7 +218,7 @@ onUnmounted(() => {
                         <Search :size="22" />
                     </span>
                     <span>
-                        <span class="block font-semibold">Search food</span>
+                        <span class="block font-semibold">Search</span>
                     </span>
                 </Button>
 
@@ -299,7 +227,7 @@ onUnmounted(() => {
                         <ScanBarcode :size="22" />
                     </span>
                     <span>
-                        <span class="block font-semibold">Scan barcode</span>
+                        <span class="block font-semibold">Scan</span>
                     </span>
                 </Button>
                 </div>

@@ -51,7 +51,7 @@ class EnsureLocalRequest
             return false;
         }
 
-        if (! in_array($request->server('NATIVEPHP_PLATFORM'), ['android', 'ios'], true)) {
+        if ($request->server('NATIVEPHP_PLATFORM') !== 'android') {
             return false;
         }
 

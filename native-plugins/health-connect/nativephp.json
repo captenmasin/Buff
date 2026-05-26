@@ -40,8 +40,5 @@
                 "androidx.work:work-runtime-ktx:2.11.2"
             ]
         }
-    },
-    "ios": {
-        "min_version": 18
     }
 }

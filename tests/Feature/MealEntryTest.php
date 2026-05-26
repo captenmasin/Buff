@@ -77,6 +77,16 @@ it('creates a barcode meal from a liquid product portion', function (): void {
         ->and($entry->portion_unit)->toBe('ml');
 });
 
+it('opens the add page in scan mode', function (): void {
+    $this->get('/add?mode=food&scan=1')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->where('mode', 'food')
+            ->where('autoScan', true)
+        );
+});
+
 it('passes unique recent previous custom meals to add page', function (): void {
     $olderDuplicate = MealEntry::query()->create([
         'date' => '2026-05-17',

@@ -5,8 +5,5 @@
     },
     "android": {
         "min_version": 33
-    },
-    "ios": {
-        "min_version": 18
     }
 }
