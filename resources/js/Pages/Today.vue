@@ -10,7 +10,6 @@ import Button from '../Components/ui/button/Button.vue';
 import DropdownMenu from '../Components/ui/dropdown-menu/DropdownMenu.vue';
 import DropdownMenuItem from '../Components/ui/dropdown-menu/DropdownMenuItem.vue';
 import Input from '../Components/ui/input/Input.vue';
-import Popover from '../Components/ui/popover/Popover.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -142,7 +141,7 @@ const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekda
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
-const datePickerOpen = ref(false);
+const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
 const selectedMeal = ref<SelectedMeal | null>(null);
 const editingMeal = ref<SelectedMeal | null>(null);
 const openMealActions = ref<number | null>(null);
@@ -381,22 +380,16 @@ onBeforeUnmount(() => {
                 <p class="text-sm  text-muted-foreground">Buff</p>
                 <h1 class="text-3xl font-semibold tracking-normal text-foreground">{{ displayDate }}</h1>
             </div>
-            <Popover v-model="datePickerOpen">
-                <template #trigger="{ toggle }">
-                    <Button variant="outline" size="icon" aria-label="Select date" @click="toggle">
-                        <Calendar :size="21"/>
-                    </Button>
-                </template>
-
-                <template #default="{ close }">
-                    <Input
-                        :value="summary.date"
-                        type="date"
-                        class="w-44 bg-card px-3 py-2 text-sm"
-                        @change="selectDate($event); close()"
-                    />
-                </template>
-            </Popover>
+            <Button as="label" variant="outline" size="icon" class="relative cursor-pointer overflow-hidden" aria-label="Select date">
+                <Calendar :size="21"/>
+                <input
+                    :value="summary.date"
+                    type="date"
+                    class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                    aria-label="Select date"
+                    @change="selectDate"
+                />
+            </Button>
         </header>
 
         <nav class="grid grid-cols-7 gap-2" aria-label="Week">
@@ -542,14 +535,15 @@ onBeforeUnmount(() => {
                 <h2 class="text-lg font-semibold">Workouts</h2>
                 <template v-if="showHealthConnect">
                     <Button
-                        v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
+                        v-if="canSyncHealthConnect"
                         variant="outline"
-                        size="icon"
+                        size="sm"
                         :disabled="healthConnectLoading"
                         aria-label="Sync Health Connect"
                         @click="syncHealthConnect"
                     >
-                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
+                        <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
+                        Re-sync
                     </Button>
                     <Button
                         v-else
