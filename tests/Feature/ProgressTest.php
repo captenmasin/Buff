@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\DailyGoal;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -57,6 +58,11 @@ it('renders latest metric delta and history', function (): void {
 });
 
 it('passes body goals to progress', function (): void {
+    AppPreference::current()->update([
+        'weight_unit' => 'lb',
+        'height_unit' => 'in',
+    ]);
+
     DailyGoal::query()->create([
         'calories' => 2000,
         'protein_g' => 170,
@@ -74,6 +80,8 @@ it('passes body goals to progress', function (): void {
             ->where('goals.height_cm', 178)
             ->where('goals.target_weight_kg', 80)
             ->where('goals.target_body_fat_percent', 15)
+            ->where('preferences.weight_unit', 'lb')
+            ->where('preferences.height_unit', 'in')
         );
 });
 

@@ -6,6 +6,7 @@ import Card from '../Components/Card.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import { heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
 
 const props = defineProps<{
     defaults: {
@@ -16,8 +17,8 @@ const props = defineProps<{
         height_cm: number | null;
         target_weight_kg: number | null;
         target_body_fat_percent: number | null;
-        weight_unit: 'kg' | 'lb';
-        height_unit: 'cm' | 'in';
+        weight_unit: WeightUnit;
+        height_unit: HeightUnit;
     };
 }>();
 
@@ -41,30 +42,14 @@ const steps = ['Units', 'Goals', 'Body'];
 const macroCalories = computed(() => Math.round((Number(form.protein_g) * 4) + (Number(form.carbs_g) * 4) + (Number(form.fat_g) * 9)));
 const macrosMatch = computed(() => macroCalories.value === Number(form.calories));
 
-function kgToLb(value: number): number {
-    return Number((value * 2.2046226218).toFixed(1));
-}
-
-function lbToKg(value: number): number {
-    return Number((value / 2.2046226218).toFixed(1));
-}
-
-function cmToIn(value: number): number {
-    return Number((value / 2.54).toFixed(1));
-}
-
-function inToCm(value: number): number {
-    return Number((value * 2.54).toFixed(1));
-}
-
 function syncDisplayFromStored() {
-    weightDisplay.value = form.target_weight_kg === '' ? '' : String(form.weight_unit === 'lb' ? kgToLb(Number(form.target_weight_kg)) : form.target_weight_kg);
-    heightDisplay.value = form.height_cm === '' ? '' : String(form.height_unit === 'in' ? cmToIn(Number(form.height_cm)) : form.height_cm);
+    weightDisplay.value = form.target_weight_kg === '' ? '' : String(weightFromKg(Number(form.target_weight_kg), form.weight_unit));
+    heightDisplay.value = form.height_cm === '' ? '' : String(heightFromCm(Number(form.height_cm), form.height_unit));
 }
 
-function syncStoredFromDisplay() {
-    form.target_weight_kg = weightDisplay.value === '' ? '' : form.weight_unit === 'lb' ? lbToKg(Number(weightDisplay.value)) : Number(weightDisplay.value);
-    form.height_cm = heightDisplay.value === '' ? '' : form.height_unit === 'in' ? inToCm(Number(heightDisplay.value)) : Number(heightDisplay.value);
+function syncStoredFromDisplay(weightUnit: WeightUnit = form.weight_unit, heightUnit: HeightUnit = form.height_unit) {
+    form.target_weight_kg = weightToKg(weightDisplay.value, weightUnit);
+    form.height_cm = heightToCm(heightDisplay.value, heightUnit);
 }
 
 function nextStep() {
@@ -86,7 +71,13 @@ function finish() {
     form.post('/onboarding');
 }
 
-watch(() => [form.weight_unit, form.height_unit], syncDisplayFromStored);
+watch(
+    () => [form.weight_unit, form.height_unit] as const,
+    ([,], [previousWeightUnit, previousHeightUnit]) => {
+        syncStoredFromDisplay(previousWeightUnit, previousHeightUnit);
+        syncDisplayFromStored();
+    },
+);
 syncDisplayFromStored();
 </script>
 

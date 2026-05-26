@@ -6,6 +6,7 @@ import Card from "../Components/Card.vue";
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
+import { formatBodyValue, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
 
 interface BodyMetric {
     id: number;
@@ -26,6 +27,11 @@ interface BodyDelta {
     body_fat_percent: number | null;
 }
 
+interface UnitPreferences {
+    weight_unit: WeightUnit;
+    height_unit: HeightUnit;
+}
+
 interface ChartRange {
     min: number;
     max: number;
@@ -33,6 +39,7 @@ interface ChartRange {
 
 const props = withDefaults(defineProps<{
     today: string;
+    preferences: UnitPreferences;
     latest?: BodyMetric | null;
     goals?: BodyGoals | null;
     delta?: BodyDelta | null;
@@ -45,12 +52,16 @@ const props = withDefaults(defineProps<{
 
 const form = useForm({
     date: props.today,
-    weight_kg: props.latest?.date === props.today ? props.latest.weight_kg : '',
+    weight_kg: props.latest?.date === props.today ? weightFromKg(props.latest.weight_kg, props.preferences.weight_unit) : '',
     body_fat_percent: props.latest?.date === props.today ? props.latest.body_fat_percent : '',
     notes: props.latest?.date === props.today ? props.latest.notes : '',
 });
 
 const hasDelta = computed(() => Boolean(props.delta));
+const latestWeight = computed(() => weightFromKg(props.latest?.weight_kg, props.preferences.weight_unit));
+const displayDeltaWeight = computed(() => weightFromKg(props.delta?.weight_kg, props.preferences.weight_unit));
+const displayHeight = computed(() => props.goals?.height_cm ? formatBodyValue(props.preferences.height_unit === 'in' ? props.goals.height_cm / 2.54 : props.goals.height_cm) : null);
+const displayTargetWeight = computed(() => weightFromKg(props.goals?.target_weight_kg, props.preferences.weight_unit));
 const currentBmi = computed(() => {
     if (!props.latest?.weight_kg || !props.goals?.height_cm) return null;
 
@@ -59,9 +70,10 @@ const currentBmi = computed(() => {
     return (Number(props.latest.weight_kg) / (heightMeters * heightMeters)).toFixed(1);
 });
 const chartMetrics = computed(() => [...props.history].reverse());
-const weightRange = computed(() => rangeFor(chartMetrics.value.map((metric) => metric.weight_kg), props.goals?.target_weight_kg));
+const chartWeights = computed(() => chartMetrics.value.map((metric) => weightFromKg(metric.weight_kg, props.preferences.weight_unit)));
+const weightRange = computed(() => rangeFor(chartWeights.value, displayTargetWeight.value));
 const bodyFatRange = computed(() => rangeFor(chartMetrics.value.map((metric) => metric.body_fat_percent).filter((value) => value !== null), props.goals?.target_body_fat_percent));
-const weightPoints = computed(() => chartPoints(chartMetrics.value.map((metric) => metric.weight_kg), weightRange.value));
+const weightPoints = computed(() => chartPoints(chartWeights.value, weightRange.value));
 const bodyFatPoints = computed(() => chartPoints(chartMetrics.value.map((metric) => metric.body_fat_percent), bodyFatRange.value));
 
 function deltaLabel(value: number | null | undefined, suffix: string) {
@@ -73,7 +85,12 @@ function deltaLabel(value: number | null | undefined, suffix: string) {
 }
 
 function save() {
-    form.post('/progress/body-metrics', { preserveScroll: true });
+    form
+        .transform((data) => ({
+            ...data,
+            weight_kg: weightToKg(data.weight_kg, props.preferences.weight_unit),
+        }))
+        .post('/progress/body-metrics', { preserveScroll: true });
 }
 
 function rangeFor(values: Array<number | null>, target: number | null = null): ChartRange {
@@ -134,16 +151,18 @@ function removeMetric(metric: BodyMetric) {
         <article class="grid grid-cols-3 gap-3">
             <Card>
                 <p class="text-xs font-semibold uppercase text-muted-foreground">Weight</p>
-                <p class="mt-2 text-3xl font-semibold">{{ latest?.weight_kg ?? '--' }}<span class="text-sm text-muted-foreground"> kg</span></p>
+                <p class="mt-2 text-3xl font-semibold">
+                    {{ formatBodyValue(latestWeight) }}<span v-if="latestWeight !== null" class="text-sm text-muted-foreground"> {{ preferences.weight_unit }}</span>
+                </p>
                 <p class="mt-1 flex items-center gap-1 text-sm " :class="delta?.weight_kg > 0 ? 'text-destructive' : 'text-success-foreground'">
                     <component :is="delta?.weight_kg > 0 ? TrendingUp : TrendingDown" v-if="hasDelta" :size="15" />
-                    {{ hasDelta ? deltaLabel(delta.weight_kg, ' kg') : 'First entry' }}
+                    {{ hasDelta ? deltaLabel(displayDeltaWeight, ` ${preferences.weight_unit}`) : 'First entry' }}
                 </p>
             </Card>
 
             <Card>
                 <p class="text-xs font-semibold uppercase text-muted-foreground">Body fat</p>
-                <p class="mt-2 text-3xl font-semibold">{{ latest?.body_fat_percent ?? '--' }}<span class="text-sm text-muted-foreground">%</span></p>
+                <p class="mt-2 text-3xl font-semibold">{{ latest?.body_fat_percent ?? '--' }}<span v-if="latest?.body_fat_percent !== null && latest?.body_fat_percent !== undefined" class="text-sm text-muted-foreground">%</span></p>
                 <p class="mt-1 flex items-center gap-1 text-sm " :class="delta?.body_fat_percent > 0 ? 'text-destructive' : 'text-success-foreground'">
                     <component :is="delta?.body_fat_percent > 0 ? TrendingUp : TrendingDown" v-if="hasDelta && delta.body_fat_percent !== null" :size="15" />
                     {{ hasDelta ? deltaLabel(delta.body_fat_percent, '%') : 'First entry' }}
@@ -153,7 +172,7 @@ function removeMetric(metric: BodyMetric) {
             <Card>
                 <p class="text-xs font-semibold uppercase text-muted-foreground">BMI</p>
                 <p class="mt-2 text-3xl font-semibold">{{ currentBmi ?? '--' }}</p>
-                <p class="mt-1 text-sm  text-muted-foreground">{{ goals?.height_cm ? `${goals.height_cm} cm` : 'Set height' }}</p>
+                <p class="mt-1 text-sm  text-muted-foreground">{{ displayHeight ? `${displayHeight} ${preferences.height_unit}` : 'Set height' }}</p>
             </Card>
         </article>
 
@@ -163,10 +182,10 @@ function removeMetric(metric: BodyMetric) {
                 <div>
                     <div class="mb-2 flex items-center justify-between text-xs font-semibold uppercase text-muted-foreground">
                         <span>Weight</span>
-                        <span v-if="goals?.target_weight_kg">Goal {{ goals.target_weight_kg }} kg</span>
+                        <span v-if="displayTargetWeight">Goal {{ formatBodyValue(displayTargetWeight) }} {{ preferences.weight_unit }}</span>
                     </div>
                     <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-32 w-full overflow-visible rounded-md bg-muted">
-                        <line v-if="targetY(goals?.target_weight_kg, weightRange) !== null" x1="0" x2="100" :y1="targetY(goals.target_weight_kg, weightRange)" :y2="targetY(goals.target_weight_kg, weightRange)" stroke="var(--food)" stroke-width="1.5" stroke-dasharray="4 3" />
+                        <line v-if="targetY(displayTargetWeight, weightRange) !== null" x1="0" x2="100" :y1="targetY(displayTargetWeight, weightRange)" :y2="targetY(displayTargetWeight, weightRange)" stroke="var(--food)" stroke-width="1.5" stroke-dasharray="4 3" />
                         <polyline :points="weightPoints" fill="none" stroke="var(--primary)" stroke-width="3" vector-effect="non-scaling-stroke" />
                     </svg>
                 </div>
@@ -200,12 +219,12 @@ function removeMetric(metric: BodyMetric) {
 
             <div class="grid grid-cols-2 gap-3">
                 <label>
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Weight kg</span>
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Weight {{ preferences.weight_unit }}</span>
                     <Input
                         v-model="form.weight_kg"
                         type="number"
                         min="1"
-                        max="1000"
+                        :max="preferences.weight_unit === 'lb' ? 2200 : 1000"
                         step="0.1"
                         class="mt-1"
                     />
@@ -251,7 +270,7 @@ function removeMetric(metric: BodyMetric) {
                     <div class="flex items-center justify-between gap-3">
                         <p class="font-semibold">{{ metric.date }}</p>
                         <p class="text-sm  text-muted-foreground">
-                            {{ metric.weight_kg }} kg
+                            {{ formatBodyValue(weightFromKg(metric.weight_kg, preferences.weight_unit)) }} {{ preferences.weight_unit }}
                             <span v-if="metric.body_fat_percent !== null"> · {{ metric.body_fat_percent }}%</span>
                         </p>
                     </div>

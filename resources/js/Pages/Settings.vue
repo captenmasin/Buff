@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { Download, Moon, Smartphone, Sun, Upload } from '@lucide/vue';
 import { applyAppearance, saveAppearance, storedAppearance, type Appearance } from '../appearance';
 import Card from '../Components/Card.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import { heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
 
 const props = defineProps<{
     settings: {
@@ -15,18 +16,18 @@ const props = defineProps<{
         target_body_fat_percent: number | null;
     };
     preferences: {
-        weight_unit: 'kg' | 'lb';
-        height_unit: 'cm' | 'in';
+        weight_unit: WeightUnit;
+        height_unit: HeightUnit;
     };
 }>();
 
 const bodyTargetForm = useForm({
-    target_weight_kg: props.settings.target_weight_kg ?? '',
+    target_weight_kg: weightFromKg(props.settings.target_weight_kg, props.preferences.weight_unit) ?? '',
     target_body_fat_percent: props.settings.target_body_fat_percent ?? '',
 });
 
 const heightForm = useForm({
-    height_cm: props.settings.height_cm ?? '',
+    height_cm: heightFromCm(props.settings.height_cm, props.preferences.height_unit) ?? '',
 });
 
 const unitForm = useForm({
@@ -50,11 +51,21 @@ const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof 
 ];
 
 function saveBodyTargets() {
-    bodyTargetForm.put('/settings/body-targets', { preserveScroll: true });
+    bodyTargetForm
+        .transform((data) => ({
+            ...data,
+            target_weight_kg: weightToKg(data.target_weight_kg, unitForm.weight_unit),
+        }))
+        .put('/settings/body-targets', { preserveScroll: true });
 }
 
 function saveHeight() {
-    heightForm.put('/settings/height', { preserveScroll: true });
+    heightForm
+        .transform((data) => ({
+            ...data,
+            height_cm: heightToCm(data.height_cm, unitForm.height_unit),
+        }))
+        .put('/settings/height', { preserveScroll: true });
 }
 
 function saveUnits() {
@@ -92,6 +103,17 @@ function selectAppearance(value: Appearance) {
     saveAppearance(value);
     applyAppearance(value);
 }
+
+watch(
+    () => [unitForm.weight_unit, unitForm.height_unit] as const,
+    ([,], [previousWeightUnit, previousHeightUnit]) => {
+        const currentTargetWeightKg = weightToKg(bodyTargetForm.target_weight_kg, previousWeightUnit);
+        const currentHeightCm = heightToCm(heightForm.height_cm, previousHeightUnit);
+
+        bodyTargetForm.target_weight_kg = currentTargetWeightKg === '' ? '' : weightFromKg(Number(currentTargetWeightKg), unitForm.weight_unit) ?? '';
+        heightForm.height_cm = currentHeightCm === '' ? '' : heightFromCm(Number(currentHeightCm), unitForm.height_unit) ?? '';
+    },
+);
 </script>
 
 <template>
@@ -155,12 +177,12 @@ function selectAppearance(value: Appearance) {
 
                 <div class="grid grid-cols-2 gap-3">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Weight kg</span>
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Weight {{ unitForm.weight_unit }}</span>
                         <Input
                             v-model.number="bodyTargetForm.target_weight_kg"
                             type="number"
                             min="1"
-                            max="1000"
+                            :max="unitForm.weight_unit === 'lb' ? 2200 : 1000"
                             step="0.1"
                             class="mt-1"
                         />
@@ -191,12 +213,12 @@ function selectAppearance(value: Appearance) {
             <form class="space-y-3" @submit.prevent="saveHeight">
                 <h2 class="font-semibold">Height</h2>
                 <label class="block">
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Height cm</span>
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Height {{ unitForm.height_unit }}</span>
                     <Input
                         v-model.number="heightForm.height_cm"
                         type="number"
-                        min="50"
-                        max="260"
+                        :min="unitForm.height_unit === 'in' ? 20 : 50"
+                        :max="unitForm.height_unit === 'in' ? 102 : 260"
                         step="0.1"
                         class="mt-1"
                     />

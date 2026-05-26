@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\DailyGoal;
 use Illuminate\Http\RedirectResponse;
@@ -22,9 +23,14 @@ class ProgressController extends Controller
         $latest = $metrics->first();
         $previous = $metrics->skip(1)->first();
         $goal = DailyGoal::query()->latest('updated_at')->first();
+        $preferences = AppPreference::current();
 
         return Inertia::render('Progress', [
             'today' => today()->toDateString(),
+            'preferences' => [
+                'weight_unit' => $preferences->weight_unit,
+                'height_unit' => $preferences->height_unit,
+            ],
             'latest' => $latest ? $this->metricPayload($latest) : null,
             'goals' => $goal ? [
                 'height_cm' => $goal->height_cm !== null ? (float) $goal->height_cm : null,
