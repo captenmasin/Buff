@@ -25,6 +25,10 @@ const navItems = [
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
 const isAddActive = computed(() => path.value === '/add');
 
+function isActive(match: string) {
+    return path.value === match;
+}
+
 function openAddDrawer(pushHistory = true) {
     if (addDrawerOpen.value) {
         return;
@@ -167,8 +171,39 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="app-shell mx-auto flex max-w-md flex-col bg-background">
-        <main class="app-main flex-1 px-4">
+    <div class="app-shell flex bg-background sm:pl-64">
+        <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border bg-card/80 px-4 py-5 backdrop-blur sm:flex sm:flex-col">
+            <div class="mb-6 px-2">
+                <p class="text-sm text-muted-foreground">Buff</p>
+                <p class="text-2xl font-semibold text-foreground">Daily log</p>
+            </div>
+
+            <nav class="grid gap-1" aria-label="Primary">
+                <Button
+                    v-for="item in navItems"
+                    :key="item.href"
+                    :as="Link"
+                    :href="item.href"
+                    :variant="isActive(item.match) ? 'secondary' : 'ghost'"
+                    class="h-11 justify-start px-3 text-sm"
+                >
+                    <component :is="item.icon" :size="19" stroke-width="2.2" />
+                    <span>{{ item.label }}</span>
+                </Button>
+
+                <Button
+                    :variant="isAddActive ? 'default' : 'surface'"
+                    class="mt-3 h-11 justify-start px-3 text-sm"
+                    aria-label="Add"
+                    @click="openAddDrawer"
+                >
+                    <Plus :size="19" stroke-width="2.4" />
+                    <span>Add</span>
+                </Button>
+            </nav>
+        </aside>
+
+        <main class="app-main mx-auto w-full max-w-md flex-1 px-4 sm:max-w-3xl sm:px-6 lg:max-w-5xl lg:px-8">
             <slot />
         </main>
 
@@ -197,7 +232,7 @@ onUnmounted(() => {
         />
 
         <section
-            class="bottom-drawer fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md transform rounded-t-lg bg-card px-4 pt-3 shadow-2xl transition-transform duration-200"
+            class="bottom-drawer fixed inset-x-0 bottom-0 z-40 mx-auto max-w-md transform rounded-t-lg bg-card px-4 pt-3 shadow-2xl transition-transform duration-200 sm:left-64 sm:max-w-lg"
             :class="addDrawerOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!addDrawerOpen"
             :inert="!addDrawerOpen"
@@ -254,13 +289,13 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-lg backdrop-blur">
+        <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-lg backdrop-blur sm:hidden">
             <div class="mx-auto grid max-w-md grid-cols-5 gap-1 px-3 pt-2">
                 <Button
                     :as="Link"
                     :href="navItems[0].href"
                     size="nav"
-                    :variant="path === navItems[0].match ? 'secondary' : 'ghost'"
+                    :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
                     class="flex"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
@@ -271,7 +306,7 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[1].href"
                     size="nav"
-                    :variant="path === navItems[1].match ? 'secondary' : 'ghost'"
+                    :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
                     class="flex"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
@@ -292,7 +327,7 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[2].href"
                     size="nav"
-                    :variant="path === navItems[2].match ? 'secondary' : 'ghost'"
+                    :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
                     class="flex"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
@@ -303,7 +338,7 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[3].href"
                     size="nav"
-                    :variant="path === navItems[3].match ? 'secondary' : 'ghost'"
+                    :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
                     class="flex"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />

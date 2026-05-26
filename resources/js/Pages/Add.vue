@@ -810,7 +810,7 @@ onUnmounted(() => {
 
         <section
             v-if="foodAddSheetOpen"
-            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-card px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-2xl transition-transform duration-200"
+            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-card px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-2xl transition-transform duration-200 sm:left-64 sm:max-w-lg"
             :class="foodAddSheetOpen ? 'translate-y-0' : 'translate-y-full'"
             :aria-hidden="!foodAddSheetOpen"
             :inert="!foodAddSheetOpen"

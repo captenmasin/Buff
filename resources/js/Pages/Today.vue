@@ -138,6 +138,8 @@ const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
+const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
+const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'});
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
@@ -354,6 +356,18 @@ function macroPercent(consumed: number, goal?: number) {
     return Math.round((Number(consumed) / Number(goal)) * 100);
 }
 
+function weekdayLabel(value: string, format: 'short' | 'long') {
+    const [year, month, day] = String(value).split('-').map(Number);
+
+    if (!year || !month || !day) {
+        return value;
+    }
+
+    const date = new Date(year, month - 1, day);
+
+    return (format === 'short' ? shortWeekdayFormatter : longWeekdayFormatter).format(date);
+}
+
 function toggleMealActions(entryId: number) {
     openMealActions.value = openMealActions.value === entryId ? null : entryId;
     hapticImpact(18);
@@ -399,14 +413,16 @@ onBeforeUnmount(() => {
                 :href="`/?date=${day.date}`"
                 class="relative flex min-h-16 flex-col items-center justify-center gap-1 rounded-md border text-sm font-semibold transition active:bg-muted"
                 :class="day.is_selected ? 'border-primary bg-secondary text-foreground' : 'border-transparent text-muted-foreground'"
-                :aria-label="`${day.date} ${day.status}`"
+                :aria-label="`${weekdayLabel(day.date, 'long')} ${day.date} ${day.status}`"
             >
                 <span
                     v-if="day.is_today"
                     class="absolute top-1 h-1.5 w-1.5 rounded-full bg-primary"
                     aria-label="Today"
                 />
-                <span>{{ day.label }}</span>
+                <span class="sm:hidden">{{ day.label }}</span>
+                <span class="hidden sm:inline lg:hidden">{{ weekdayLabel(day.date, 'short') }}</span>
+                <span class="hidden lg:inline">{{ weekdayLabel(day.date, 'long') }}</span>
                 <span class="h-2.5 w-2.5 rounded-full" :class="dayStatusClass(day.status)"/>
             </Link>
         </nav>
@@ -598,8 +614,8 @@ onBeforeUnmount(() => {
             <span class="text-sm text-muted-foreground">Calories & macros</span>
         </Button>
 
-        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4" @click.self="selectedMeal = null">
-            <Card class="w-full max-w-md overflow-hidden">
+        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="selectedMeal = null">
+            <Card class="w-full max-w-md overflow-hidden sm:max-w-lg">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold uppercase text-muted-foreground">{{ mealLabels[selectedMeal.meal_type] }}</p>
@@ -631,8 +647,8 @@ onBeforeUnmount(() => {
             </Card>
         </div>
 
-        <div v-if="editingMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4" @click.self="editingMeal = null">
-            <Card class="w-full max-w-md">
+        <div v-if="editingMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="editingMeal = null">
+            <Card class="w-full max-w-md sm:max-w-lg">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 class="text-xl font-semibold">Edit meal</h2>
                     <Button variant="ghost" size="icon" aria-label="Close meal editor" @click="editingMeal = null">

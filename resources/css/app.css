@@ -150,6 +150,12 @@ textarea {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
 }
 
+.app-sidebar {
+    min-height: 100dvh;
+    overflow-y: auto;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
+}
+
 @supports (padding-top: max(0px)) {
     .app-main {
         padding-top: calc(max(env(safe-area-inset-top, 0px), 2rem) + 0.75rem);
@@ -161,5 +167,21 @@ textarea {
 
     .bottom-drawer {
         padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 0.75rem) + 1rem);
+    }
+
+    .app-sidebar {
+        padding-top: calc(max(env(safe-area-inset-top, 0px), 1rem) + 1rem);
+    }
+}
+
+@media (width >= 40rem) {
+    .app-main {
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+    }
+
+    @supports (padding-bottom: max(0px)) {
+        .app-main {
+            padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 1rem) + 1rem);
+        }
     }
 }
