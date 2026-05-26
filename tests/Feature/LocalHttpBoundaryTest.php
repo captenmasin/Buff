@@ -1,5 +1,17 @@
 <?php
 
+use App\Models\DailyGoal;
+
+beforeEach(function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+});
+
 it('allows loopback http requests without a local http boundary', function (): void {
     config(['app.allow_remote_http' => false]);
 

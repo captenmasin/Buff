@@ -135,6 +135,9 @@ const mealIcons = {
 };
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
+const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
+const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
+const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
@@ -419,6 +422,22 @@ onBeforeUnmount(() => {
             Set your daily calorie and macro goals before logging meals.
             <Link href="/goals" class="font-semibold underline">Set goals</Link>
         </div>
+
+        <Card v-if="hasGoal && isEmptyDay" class="bg-secondary border-0">
+            <div class="flex items-start gap-3">
+                <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">
+                    <Plus :size="20" />
+                </div>
+                <div class="min-w-0 flex-1">
+                    <h2 class="font-semibold">Start today</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Log a meal or workout to begin tracking this day.</p>
+                </div>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-2">
+                <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" variant="default">Add food</Button>
+                <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" variant="surface">Add workout</Button>
+            </div>
+        </Card>
 
         <Card>
             <div class="flex items-start justify-between gap-4">

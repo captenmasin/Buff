@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\AppPreference;
 use App\Models\DailyGoal;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -22,6 +23,8 @@ it('renders body and height settings', function (): void {
             ->where('settings.height_cm', 178)
             ->where('settings.target_weight_kg', 80)
             ->where('settings.target_body_fat_percent', 15)
+            ->where('preferences.weight_unit', 'kg')
+            ->where('preferences.height_unit', 'cm')
         );
 });
 
@@ -44,5 +47,19 @@ it('updates height from settings', function (): void {
 
     $this->assertDatabaseHas('daily_goals', [
         'height_cm' => 178,
+    ]);
+});
+
+it('updates unit preferences from settings', function (): void {
+    AppPreference::current();
+
+    $this->put('/settings/units', [
+        'weight_unit' => 'lb',
+        'height_unit' => 'in',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('app_preferences', [
+        'weight_unit' => 'lb',
+        'height_unit' => 'in',
     ]);
 });

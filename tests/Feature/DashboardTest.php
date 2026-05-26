@@ -52,6 +52,18 @@ it('reports daily calorie and macro remaining totals', function (): void {
         );
 });
 
+it('redirects new users to onboarding until goals exist', function (): void {
+    $this->get('/')
+        ->assertRedirect('/onboarding');
+
+    $this->get('/?skip_onboarding=1')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Today')
+            ->where('summary.goal', null)
+        );
+});
+
 it('reports monday first week statuses with burned calorie offset', function (): void {
     DailyGoal::query()->create([
         'calories' => 2000,

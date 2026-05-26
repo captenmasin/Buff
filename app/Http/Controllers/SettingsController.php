@@ -2,9 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppPreference;
 use App\Models\DailyGoal;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -13,6 +15,7 @@ class SettingsController extends Controller
     public function edit(): Response
     {
         $goal = DailyGoal::query()->latest('updated_at')->first();
+        $preferences = AppPreference::current();
 
         return Inertia::render('Settings', [
             'settings' => $goal ? [
@@ -24,7 +27,23 @@ class SettingsController extends Controller
                 'target_weight_kg' => null,
                 'target_body_fat_percent' => null,
             ],
+            'preferences' => [
+                'weight_unit' => $preferences->weight_unit,
+                'height_unit' => $preferences->height_unit,
+            ],
         ]);
+    }
+
+    public function updateUnits(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'weight_unit' => ['required', Rule::in(AppPreference::WEIGHT_UNITS)],
+            'height_unit' => ['required', Rule::in(AppPreference::HEIGHT_UNITS)],
+        ]);
+
+        AppPreference::current()->update($validated);
+
+        return back()->with('message', 'Unit preferences saved.');
     }
 
     public function updateBodyTargets(Request $request): RedirectResponse

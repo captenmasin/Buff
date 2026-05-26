@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataTransferController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
 use App\Http\Controllers\MacroController;
 use App\Http\Controllers\MealController;
+use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\WeeklySummaryController;
@@ -12,6 +14,8 @@ use App\Http\Controllers\WorkoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', DashboardController::class);
+Route::get('/onboarding', [OnboardingController::class, 'create']);
+Route::post('/onboarding', [OnboardingController::class, 'store']);
 Route::get('/weekly', WeeklySummaryController::class);
 Route::get('/macros/{macro}', MacroController::class);
 
@@ -19,8 +23,11 @@ Route::get('/goals', [GoalController::class, 'edit']);
 Route::put('/goals', [GoalController::class, 'update']);
 
 Route::get('/settings', [SettingsController::class, 'edit']);
+Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
 Route::put('/settings/body-targets', [SettingsController::class, 'updateBodyTargets']);
 Route::put('/settings/height', [SettingsController::class, 'updateHeight']);
+Route::get('/settings/export', [DataTransferController::class, 'export']);
+Route::post('/settings/import', [DataTransferController::class, 'import']);
 
 Route::get('/progress', [ProgressController::class, 'index']);
 Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
