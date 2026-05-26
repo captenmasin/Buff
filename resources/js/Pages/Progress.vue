@@ -50,10 +50,6 @@ const form = useForm({
     notes: props.latest?.date === props.today ? props.latest.notes : '',
 });
 
-const heightForm = useForm({
-    height_cm: props.goals?.height_cm ?? '',
-});
-
 const hasDelta = computed(() => Boolean(props.delta));
 const currentBmi = computed(() => {
     if (!props.latest?.weight_kg || !props.goals?.height_cm) return null;
@@ -78,10 +74,6 @@ function deltaLabel(value: number | null | undefined, suffix: string) {
 
 function save() {
     form.post('/progress/body-metrics', { preserveScroll: true });
-}
-
-function saveHeight() {
-    heightForm.put('/progress/height', { preserveScroll: true });
 }
 
 function rangeFor(values: Array<number | null>, target: number | null = null): ChartRange {
@@ -190,27 +182,6 @@ function removeMetric(metric: BodyMetric) {
                     </svg>
                 </div>
             </div>
-        </Card>
-
-        <Card>
-            <form class="space-y-3" @submit.prevent="saveHeight">
-                <h2 class="font-semibold">Height</h2>
-                <label class="block">
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Height cm</span>
-                    <Input
-                        v-model.number="heightForm.height_cm"
-                        type="number"
-                        min="50"
-                        max="260"
-                        step="0.1"
-                        class="mt-1"
-                    />
-                    <span v-if="heightForm.errors.height_cm" class="mt-1 block text-sm  text-destructive">{{ heightForm.errors.height_cm }}</span>
-                </label>
-                <Button class="w-full" :disabled="heightForm.processing">
-                    Save height
-                </Button>
-            </form>
         </Card>
 
         <Card>

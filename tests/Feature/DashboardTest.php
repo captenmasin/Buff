@@ -111,8 +111,10 @@ it('reports monday first week statuses with burned calorie offset', function ():
             ->where('week.1.date', '2026-05-19')
             ->where('week.1.status', 'target')
             ->where('week.1.effective_target', 2300)
+            ->where('week.1.protein_g', 1)
             ->where('week.1.is_selected', true)
             ->where('week.2.status', 'over')
             ->where('week.3.status', 'neutral')
+            ->missing('weekRoundup')
         );
 });

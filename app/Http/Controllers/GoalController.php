@@ -23,16 +23,12 @@ class GoalController extends Controller
                 'carbs_g' => (float) $goal->carbs_g,
                 'fat_g' => (float) $goal->fat_g,
                 'macro_calories' => $goal->macro_calories,
-                'target_weight_kg' => $goal->target_weight_kg !== null ? (float) $goal->target_weight_kg : null,
-                'target_body_fat_percent' => $goal->target_body_fat_percent !== null ? (float) $goal->target_body_fat_percent : null,
             ] : [
                 'calories' => 2000,
                 'protein_g' => 170,
                 'carbs_g' => 195,
                 'fat_g' => 60,
                 'macro_calories' => 2000,
-                'target_weight_kg' => null,
-                'target_body_fat_percent' => null,
             ],
         ]);
     }
@@ -44,8 +40,6 @@ class GoalController extends Controller
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'target_weight_kg' => ['nullable', 'numeric', 'min:1', 'max:1000'],
-            'target_body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
         ]);
 
         $macroCalories = $calculator->macroCalories(

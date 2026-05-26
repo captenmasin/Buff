@@ -1,14 +1,18 @@
 import '../css/app.css';
 
 import { axiosAdapter } from '@inertiajs/core';
-import { createInertiaApp, http } from '@inertiajs/vue3';
+import { createInertiaApp, http, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { createApp, h } from 'vue';
 import AppShell from './Layouts/AppShell.vue';
+import { applyAppearance, watchSystemAppearance } from './appearance';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 http.setClient(axiosAdapter(axios));
+applyAppearance();
+watchSystemAppearance();
+(window as typeof window & { router?: typeof router }).router = router;
 
 createInertiaApp({
     title: (title) => (title ? `${title} - Buff` : 'Buff'),

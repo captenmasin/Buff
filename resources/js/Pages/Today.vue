@@ -2,7 +2,7 @@
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
-import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, Trash2, X} from '@lucide/vue';
+import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
@@ -79,16 +79,28 @@ interface WeekDay {
     status: DayStatus;
     is_today: boolean;
     is_selected: boolean;
+    consumed_calories: number;
+    burned_calories: number;
     effective_target?: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
 }
 
 interface HealthConnectState {
+    is_android: boolean;
     available: boolean;
     supported: boolean;
     status: string;
     last_successful_sync_at?: string | null;
+    last_synced_at?: string | null;
+    last_status?: string | null;
     synced_records?: number | null;
     last_error?: string | null;
+    message?: string | null;
+    has_permissions?: boolean | null;
+    foreground_granted?: boolean | null;
+    background_granted?: boolean | null;
 }
 
 interface MacroCard {
@@ -126,6 +138,7 @@ const hasGoal = computed(() => Boolean(props.summary.goal));
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
+const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
 const datePickerOpen = ref(false);
 const selectedMeal = ref<SelectedMeal | null>(null);
 const editingMeal = ref<SelectedMeal | null>(null);
@@ -196,9 +209,13 @@ const healthConnectLabel = computed(() => {
 });
 
 const healthConnectDetail = computed(() => {
+    if (healthConnectState.value.message) {
+        return healthConnectState.value.message;
+    }
+
     if (healthConnectState.value.last_successful_sync_at) {
         if (Number(healthConnectState.value.synced_records || 0) === 0) {
-            return 'Last sync found no workouts in Health Connect.';
+            return `Last sync found no workouts · ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
         }
 
         return `Synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
@@ -208,7 +225,35 @@ const healthConnectDetail = computed(() => {
         return healthConnectState.value.last_error;
     }
 
+    if (healthConnectState.value.last_synced_at) {
+        return `Last checked ${new Date(healthConnectState.value.last_synced_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
+    }
+
     return 'Automatically imports workouts.';
+});
+
+const healthConnectMeta = computed(() => {
+    if (!healthConnectState.value.supported) {
+        return 'Android app only';
+    }
+
+    if (healthConnectState.value.foreground_granted === false) {
+        return 'Workout permissions need review';
+    }
+
+    if (healthConnectState.value.background_granted === false) {
+        return 'Background sync permission is off';
+    }
+
+    if (healthConnectState.value.last_status === 'error') {
+        return 'Last background sync failed';
+    }
+
+    if (healthConnectState.value.last_synced_at) {
+        return `Checked ${new Date(healthConnectState.value.last_synced_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
+    }
+
+    return null;
 });
 
 async function refreshHealthConnectStatus() {
@@ -243,7 +288,7 @@ async function syncHealthConnect() {
 }
 
 function handleWindowFocus() {
-    if (healthConnectState.value.supported) {
+    if (showHealthConnect.value) {
         refreshHealthConnectStatus();
     }
 }
@@ -313,7 +358,7 @@ function toggleMealActions(entryId: number) {
 }
 
 onMounted(() => {
-    if (healthConnectState.value.supported) {
+    if (showHealthConnect.value) {
         refreshHealthConnectStatus();
         window.addEventListener('focus', handleWindowFocus);
     }
@@ -476,34 +521,37 @@ onBeforeUnmount(() => {
         <section class="space-y-2">
             <div class="flex items-center justify-between">
                 <h2 class="text-lg font-semibold">Workouts</h2>
-                <Button
-                    v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
-                    variant="outline"
-                    size="icon"
-                    :disabled="healthConnectLoading"
-                    aria-label="Sync Health Connect"
-                    @click="syncHealthConnect"
-                >
-                    <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
-                </Button>
-                <Button
-                    v-else
-                    size="sm"
-                    :disabled="healthConnectLoading || !healthConnectState.available"
-                    @click="connectHealthConnect"
-                >
-                    Connect
-                </Button>
+                <template v-if="showHealthConnect">
+                    <Button
+                        v-if="healthConnectState.status === 'connected' || healthConnectState.status === 'sync_queued'"
+                        variant="outline"
+                        size="icon"
+                        :disabled="healthConnectLoading"
+                        aria-label="Sync Health Connect"
+                        @click="syncHealthConnect"
+                    >
+                        <RefreshCw :size="17" :class="{ 'animate-spin': healthConnectLoading }"/>
+                    </Button>
+                    <Button
+                        v-else
+                        size="sm"
+                        :disabled="healthConnectLoading || !healthConnectState.available"
+                        @click="connectHealthConnect"
+                    >
+                        Connect
+                    </Button>
+                </template>
             </div>
 
             <Card>
-                <div v-if="healthConnectState.supported" class="mb-3 flex items-center gap-3 rounded-md border border-border bg-muted p-3">
+                <div v-if="showHealthConnect" class="mb-3 flex items-center gap-3 rounded-md border border-border bg-muted p-3">
                     <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">
                         <Link2 :size="18"/>
                     </div>
                     <div class="min-w-0 flex-1">
                         <p class="">{{ healthConnectLabel }}</p>
                         <p class="truncate text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
+                        <p v-if="healthConnectMeta" class="truncate text-xs text-muted-foreground/80">{{ healthConnectMeta }}</p>
                     </div>
                 </div>
 
@@ -528,6 +576,14 @@ onBeforeUnmount(() => {
                 <p v-else class="text-sm text-muted-foreground">No workouts yet.</p>
             </Card>
         </section>
+
+        <Button :as="Link" :href="`/weekly?date=${summary.date}`" variant="outline" class="w-full justify-between">
+            <span class="flex items-center gap-2">
+                <TrendingUp :size="19" />
+                Weekly roundup
+            </span>
+            <span class="text-sm text-muted-foreground">Calories & macros</span>
+        </Button>
 
         <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4" @click.self="selectedMeal = null">
             <Card class="w-full max-w-md overflow-hidden">

@@ -44,6 +44,36 @@
     --radius: 0.5rem;
 }
 
+.dark {
+    --background: #101410;
+    --foreground: #eef3ec;
+    --card: #181e18;
+    --card-foreground: #eef3ec;
+    --popover: #181e18;
+    --popover-foreground: #eef3ec;
+    --primary: #bdd7ae;
+    --primary-foreground: #132015;
+    --secondary: #263324;
+    --secondary-foreground: #eef3ec;
+    --muted: #20271f;
+    --muted-foreground: #a8b2a3;
+    --accent: #8fbe76;
+    --accent-foreground: #10200e;
+    --destructive: #f87171;
+    --destructive-foreground: #2f0909;
+    --border: #30392e;
+    --input: #30392e;
+    --ring: #8fbe76;
+    --success: #34d399;
+    --success-foreground: #052e23;
+    --warning: #facc15;
+    --warning-foreground: #422006;
+    --danger-soft: #3b1212;
+    --danger-soft-foreground: #fecaca;
+    --warning-soft: #342607;
+    --warning-soft-foreground: #fde68a;
+}
+
 @theme inline {
     --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Dumbbell, Home, Plus, Scale, Utensils, X, Target } from '@lucide/vue';
+import { Dumbbell, Home, Pencil, Plus, Scale, Search, Settings, ScanBarcode, X, Target } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import Button from '../Components/ui/button/Button.vue';
 
@@ -22,19 +22,23 @@ const navItems = [
     { href: '/', label: 'Home', icon: Home, match: '/' },
     { href: '/goals', label: 'Goals', icon: Target, match: '/goals' },
     { href: '/progress', label: 'Progress', icon: Scale, match: '/progress' },
+    { href: '/settings', label: 'Settings', icon: Settings, match: '/settings' },
 ];
 
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
 const isAddActive = computed(() => path.value === '/add');
 
-function openAddDrawer() {
+function openAddDrawer(pushHistory = true) {
     if (addDrawerOpen.value) {
         return;
     }
 
     hapticImpact();
-    window.history.pushState({ ...(window.history.state || {}), buffAddDrawer: true }, '');
-    drawerHistoryActive.value = true;
+    if (pushHistory) {
+        window.history.pushState({ ...(window.history.state || {}), buffAddDrawer: true }, '');
+        drawerHistoryActive.value = true;
+    }
+
     addDrawerOpen.value = true;
 }
 
@@ -77,11 +81,11 @@ function handleNativeAndroidBack() {
     return false;
 }
 
-function openAddMode(mode: string) {
+function openAddMode(mode: string, extra: Record<string, string> = {}) {
     hapticImpact();
     closeDrawerImmediately();
 
-    const params = new URLSearchParams({ mode });
+    const params = new URLSearchParams({ mode, ...extra });
     const selectedDate = page.props.summary?.date;
 
     if (selectedDate) {
@@ -89,6 +93,18 @@ function openAddMode(mode: string) {
     }
 
     router.visit(`/add?${params.toString()}`);
+}
+
+function handleShortcutDrawerFlag() {
+    const url = new URL(page.url, window.location.origin);
+
+    if (url.searchParams.get('add') !== '1') {
+        return;
+    }
+
+    openAddDrawer(false);
+    url.searchParams.delete('add');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function clearFallbackToast() {
@@ -188,6 +204,7 @@ onMounted(() => {
     window.addEventListener('storage', scheduleFoodGoalReminder);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
     scheduleFoodGoalReminder();
+    handleShortcutDrawerFlag();
 
     showFlashToast(page.props.flash?.message);
 
@@ -195,6 +212,7 @@ onMounted(() => {
         const flash = event.detail.page.props.flash as { message?: string } | undefined;
 
         showFlashToast(flash?.message);
+        handleShortcutDrawerFlag();
     });
 });
 
@@ -259,20 +277,40 @@ onUnmounted(() => {
         >
             <div class="mx-auto mb-3 h-1 w-10 rounded-full bg-muted-foreground/35" />
             <div class="mb-4 flex items-center justify-between">
-                <h2 class="text-lg font-bold">Add</h2>
+                <h2 class="text-lg font-semibold">Add</h2>
                 <Button variant="ghost" size="icon" aria-label="Close add drawer" @click="closeAddDrawer">
                     <X :size="20" />
                 </Button>
             </div>
 
             <div class="grid gap-3">
+                <div class="grid grid-cols-2 gap-2">
                 <Button variant="surface" class="h-auto justify-start p-4 text-left" @click="openAddMode('food')">
                     <span class="grid h-11 w-11 place-items-center rounded-md bg-primary text-primary-foreground">
-                        <Utensils :size="22" />
+                        <Search :size="22" />
                     </span>
                     <span>
-                        <span class="block font-bold">Food</span>
-                        <span class="block text-sm font-medium text-muted-foreground">Search or scan</span>
+                        <span class="block font-semibold">Search food</span>
+                    </span>
+                </Button>
+
+                <Button variant="surface" class="h-auto justify-start p-4 text-left" @click="openAddMode('food', { scan: '1' })">
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-primary text-primary-foreground">
+                        <ScanBarcode :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-semibold">Scan barcode</span>
+                    </span>
+                </Button>
+                </div>
+
+                <Button variant="surface" class="h-auto justify-start p-4 text-left" @click="openAddMode('custom')">
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-food text-primary-foreground">
+                        <Pencil :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-semibold">Custom food</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Log your own macros</span>
                     </span>
                 </Button>
 
@@ -281,7 +319,7 @@ onUnmounted(() => {
                         <Dumbbell :size="22" />
                     </span>
                     <span>
-                        <span class="block font-bold">Workout</span>
+                        <span class="block font-semibold">Workout</span>
                         <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
                     </span>
                 </Button>
@@ -289,7 +327,7 @@ onUnmounted(() => {
         </section>
 
         <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-lg backdrop-blur">
-            <div class="mx-auto grid max-w-md grid-cols-4 gap-1 px-3 pt-2">
+            <div class="mx-auto grid max-w-md grid-cols-5 gap-1 px-3 pt-2">
                 <Button
                     :as="Link"
                     :href="navItems[0].href"
@@ -313,6 +351,16 @@ onUnmounted(() => {
                 </Button>
 
                 <Button
+                    size="icon"
+                    :variant="isAddActive ? 'default' : 'default'"
+                    class="relative z-10 mx-auto -mt-5 h-16 w-16 rounded-full border-4 border-card shadow-none active:translate-y-0.5 active:bg-primary"
+                    aria-label="Add"
+                    @click="openAddDrawer"
+                >
+                    <Plus :size="28" stroke-width="2.4" />
+                </Button>
+
+                <Button
                     :as="Link"
                     :href="navItems[2].href"
                     size="nav"
@@ -324,14 +372,14 @@ onUnmounted(() => {
                 </Button>
 
                 <Button
+                    :as="Link"
+                    :href="navItems[3].href"
                     size="nav"
-                    :variant="isAddActive ? 'secondary' : 'ghost'"
+                    :variant="path === navItems[3].match ? 'secondary' : 'ghost'"
                     class="flex"
-                    aria-label="Add"
-                    @click="openAddDrawer"
                 >
-                    <Plus :size="20" stroke-width="2.2" />
-                    <span class="text-[11px] font-semibold">Add</span>
+                    <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
+                    <span>{{ navItems[3].label }}</span>
                 </Button>
             </div>
         </nav>

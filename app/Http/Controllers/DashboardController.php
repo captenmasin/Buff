@@ -20,7 +20,7 @@ class DashboardController extends Controller
 
         return Inertia::render('Today', [
             'summary' => $summary->forDate($date),
-            'week' => $weekSummary->forDate($date),
+            'week' => $weekSummary->forDate($date)['days'],
             'mealTypes' => MealEntry::MEAL_TYPES,
             'healthConnect' => HealthConnectController::sharedStatus(),
         ]);

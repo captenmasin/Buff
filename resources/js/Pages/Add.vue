@@ -5,6 +5,7 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils, History, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
+import MacroSummary from '../Components/Add/MacroSummary.vue';
 import Card from "../Components/Card.vue";
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
@@ -884,24 +885,7 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <div class="grid grid-cols-4 gap-2 rounded-md border border-border bg-muted p-3 text-center">
-                    <div>
-                        <p class="text-xs font-semibold uppercase text-muted-foreground">Kcal</p>
-                        <p class="mt-1 text-lg font-semibold text-foreground">{{ activeFoodMacros.calories }}</p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase text-muted-foreground">Protein</p>
-                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.protein_g) }}g</p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase text-muted-foreground">Carbs</p>
-                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.carbs_g) }}g</p>
-                    </div>
-                    <div>
-                        <p class="text-xs font-semibold uppercase text-muted-foreground">Fat</p>
-                        <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(activeFoodMacros.fat_g) }}g</p>
-                    </div>
-                </div>
+                <MacroSummary :macros="activeFoodMacros" />
 
                 <Button
                     class="w-full text-lg"

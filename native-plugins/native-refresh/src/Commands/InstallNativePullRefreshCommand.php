@@ -14,10 +14,12 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
     {
         if ($this->isAndroid()) {
             $this->installAndroidRefresh();
+            $this->installAndroidAddShortcut();
         }
 
         if ($this->isIos()) {
             $this->installIosRefresh();
+            $this->installIosAddShortcut();
         }
 
         return self::SUCCESS;
@@ -97,6 +99,20 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         $this->info('Installed Android native pull-to-refresh.');
     }
 
+    private function installAndroidAddShortcut(): void
+    {
+        $this->patchFile(
+            $this->buildPath().'/app/src/main/res/xml/shortcuts.xml',
+            fn (string $content): string => str_replace(
+                'android:data="nativephp://add"',
+                'android:data="nativephp:///?add=1"',
+                $content
+            )
+        );
+
+        $this->info('Installed Android Add shortcut drawer target.');
+    }
+
     private function installIosRefresh(): void
     {
         $this->patchFile(
@@ -155,6 +171,20 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         );
 
         $this->info('Installed iOS native pull-to-refresh.');
+    }
+
+    private function installIosAddShortcut(): void
+    {
+        $this->patchFile(
+            $this->buildPath().'/NativePHP/AppDelegate.swift',
+            fn (string $content): string => str_replace(
+                'URL(string: "nativephp://add")',
+                'URL(string: "nativephp:///?add=1")',
+                $content
+            )
+        );
+
+        $this->info('Installed iOS Add shortcut drawer target.');
     }
 
     private function patchFile(string $path, callable $patch): void

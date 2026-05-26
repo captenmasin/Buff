@@ -2,6 +2,10 @@
 import { computed } from 'vue';
 import { cn } from '../../../utils';
 
+defineOptions({
+    inheritAttrs: false,
+});
+
 type ButtonVariant = 'default' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'inverse' | 'surface';
 type ButtonSize = 'default' | 'sm' | 'lg' | 'icon' | 'nav';
 
@@ -36,6 +40,7 @@ const sizes: Record<ButtonSize, string> = {
 <template>
     <component
         :is="component"
+        v-bind="$attrs"
         :class="cn(
             'inline-flex items-center justify-center gap-2 rounded-md transition disabled:cursor-not-allowed disabled:opacity-60',
             variants[props.variant || 'default'],

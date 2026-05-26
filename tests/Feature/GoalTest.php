@@ -8,15 +8,11 @@ it('saves a goal when macro calories match', function (): void {
         'protein_g' => 170,
         'carbs_g' => 195,
         'fat_g' => 60,
-        'target_weight_kg' => 80,
-        'target_body_fat_percent' => 15,
     ])->assertRedirect('/');
 
     $goal = DailyGoal::query()->first();
 
-    expect($goal->macro_calories)->toBe(2000)
-        ->and((float) $goal->target_weight_kg)->toBe(80.0)
-        ->and((float) $goal->target_body_fat_percent)->toBe(15.0);
+    expect($goal->macro_calories)->toBe(2000);
 });
 
 it('updates the existing goal', function (): void {

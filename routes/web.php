@@ -6,14 +6,21 @@ use App\Http\Controllers\HealthConnectController;
 use App\Http\Controllers\MacroController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\WeeklySummaryController;
 use App\Http\Controllers\WorkoutController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', DashboardController::class);
+Route::get('/weekly', WeeklySummaryController::class);
 Route::get('/macros/{macro}', MacroController::class);
 
 Route::get('/goals', [GoalController::class, 'edit']);
 Route::put('/goals', [GoalController::class, 'update']);
+
+Route::get('/settings', [SettingsController::class, 'edit']);
+Route::put('/settings/body-targets', [SettingsController::class, 'updateBodyTargets']);
+Route::put('/settings/height', [SettingsController::class, 'updateHeight']);
 
 Route::get('/progress', [ProgressController::class, 'index']);
 Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
