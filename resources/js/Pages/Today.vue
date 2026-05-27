@@ -95,6 +95,7 @@ interface HealthConnectState {
     last_synced_at?: string | null;
     last_status?: string | null;
     synced_records?: number | null;
+    deleted_records?: number | null;
     last_error?: string | null;
     message?: string | null;
     has_permissions?: boolean | null;
@@ -283,7 +284,7 @@ async function connectHealthConnect() {
         refreshTodaySummaryWhenHealthConnectChanged();
 
         if (shouldPollHealthConnectStatus()) {
-            scheduleHealthConnectStatusRefresh();
+            scheduleHealthConnectStatusRefresh(20, healthConnectState.value.status === 'sync_queued');
         }
     } finally {
         healthConnectLoading.value = false;
@@ -299,7 +300,7 @@ async function syncHealthConnect() {
         refreshTodaySummaryWhenHealthConnectChanged();
 
         if (shouldPollHealthConnectStatus()) {
-            scheduleHealthConnectStatusRefresh();
+            scheduleHealthConnectStatusRefresh(20, healthConnectState.value.status === 'sync_queued');
         }
     } finally {
         healthConnectLoading.value = false;
@@ -321,7 +322,7 @@ function clearHealthConnectStatusRefresh() {
     healthConnectRefreshTimer.value = null;
 }
 
-function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
+function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20, waitForSummaryRefresh = false, initialSummaryMarker = healthConnectSummaryRefreshMarker.value) {
     clearHealthConnectStatusRefresh();
 
     if (attemptsRemaining < 1) {
@@ -331,8 +332,10 @@ function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
     healthConnectRefreshTimer.value = window.setTimeout(async () => {
         await refreshHealthConnectStatus();
 
-        if (shouldPollHealthConnectStatus()) {
-            scheduleHealthConnectStatusRefresh(attemptsRemaining - 1);
+        const summaryRefreshed = healthConnectSummaryRefreshMarker.value !== initialSummaryMarker;
+
+        if (shouldPollHealthConnectStatus() || (waitForSummaryRefresh && ! summaryRefreshed)) {
+            scheduleHealthConnectStatusRefresh(attemptsRemaining - 1, waitForSummaryRefresh, initialSummaryMarker);
         }
     }, 1000);
 }
@@ -360,7 +363,6 @@ function refreshTodaySummaryWhenHealthConnectChanged() {
     healthConnectSummaryRefreshMarker.value = marker;
     router.reload({
         only: ['summary', 'week', 'healthConnect'],
-        preserveScroll: true,
     });
 }
 
