@@ -1,7 +1,9 @@
 package com.buff.healthconnect
 
 import android.content.Context
+import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.HealthConnectFeatures
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
@@ -17,12 +19,13 @@ object HealthConnectPlugin {
     private const val PERIODIC_WORK_NAME = "buff-health-connect-sync"
     private const val IMMEDIATE_WORK_NAME = "buff-health-connect-sync-now"
 
-    val requiredPermissions: Set<String> = setOf(
+    val foregroundPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
-        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
-        HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+        HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class)
     )
+    val backgroundPermission: String = HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
+    val requiredPermissions: Set<String> = foregroundPermissions + backgroundPermission
 
     fun isAvailable(context: Context): Boolean {
         return HealthConnectClient.getSdkStatus(context) == HealthConnectClient.SDK_AVAILABLE
@@ -37,7 +40,39 @@ object HealthConnectPlugin {
             .permissionController
             .getGrantedPermissions()
 
-        return granted.containsAll(requiredPermissions)
+        return granted.containsAll(foregroundPermissions)
+    }
+
+    fun backgroundReadAvailable(context: Context): Boolean {
+        if (!isAvailable(context)) {
+            return false
+        }
+
+        return HealthConnectClient.getOrCreate(context)
+            .features
+            .getFeatureStatus(HealthConnectFeatures.FEATURE_READ_HEALTH_DATA_IN_BACKGROUND) == HealthConnectFeatures.FEATURE_STATUS_AVAILABLE
+    }
+
+    suspend fun permissionsToRequest(context: Context): Set<String> {
+        if (!isAvailable(context)) {
+            return emptySet()
+        }
+
+        val granted = HealthConnectClient.getOrCreate(context)
+            .permissionController
+            .getGrantedPermissions()
+
+        val missingForeground = foregroundPermissions - granted
+
+        if (missingForeground.isNotEmpty()) {
+            return missingForeground
+        }
+
+        if (backgroundReadAvailable(context) && backgroundPermission !in granted) {
+            return setOf(backgroundPermission)
+        }
+
+        return emptySet()
     }
 
     suspend fun status(context: Context): Map<String, Any> {
@@ -51,21 +86,21 @@ object HealthConnectPlugin {
             emptySet()
         }
 
-        val foregroundPermissions = requiredPermissions - HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND
         val hasForegroundPermissions = granted.containsAll(foregroundPermissions)
-        val backgroundGranted = granted.contains(HealthPermission.PERMISSION_READ_HEALTH_DATA_IN_BACKGROUND)
+        val backgroundAvailable = backgroundReadAvailable(context)
+        val backgroundGranted = granted.contains(backgroundPermission)
 
         return mapOf(
             "supported" to true,
             "available" to available,
             "sdk_status" to sdkStatus,
-            "has_permissions" to (hasForegroundPermissions && backgroundGranted),
+            "has_permissions" to hasForegroundPermissions,
             "foreground_granted" to hasForegroundPermissions,
             "background_granted" to backgroundGranted,
+            "background_available" to backgroundAvailable,
             "status" to when {
                 !available -> "unavailable"
-                hasForegroundPermissions && backgroundGranted -> "connected"
-                hasForegroundPermissions -> "background_permission_required"
+                hasForegroundPermissions -> "connected"
                 else -> "permission_required"
             }
         )
@@ -90,5 +125,9 @@ object HealthConnectPlugin {
             ExistingWorkPolicy.REPLACE,
             request
         )
+    }
+
+    fun logPermissionError(error: Throwable) {
+        Log.e("BuffHealthConnect", "Health Connect permission flow failed", error)
     }
 }

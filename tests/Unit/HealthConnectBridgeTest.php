@@ -64,6 +64,8 @@ it('unwraps data responses from the native bridge', function (): void {
 
     expect($bridge->call('HealthConnect.Status'))
         ->toMatchArray([
+            'is_android' => true,
+            'supported' => true,
             'available' => true,
             'status' => 'connected',
         ]);

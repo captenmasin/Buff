@@ -99,6 +99,7 @@ interface HealthConnectState {
     message?: string | null;
     has_permissions?: boolean | null;
     foreground_granted?: boolean | null;
+    background_available?: boolean | null;
     background_granted?: boolean | null;
 }
 
@@ -142,6 +143,7 @@ const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'
 const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'});
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
+const healthConnectRefreshTimer = ref<number | null>(null);
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
 const selectedMeal = ref<SelectedMeal | null>(null);
@@ -245,7 +247,7 @@ const healthConnectMeta = computed(() => {
         return 'Workout permissions need review';
     }
 
-    if (healthConnectState.value.background_granted === false) {
+    if (healthConnectState.value.background_available === true && healthConnectState.value.background_granted === false) {
         return 'Background sync permission is off';
     }
 
@@ -273,8 +275,13 @@ async function connectHealthConnect() {
     healthConnectLoading.value = true;
 
     try {
-        const {data} = await axios.post('/health-connect/connect');
+        const endpoint = healthConnectState.value.status === 'connected' ? '/health-connect/sync' : '/health-connect/connect';
+        const {data} = await axios.post(endpoint);
         healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+
+        if (healthConnectState.value.status === 'permission_requested') {
+            scheduleHealthConnectStatusRefresh();
+        }
     } finally {
         healthConnectLoading.value = false;
     }
@@ -293,6 +300,37 @@ async function syncHealthConnect() {
 
 function handleWindowFocus() {
     if (showHealthConnect.value) {
+        refreshHealthConnectStatus();
+    }
+}
+
+function clearHealthConnectStatusRefresh() {
+    if (healthConnectRefreshTimer.value === null) {
+        return;
+    }
+
+    window.clearTimeout(healthConnectRefreshTimer.value);
+    healthConnectRefreshTimer.value = null;
+}
+
+function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
+    clearHealthConnectStatusRefresh();
+
+    if (attemptsRemaining < 1) {
+        return;
+    }
+
+    healthConnectRefreshTimer.value = window.setTimeout(async () => {
+        await refreshHealthConnectStatus();
+
+        if (healthConnectState.value.status === 'permission_requested') {
+            scheduleHealthConnectStatusRefresh(attemptsRemaining - 1);
+        }
+    }, 1000);
+}
+
+function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
         refreshHealthConnectStatus();
     }
 }
@@ -374,14 +412,15 @@ function toggleMealActions(entryId: number) {
 }
 
 onMounted(() => {
-    if (showHealthConnect.value) {
-        refreshHealthConnectStatus();
-        window.addEventListener('focus', handleWindowFocus);
-    }
+    refreshHealthConnectStatus();
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onBeforeUnmount(() => {
+    clearHealthConnectStatusRefresh();
     window.removeEventListener('focus', handleWindowFocus);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
 
@@ -553,13 +592,12 @@ onBeforeUnmount(() => {
                     <Button
                         v-if="canSyncHealthConnect"
                         variant="outline"
-                        size="sm"
+                        size="icon"
                         :disabled="healthConnectLoading"
                         aria-label="Sync Health Connect"
                         @click="syncHealthConnect"
                     >
                         <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
-                        Re-sync
                     </Button>
                     <Button
                         v-else
@@ -572,17 +610,17 @@ onBeforeUnmount(() => {
                 </template>
             </div>
 
-            <Card>
-                <div v-if="showHealthConnect" class="mb-3 flex items-center gap-3 rounded-md border border-border bg-muted p-3">
-                    <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">
-                        <Link2 :size="18"/>
-                    </div>
-                    <div class="min-w-0 flex-1">
-                        <p class="">{{ healthConnectLabel }}</p>
-                        <p class="truncate text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
-                        <p v-if="healthConnectMeta" class="truncate text-xs text-muted-foreground/80">{{ healthConnectMeta }}</p>
-                    </div>
-                </div>
+            <Card class="py-0">
+<!--                <div v-if="showHealthConnect" class="mb-3 flex items-center gap-3">-->
+<!--                    <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">-->
+<!--                        <Link2 :size="18"/>-->
+<!--                    </div>-->
+<!--                    <div class="min-w-0 flex-1">-->
+<!--                        <p class="">{{ healthConnectLabel }}</p>-->
+<!--                        <p class="truncate text-sm text-muted-foreground">{{ healthConnectDetail }}</p>-->
+<!--                        <p v-if="healthConnectMeta" class="truncate text-xs text-muted-foreground/80">{{ healthConnectMeta }}</p>-->
+<!--                    </div>-->
+<!--                </div>-->
 
                 <div v-if="summary.workouts?.length" class="divide-y divide-border/70">
                     <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
@@ -602,7 +640,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <p v-else class="text-sm text-muted-foreground">No workouts yet.</p>
+                <div v-else class="py-3 text-center text-sm text-muted-foreground">No workouts yet.</div>
             </Card>
         </section>
 

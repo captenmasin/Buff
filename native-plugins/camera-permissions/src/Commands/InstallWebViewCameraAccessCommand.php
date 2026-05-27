@@ -17,6 +17,7 @@ class InstallWebViewCameraAccessCommand extends NativePluginHookCommand
         }
 
         $this->patchWebViewManager();
+        $this->patchMainActivity();
 
         return self::SUCCESS;
     }
@@ -66,10 +67,83 @@ class InstallWebViewCameraAccessCommand extends NativePluginHookCommand
             );
         }
 
-        if (! str_contains($content, 'override fun onPermissionRequest(request: PermissionRequest)')) {
+        if (! str_contains($content, 'cameraPermissionRequestCode')) {
+            $content = str_replace(
+                "    private var customViewCallback: WebChromeClient.CustomViewCallback? = null\n",
+                "    private var customViewCallback: WebChromeClient.CustomViewCallback? = null\n    private val cameraPermissionRequestCode = 45870\n    private var pendingCameraPermissionRequest: PermissionRequest? = null\n",
+                $content
+            );
+        }
+
+        if (! str_contains($content, 'fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean')) {
+            $content = str_replace(
+                "    private fun configureWebViewSettings() {\n",
+                "    fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean {\n        if (requestCode != cameraPermissionRequestCode) {\n            return false\n        }\n\n        val request = pendingCameraPermissionRequest ?: return true\n        pendingCameraPermissionRequest = null\n\n        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {\n            request.grant(request.resources ?: arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))\n            return true\n        }\n\n        request.deny()\n        return true\n    }\n\n    private fun configureWebViewSettings() {\n",
+                $content
+            );
+        }
+
+        $legacyPermissionRequest = <<<'KOTLIN'
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val requestedResources = request.resources ?: emptyArray()
+                val requestsCamera = requestedResources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+                val hasCameraPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (requestsCamera && hasCameraPermission) {
+                    request.grant(requestedResources)
+                    return
+                }
+
+                request.deny()
+            }
+
+KOTLIN;
+
+        $runtimePermissionRequest = <<<'KOTLIN'
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val requestedResources = request.resources ?: emptyArray()
+                val requestsCamera = requestedResources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)
+
+                if (!requestsCamera) {
+                    request.deny()
+                    return
+                }
+
+                val hasCameraPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (hasCameraPermission) {
+                    request.grant(requestedResources)
+                    return
+                }
+
+                val activity = context as? Activity
+
+                if (activity == null) {
+                    request.deny()
+                    return
+                }
+
+                pendingCameraPermissionRequest?.deny()
+                pendingCameraPermissionRequest = request
+                activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionRequestCode)
+            }
+
+KOTLIN;
+
+        if (str_contains($content, $legacyPermissionRequest)) {
+            $content = str_replace($legacyPermissionRequest, $runtimePermissionRequest, $content);
+        }
+
+        if (! str_contains($content, 'activity.requestPermissions(arrayOf(Manifest.permission.CAMERA), cameraPermissionRequestCode)')) {
             $content = str_replace(
                 "            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {\n",
-                "            override fun onPermissionRequest(request: PermissionRequest) {\n                val requestedResources = request.resources ?: emptyArray()\n                val requestsCamera = requestedResources.contains(PermissionRequest.RESOURCE_VIDEO_CAPTURE)\n                val hasCameraPermission = ContextCompat.checkSelfPermission(\n                    context,\n                    Manifest.permission.CAMERA\n                ) == PackageManager.PERMISSION_GRANTED\n\n                if (requestsCamera && hasCameraPermission) {\n                    request.grant(requestedResources)\n                    return\n                }\n\n                request.deny()\n            }\n\n            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {\n",
+                $runtimePermissionRequest."            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {\n",
                 $content
             );
         }
@@ -79,5 +153,31 @@ class InstallWebViewCameraAccessCommand extends NativePluginHookCommand
         }
 
         $this->info('Installed Android WebView camera access handling.');
+    }
+
+    private function patchMainActivity(): void
+    {
+        $path = $this->buildPath().'/app/src/main/java/com/nativephp/mobile/ui/MainActivity.kt';
+
+        if (! is_file($path)) {
+            $this->warn("Camera permission target not found: {$path}");
+
+            return;
+        }
+
+        $original = file_get_contents($path);
+        $content = $original;
+
+        if (! str_contains($content, 'webViewManager.handleCameraPermissionResult(requestCode, grantResults)')) {
+            $content = str_replace(
+                "        super.onRequestPermissionsResult(requestCode, permissions, grantResults)\n\n        // Post lifecycle event for each permission result\n",
+                "        super.onRequestPermissionsResult(requestCode, permissions, grantResults)\n\n        if (::webViewManager.isInitialized && webViewManager.handleCameraPermissionResult(requestCode, grantResults)) {\n            return\n        }\n\n        // Post lifecycle event for each permission result\n",
+                $content
+            );
+        }
+
+        if ($content !== $original) {
+            file_put_contents($path, $content);
+        }
     }
 }

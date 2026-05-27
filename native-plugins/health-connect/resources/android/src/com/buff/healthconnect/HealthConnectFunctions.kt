@@ -17,9 +17,9 @@ object HealthConnectFunctions {
     }
 
     class RequestPermissions(private val activity: FragmentActivity) : BridgeFunction {
-        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> = runBlocking {
             if (!HealthConnectPlugin.isAvailable(activity)) {
-                return BridgeResponse.success(mapOf(
+                return@runBlocking BridgeResponse.success(mapOf(
                     "supported" to true,
                     "available" to false,
                     "status" to "unavailable",
@@ -27,11 +27,20 @@ object HealthConnectFunctions {
                 ))
             }
 
+            if (HealthConnectPlugin.permissionsToRequest(activity).isEmpty()) {
+                return@runBlocking BridgeResponse.success(
+                    HealthConnectPlugin.status(activity) + mapOf(
+                        "status" to "connected",
+                        "message" to "Health Connect is connected."
+                    )
+                )
+            }
+
             Handler(Looper.getMainLooper()).post {
                 activity.startActivity(Intent(activity, HealthConnectPermissionActivity::class.java))
             }
 
-            return BridgeResponse.success(mapOf(
+            return@runBlocking BridgeResponse.success(mapOf(
                 "supported" to true,
                 "available" to true,
                 "status" to "permission_requested"

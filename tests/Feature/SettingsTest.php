@@ -2,9 +2,14 @@
 
 use App\Models\AppPreference;
 use App\Models\DailyGoal;
+use App\Services\HealthConnectBridge;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('renders body and height settings', function (): void {
+    app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
+        androidDetector: fn (): bool => false,
+    ));
+
     DailyGoal::query()->create([
         'calories' => 2000,
         'protein_g' => 170,
@@ -25,6 +30,8 @@ it('renders body and height settings', function (): void {
             ->where('settings.target_body_fat_percent', 15)
             ->where('preferences.weight_unit', 'kg')
             ->where('preferences.height_unit', 'cm')
+            ->where('healthConnect.is_android', false)
+            ->where('healthConnect.supported', false)
         );
 });
 

@@ -31,6 +31,7 @@ class SettingsController extends Controller
                 'weight_unit' => $preferences->weight_unit,
                 'height_unit' => $preferences->height_unit,
             ],
+            'healthConnect' => HealthConnectController::sharedStatus(),
         ]);
     }
 

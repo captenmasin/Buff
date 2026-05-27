@@ -73,7 +73,7 @@ function finish() {
 
 watch(
     () => [form.weight_unit, form.height_unit] as const,
-    ([,], [previousWeightUnit, previousHeightUnit]) => {
+    (_currentUnits, [previousWeightUnit, previousHeightUnit]) => {
         syncStoredFromDisplay(previousWeightUnit, previousHeightUnit);
         syncDisplayFromStored();
     },

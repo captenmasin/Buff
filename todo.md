@@ -14,3 +14,4 @@
  - [ ] Ability to see roundup of food TYPES (dairy, meat, veg, etc)
  - [ ] Marketing website
  - [ ] Cloud API rather than interfacing directly with OpenFood
+ - [ ] Google Admob

@@ -79,7 +79,11 @@ class HealthConnectBridge
             return $this->errorPayload('Health Connect returned a malformed status.');
         }
 
-        return $decoded;
+        return [
+            'is_android' => true,
+            'supported' => true,
+            ...$decoded,
+        ];
     }
 
     private function isAndroid(): bool
@@ -94,6 +98,14 @@ class HealthConnectBridge
 
         if (! function_exists('nativephp_call')) {
             return false;
+        }
+
+        if (request()->server('NATIVEPHP_PLATFORM') === 'android' || getenv('NATIVEPHP_PLATFORM') === 'android') {
+            return true;
+        }
+
+        if (function_exists('nativephp_can') && nativephp_can('HealthConnect.Status')) {
+            return true;
         }
 
         try {

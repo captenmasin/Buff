@@ -129,6 +129,7 @@ const nativeMessage = ref('');
 const nativeBridge = ref<NativeBridge | null>(null);
 const scannerStarting = ref(false);
 const webScannerOpen = ref(false);
+const webScannerReady = ref(false);
 const webScannerVideo = ref<HTMLVideoElement | null>(null);
 const webScannerControls = ref<{ stop(): void } | null>(null);
 const product = ref<FoodProduct | null>(null);
@@ -440,6 +441,7 @@ async function startScan() {
 function showManualBarcodeInput() {
     webScannerControls.value?.stop();
     webScannerControls.value = null;
+    webScannerReady.value = false;
     manualBarcodeOpen.value = true;
     webScannerOpen.value = true;
     scannerStarting.value = false;
@@ -450,6 +452,7 @@ async function startWebScan() {
     nativeMessage.value = '';
     scannerStarting.value = true;
     webScannerOpen.value = true;
+    webScannerReady.value = false;
 
     await nextTick();
 
@@ -512,8 +515,13 @@ async function startWebScan() {
 function stopWebScan() {
     webScannerControls.value?.stop();
     webScannerControls.value = null;
+    webScannerReady.value = false;
     webScannerOpen.value = false;
     manualBarcodeOpen.value = false;
+}
+
+function markWebScannerReady() {
+    webScannerReady.value = true;
 }
 
 function cameraErrorMessage(error: unknown) {
@@ -656,7 +664,23 @@ onUnmounted(() => {
             </div>
 
             <div class="relative min-h-0 flex-1">
-                <video v-show="!manualBarcodeOpen" ref="webScannerVideo" class="h-full w-full bg-foreground object-cover" muted playsinline />
+                <div v-if="!manualBarcodeOpen && !webScannerReady" class="absolute inset-0 z-10 grid h-full w-full place-items-center bg-foreground">
+                    <LoaderCircle :size="34" class="animate-spin text-primary-foreground/70" />
+                </div>
+
+                <video
+                    v-show="!manualBarcodeOpen"
+                    ref="webScannerVideo"
+                    class="scanner-video h-full w-full bg-foreground object-cover transition-opacity duration-150"
+                    :class="webScannerReady ? 'opacity-100' : 'opacity-0'"
+                    autoplay
+                    muted
+                    playsinline
+                    disablepictureinpicture
+                    controlslist="nodownload noplaybackrate noremoteplayback"
+                    @loadeddata="markWebScannerReady"
+                    @playing="markWebScannerReady"
+                />
 
                 <div v-if="manualBarcodeOpen" class="flex h-full items-center px-4">
                     <div class="w-full rounded-md bg-card p-4 text-foreground">
