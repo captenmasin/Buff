@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
-import {computed, onBeforeUnmount, onMounted, ref} from 'vue';
+import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import { hapticImpact } from '../haptics';
@@ -144,6 +144,7 @@ const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'})
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
+const healthConnectSummaryRefreshMarker = ref(healthConnectSummaryMarker(healthConnectState.value));
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
 const selectedMeal = ref<SelectedMeal | null>(null);
@@ -266,6 +267,7 @@ async function refreshHealthConnectStatus() {
     try {
         const {data} = await axios.get('/health-connect/status');
         healthConnectState.value = {...healthConnectState.value, ...data};
+        refreshTodaySummaryWhenHealthConnectChanged();
     } catch {
         healthConnectState.value = {...healthConnectState.value, last_error: 'Could not check Health Connect.'};
     }
@@ -278,8 +280,9 @@ async function connectHealthConnect() {
         const endpoint = healthConnectState.value.status === 'connected' ? '/health-connect/sync' : '/health-connect/connect';
         const {data} = await axios.post(endpoint);
         healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+        refreshTodaySummaryWhenHealthConnectChanged();
 
-        if (healthConnectState.value.status === 'permission_requested') {
+        if (shouldPollHealthConnectStatus()) {
             scheduleHealthConnectStatusRefresh();
         }
     } finally {
@@ -293,6 +296,11 @@ async function syncHealthConnect() {
     try {
         const {data} = await axios.post('/health-connect/sync');
         healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+        refreshTodaySummaryWhenHealthConnectChanged();
+
+        if (shouldPollHealthConnectStatus()) {
+            scheduleHealthConnectStatusRefresh();
+        }
     } finally {
         healthConnectLoading.value = false;
     }
@@ -323,10 +331,37 @@ function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
     healthConnectRefreshTimer.value = window.setTimeout(async () => {
         await refreshHealthConnectStatus();
 
-        if (healthConnectState.value.status === 'permission_requested') {
+        if (shouldPollHealthConnectStatus()) {
             scheduleHealthConnectStatusRefresh(attemptsRemaining - 1);
         }
     }, 1000);
+}
+
+function shouldPollHealthConnectStatus() {
+    return ['permission_requested', 'sync_queued'].includes(healthConnectState.value.status);
+}
+
+function healthConnectSummaryMarker(state: HealthConnectState) {
+    return [
+        state.last_successful_sync_at ?? '',
+        state.last_status ?? '',
+        state.synced_records ?? '',
+        state.deleted_records ?? '',
+    ].join('|');
+}
+
+function refreshTodaySummaryWhenHealthConnectChanged() {
+    const marker = healthConnectSummaryMarker(healthConnectState.value);
+
+    if (marker === healthConnectSummaryRefreshMarker.value) {
+        return;
+    }
+
+    healthConnectSummaryRefreshMarker.value = marker;
+    router.reload({
+        only: ['summary', 'week', 'healthConnect'],
+        preserveScroll: true,
+    });
 }
 
 function handleVisibilityChange() {
@@ -410,6 +445,11 @@ function toggleMealActions(entryId: number) {
     openMealActions.value = openMealActions.value === entryId ? null : entryId;
     hapticImpact(18);
 }
+
+watch(() => props.healthConnect, (healthConnect) => {
+    healthConnectState.value = {...healthConnectState.value, ...healthConnect};
+    healthConnectSummaryRefreshMarker.value = healthConnectSummaryMarker(healthConnectState.value);
+}, {deep: true});
 
 onMounted(() => {
     refreshHealthConnectStatus();
@@ -640,7 +680,7 @@ onBeforeUnmount(() => {
                     </div>
                 </div>
 
-                <div v-else class="py-3 text-center text-sm text-muted-foreground">No workouts yet.</div>
+                <div v-else class="py-5 text-center text-sm text-muted-foreground">No workouts yet.</div>
             </Card>
         </section>
 
