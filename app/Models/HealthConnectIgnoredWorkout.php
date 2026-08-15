@@ -2,13 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
-
-class HealthConnectIgnoredWorkout extends Model
+class HealthConnectIgnoredWorkout extends SyncedModel
 {
-    use HasUuids;
-
     protected $fillable = [
         'external_id',
         'ignored_at',

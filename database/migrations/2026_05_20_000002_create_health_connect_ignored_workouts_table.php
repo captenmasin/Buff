@@ -12,9 +12,9 @@ return new class extends Migration
             $table->uuid('id')->primary();
             $table->string('external_id');
             $table->dateTime('ignored_at');
-            $table->timestamps();
+            $table->timestamps(6);
 
-            $table->unique('external_id');
+            $table->index('external_id');
         });
     }
 

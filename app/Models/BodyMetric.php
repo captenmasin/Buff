@@ -2,13 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
-
-class BodyMetric extends Model
+class BodyMetric extends SyncedModel
 {
-    use HasUuids;
-
     protected $fillable = [
         'date',
         'weight_kg',

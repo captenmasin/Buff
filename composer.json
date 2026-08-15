@@ -6,10 +6,11 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
+        "php": "^8.3",
+        "buff/background-tasks": "*",
         "buff/camera-permissions": "*",
         "buff/health-connect": "*",
         "buff/native-refresh": "*",
-        "php": "^8.3",
         "inertiajs/inertia-laravel": "^3.1",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
@@ -39,6 +40,13 @@
         }
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "native-plugins/background-tasks",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "path",
             "url": "native-plugins/camera-permissions",

@@ -35,7 +35,7 @@ interface DailyTotals {
 }
 
 interface MealEntry {
-    id: number;
+    id: string;
     name: string;
     meal_type?: MealType;
     source_type: string;
@@ -53,7 +53,7 @@ interface MealEntry {
 type SelectedMeal = MealEntry & { meal_type: MealType };
 
 interface WorkoutEntry {
-    id: number;
+    id: string;
     title: string;
     calories_burned: number;
     logged_time: string | null;
@@ -114,6 +114,12 @@ interface MacroCard {
     color: string;
 }
 
+interface MealPhoto {
+    id: string;
+    url: string;
+    mime_type: string;
+}
+
 const props = defineProps<{
     summary: DailySummary;
     week: WeekDay[];
@@ -150,7 +156,10 @@ const showHealthConnect = computed(() => healthConnectState.value.is_android ===
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
 const selectedMeal = ref<SelectedMeal | null>(null);
 const editingMeal = ref<SelectedMeal | null>(null);
-const openMealActions = ref<number | null>(null);
+const openMealActions = ref<string | null>(null);
+const selectedMealPhotos = ref<MealPhoto[]>([]);
+const mealPhotosLoading = ref(false);
+let mealPhotoRequest = 0;
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
     return Math.min(100, Math.round((props.summary.totals.calories / props.summary.goal.calories) * 100));
@@ -194,7 +203,7 @@ function macroProgress(consumed: number, goal?: number) {
     return Math.min(100, Math.round((consumed / goal) * 100));
 }
 
-function removeEntry(id: number) {
+function removeEntry(id: string) {
     openMealActions.value = null;
 
     if (window.confirm('Delete this meal?')) {
@@ -203,7 +212,7 @@ function removeEntry(id: number) {
     }
 }
 
-function removeWorkout(id: number) {
+function removeWorkout(id: string) {
     hapticImpact();
     router.delete(`/workouts/${id}`, {preserveScroll: true});
 }
@@ -393,6 +402,37 @@ function openMeal(entry: MealEntry, mealType: MealType) {
     openMealActions.value = null;
     hapticImpact();
     selectedMeal.value = {...entry, meal_type: mealType};
+    loadMealPhotos(entry.id);
+}
+
+async function loadMealPhotos(mealId: string) {
+    const request = ++mealPhotoRequest;
+    selectedMealPhotos.value = [];
+
+    mealPhotosLoading.value = true;
+
+    try {
+        const {data} = await axios.get(`/meals/${mealId}/photos`);
+
+        if (request === mealPhotoRequest) {
+            selectedMealPhotos.value = data.photos || [];
+        }
+    } catch {
+        if (request === mealPhotoRequest) {
+            selectedMealPhotos.value = [];
+        }
+    } finally {
+        if (request === mealPhotoRequest) {
+            mealPhotosLoading.value = false;
+        }
+    }
+}
+
+function closeMeal() {
+    mealPhotoRequest++;
+    selectedMeal.value = null;
+    selectedMealPhotos.value = [];
+    mealPhotosLoading.value = false;
 }
 
 function startEditingMeal(entry: MealEntry, mealType: MealType) {
@@ -443,7 +483,7 @@ function weekdayLabel(value: string, format: 'short' | 'long') {
     return (format === 'short' ? shortWeekdayFormatter : longWeekdayFormatter).format(date);
 }
 
-function toggleMealActions(entryId: number) {
+function toggleMealActions(entryId: string) {
     openMealActions.value = openMealActions.value === entryId ? null : entryId;
     hapticImpact(18);
 }
@@ -694,14 +734,14 @@ onBeforeUnmount(() => {
             <span class="text-sm text-muted-foreground">Calories & macros</span>
         </Button>
 
-        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="selectedMeal = null">
+        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="closeMeal">
             <Card class="w-full max-w-md overflow-hidden sm:max-w-lg">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold uppercase text-muted-foreground">{{ mealLabels[selectedMeal.meal_type] }}</p>
                         <h2 class="truncate text-xl font-semibold">{{ selectedMeal.name }}</h2>
                     </div>
-                    <Button variant="ghost" size="icon" class="flex-none" aria-label="Close meal details" @click="selectedMeal = null">
+                    <Button variant="ghost" size="icon" class="flex-none" aria-label="Close meal details" @click="closeMeal">
                         <X :size="20"/>
                     </Button>
                 </div>
@@ -716,6 +756,19 @@ onBeforeUnmount(() => {
                         </span>
                         </div>
                     </div>
+                </div>
+                <div v-if="mealPhotosLoading" class="mt-4 flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                    <RefreshCw :size="16" class="animate-spin" />
+                    Loading meal photos…
+                </div>
+                <div v-else-if="selectedMealPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
+                    <img
+                        v-for="photo in selectedMealPhotos"
+                        :key="photo.id"
+                        :src="photo.url"
+                        alt="Meal photo"
+                        class="aspect-square w-full rounded-md object-cover"
+                    >
                 </div>
                 <div class="mt-4 grid min-w-0 grid-cols-3 gap-2">
                     <div v-for="macro in selectedMealMacros" :key="macro[0]" class="min-w-0 rounded-md bg-muted p-3 max-[360px]:p-2">

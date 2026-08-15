@@ -2,14 +2,10 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class MealEntry extends Model
+class MealEntry extends SyncedModel
 {
-    use HasUuids;
-
     public const MEAL_TYPES = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
     public const SOURCE_CUSTOM = 'custom';

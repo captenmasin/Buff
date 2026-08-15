@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "54da2c312b861ace81540e5436330299",
+    "content-hash": "9cdb068badaef7e4852d9c0efc8c834e",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -120,6 +120,39 @@
                 }
             ],
             "time": "2026-02-10T14:33:43+00:00"
+        },
+        {
+            "name": "buff/background-tasks",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "native-plugins/background-tasks",
+                "reference": "efaa296ada71e760a8ef2ad2405a7ce31e3e2172"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Buff\\BackgroundTasks\\BackgroundTasksServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Buff\\BackgroundTasks\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Android background scheduling for Laravel commands in Buff.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "buff/camera-permissions",

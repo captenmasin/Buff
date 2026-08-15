@@ -16,7 +16,7 @@ return new class extends Migration
             $table->decimal('carbs_g', 8, 2);
             $table->decimal('fat_g', 8, 2);
             $table->unsignedInteger('macro_calories');
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

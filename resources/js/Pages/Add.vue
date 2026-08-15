@@ -10,6 +10,7 @@ import Card from "../Components/Card.vue";
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import Textarea from '../Components/ui/textarea/Textarea.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroField = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -30,7 +31,7 @@ interface FoodProduct {
 
 interface PreviousMeal {
     type: 'previous_meal';
-    id: number;
+    id: string;
     name: string;
     brand?: string | null;
     image_url?: string | null;
@@ -48,6 +49,28 @@ interface PortionOption {
     label?: string;
     quantity: number;
     unit: string;
+}
+
+interface AnalysisContext {
+    id: string;
+    confidence: number;
+    recognized_components: string[];
+}
+
+interface MealAnalysisDraft {
+    name: string;
+    portion_quantity: number;
+    portion_unit: string;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    confidence: number;
+    recognized_components: string[];
+}
+
+interface SelectedPhoto {
+    file: File;
+    preview: string;
 }
 
 interface NativeBridge {
@@ -143,6 +166,16 @@ const selectedPreviousMeal = ref<PreviousMeal | null>(null);
 const previousMealPortionQuantity = ref<number | null>(null);
 const previousMealPortionUnit = ref('g');
 let foodSearchRequestId = 0;
+const photoInput = ref<HTMLInputElement | null>(null);
+const selectedPhotos = ref<SelectedPhoto[]>([]);
+const photoNote = ref('');
+const photoAnalysisLoading = ref(false);
+const photoAnalysisError = ref('');
+const analysisContext = ref<AnalysisContext | null>(null);
+const analysisFollowUpDialog = ref<HTMLDialogElement | null>(null);
+const analysisFollowUp = ref('');
+const analysisFollowUpLoading = ref(false);
+const analysisFollowUpError = ref('');
 
 const customMealForm = useForm({
     date: props.date,
@@ -153,6 +186,7 @@ const customMealForm = useForm({
     protein_g: 0,
     carbs_g: 0,
     fat_g: 0,
+    analysis_id: '',
 });
 
 const barcodeMealForm = useForm({
@@ -594,6 +628,172 @@ function addCustomMeal() {
     customMealForm.post('/meals/custom');
 }
 
+async function selectPhotos(event: Event) {
+    const input = event.target instanceof HTMLInputElement ? event.target : null;
+    const files = Array.from(input?.files ?? []).slice(0, 3 - selectedPhotos.value.length);
+
+    for (const file of files) {
+        const resized = await resizePhoto(file);
+        selectedPhotos.value.push({file: resized, preview: URL.createObjectURL(resized)});
+    }
+
+    if (input) {
+        input.value = '';
+    }
+}
+
+async function resizePhoto(file: File) {
+    try {
+        const image = await createImageBitmap(file);
+        const scale = Math.min(1, 1600 / Math.max(image.width, image.height));
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        const context = canvas.getContext('2d');
+
+        if (!context) {
+            image.close();
+            return file;
+        }
+
+        context.fillStyle = '#ffffff';
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+        image.close();
+        const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+
+        return blob
+            ? new File([blob], file.name.replace(/\.[^.]+$/, '') + '.jpg', {type: 'image/jpeg'})
+            : file;
+    } catch {
+        return file;
+    }
+}
+
+function removePhoto(index: number) {
+    const [photo] = selectedPhotos.value.splice(index, 1);
+
+    if (photo) {
+        URL.revokeObjectURL(photo.preview);
+    }
+}
+
+function applyAnalysisDraft(analysis: {id: string; draft: MealAnalysisDraft}) {
+    const draft = analysis.draft;
+
+    analysisContext.value = {
+        id: analysis.id,
+        confidence: Number(draft.confidence || 0),
+        recognized_components: Array.isArray(draft.recognized_components) ? draft.recognized_components : [],
+    };
+    customMealForm.name = draft.name;
+    customMealForm.portion_quantity = Number(draft.portion_quantity);
+    customMealForm.portion_unit = draft.portion_unit;
+    customMealForm.protein_g = Number(draft.protein_g);
+    customMealForm.carbs_g = Number(draft.carbs_g);
+    customMealForm.fat_g = Number(draft.fat_g);
+    customMealForm.analysis_id = analysis.id;
+    customMealForm.clearErrors();
+}
+
+async function analyzePhotos() {
+    if (selectedPhotos.value.length === 0) {
+        photoAnalysisError.value = 'Add at least one meal photo.';
+        return;
+    }
+
+    photoAnalysisLoading.value = true;
+    photoAnalysisError.value = '';
+    const data = new FormData();
+    selectedPhotos.value.forEach(({file}) => data.append('photos[]', file));
+    data.append('note', photoNote.value);
+
+    try {
+        const response = await axios.post('/meal-analyses', data);
+        const analysis = response.data.analysis;
+        const draft = analysis?.draft;
+
+        if (!analysis?.id || !draft) {
+            throw new Error('Invalid analysis');
+        }
+
+        applyAnalysisDraft(analysis);
+    } catch (error) {
+        const code = axios.isAxiosError(error) ? error.response?.data?.code : null;
+        photoAnalysisError.value = {
+            meal_analysis_quota_reached: 'Today’s photo-analysis limit has been reached.',
+            meal_analysis_in_progress: 'Another meal analysis is still running.',
+            invalid_meal_analysis: 'The photos did not produce a usable estimate. Try clearer photos.',
+            meal_analysis_unavailable: 'Meal analysis is temporarily unavailable.',
+        }[code] || (axios.isAxiosError(error) ? error.response?.data?.message : null) || 'Could not analyze these photos. Check your connection.';
+    } finally {
+        photoAnalysisLoading.value = false;
+    }
+}
+
+async function followUpAnalysis() {
+    const correction = analysisFollowUp.value.trim();
+    const id = analysisContext.value?.id;
+
+    if (!correction || !id) {
+        analysisFollowUpError.value = 'Describe what the estimate got wrong.';
+        return;
+    }
+
+    analysisFollowUpLoading.value = true;
+    analysisFollowUpError.value = '';
+
+    try {
+        const response = await axios.post(`/meal-analyses/${id}/follow-up`, {correction});
+        const analysis = response.data.analysis;
+
+        if (!analysis?.id || !analysis?.draft) {
+            throw new Error('Invalid analysis');
+        }
+
+        applyAnalysisDraft(analysis);
+        analysisFollowUpLoading.value = false;
+        closeFollowUpModal();
+        window.dispatchEvent(new CustomEvent('buff:toast', {detail: 'Estimate updated.'}));
+    } catch (error) {
+        analysisFollowUpError.value = axios.isAxiosError(error)
+            ? error.response?.data?.errors?.correction?.[0] || error.response?.data?.message || 'Could not update the estimate.'
+            : 'Could not update the estimate.';
+    } finally {
+        analysisFollowUpLoading.value = false;
+    }
+}
+
+function openFollowUpModal() {
+    analysisFollowUpError.value = '';
+    analysisFollowUpDialog.value?.showModal();
+}
+
+function closeFollowUpModal() {
+    if (analysisFollowUpLoading.value) {
+        return;
+    }
+
+    analysisFollowUpDialog.value?.close();
+    analysisFollowUp.value = '';
+    analysisFollowUpError.value = '';
+}
+
+async function cancelAnalysis() {
+    const id = analysisContext.value?.id;
+
+    if (id) {
+        try {
+            await axios.delete(`/meal-analyses/${id}`);
+        } catch {
+            // Drafts expire server-side if cancellation cannot get online.
+        }
+    }
+
+    analysisContext.value = null;
+    customMealForm.analysis_id = '';
+}
+
 function addWorkout() {
     hapticImpact();
     workoutForm.post('/workouts');
@@ -629,6 +829,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
     stopWebScan();
+    selectedPhotos.value.forEach(({preview}) => URL.revokeObjectURL(preview));
 
     if (nativeBridge.value) {
         nativeBridge.value.Off(nativeBridge.value.Events.Scanner.CodeScanned, handleScan);
@@ -644,7 +845,7 @@ onUnmounted(() => {
             <div>
                 <p class="text-sm  text-muted-foreground">{{ displayDate }}</p>
                 <h1 class="text-3xl font-semibold tracking-normal text-foreground">
-                    {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'workout' ? 'Workout' : 'Add' }}
+                    {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Workout' : 'Add' }}
                     <span v-if="meal">
                          - {{ meal }}
                     </span>
@@ -729,7 +930,81 @@ onUnmounted(() => {
                     <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
                 </span>
             </Button>
+
+            <Button
+                :as="Link"
+                :href="addModeUrl('photo')"
+                variant="outline"
+                class="h-auto justify-start p-4 text-left"
+            >
+                <span class="grid h-11 w-11 place-items-center rounded-md bg-food text-primary-foreground">
+                    <Camera :size="22" />
+                </span>
+                <span>
+                    <span class="block font-semibold">Photo meal</span>
+                    <span class="block text-sm font-medium text-muted-foreground">Estimate editable macros</span>
+                </span>
+            </Button>
         </article>
+
+        <Card v-if="mode === 'photo' && !analysisContext">
+            <div class="flex items-center gap-2">
+                <Camera :size="21" class="text-food" />
+                <h2 class="font-semibold">Analyze meal photos</h2>
+            </div>
+            <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
+
+            <div v-if="selectedPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
+                <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-md bg-muted">
+                    <img :src="photo.preview" alt="Selected meal" class="h-full w-full object-cover">
+                    <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removePhoto(index)">
+                        <X :size="16" />
+                    </Button>
+                </div>
+            </div>
+
+            <input
+                ref="photoInput"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                multiple
+                class="hidden"
+                @change="selectPhotos"
+            >
+            <Button
+                v-if="selectedPhotos.length < 3"
+                type="button"
+                variant="surface"
+                class="mt-4 w-full"
+                @click="photoInput?.click()"
+            >
+                <Camera :size="18" />
+                {{ selectedPhotos.length ? 'Add another' : 'Take or choose photo' }}
+            </Button>
+
+            <label class="mt-4 block">
+                <span class="text-xs font-semibold uppercase text-muted-foreground">Context (optional)</span>
+                <Textarea v-model="photoNote" maxlength="1000" rows="3" class="mt-1" placeholder="Sauce, hidden ingredients, or portion notes" />
+            </label>
+
+            <p v-if="photoAnalysisError" class="mt-3 rounded-md bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
+                {{ photoAnalysisError }}
+            </p>
+
+            <Button type="button" class="mt-4 w-full" :disabled="photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
+                <LoaderCircle v-if="photoAnalysisLoading" :size="18" class="animate-spin" />
+                {{ photoAnalysisLoading ? 'Analyzing meal…' : 'Analyze meal' }}
+            </Button>
+        </Card>
+
+        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 grid place-items-center bg-background/85 px-6 backdrop-blur" role="status" aria-live="polite">
+            <div class="text-center">
+                <LoaderCircle :size="36" class="mx-auto animate-spin text-primary" />
+                <p class="mt-3 font-semibold">Analyzing your meal…</p>
+                <p class="mt-1 text-sm text-muted-foreground">Keep Buff open while the estimate is prepared.</p>
+            </div>
+        </div>
 
         <Card v-if="mode === 'food'">
             <div class="flex items-center gap-2">
@@ -743,7 +1018,6 @@ onUnmounted(() => {
                     type="search"
                     placeholder="Search..."
                     class="min-w-0 flex-1"
-                    @input="searchFoodProducts"
                 />
                 <Button class="aspect-square h-[50px] shrink-0 px-0 py-0" :disabled="foodSearchLoading" aria-label="Search">
                     <LoaderCircle v-if="foodSearchLoading" :size="21" class="animate-spin" />
@@ -923,13 +1197,26 @@ onUnmounted(() => {
             </div>
         </section>
 
-        <Card v-if="mode === 'custom'">
+        <Card v-if="mode === 'custom' || analysisContext">
             <div class="flex items-center gap-2">
                 <Utensils :size="21" class="text-food" />
-                <h2 class="font-semibold">Custom food</h2>
+                <h2 class="font-semibold">{{ analysisContext ? 'Review meal estimate' : 'Custom food' }}</h2>
             </div>
 
-            <div v-if="previousCustomMeals.length" class="mt-4">
+            <div v-if="analysisContext" class="mt-4 rounded-md bg-muted p-3 text-sm">
+                <p><strong>Confidence:</strong> {{ Math.round(analysisContext.confidence * 100) }}%</p>
+                <p v-if="analysisContext.recognized_components.length" class="mt-1 text-muted-foreground">
+                    Recognized: {{ analysisContext.recognized_components.join(', ') }}
+                </p>
+                <p class="mt-2 text-muted-foreground">Review every value before saving.</p>
+            </div>
+
+            <Button v-if="analysisContext" type="button" variant="surface" class="mt-4 w-full" @click="openFollowUpModal">
+                <Pencil :size="18" />
+                Follow-up
+            </Button>
+
+            <div v-if="previousCustomMeals.length && !analysisContext" class="mt-4">
                 <p class="text-xs font-semibold uppercase text-muted-foreground">Previous custom foods</p>
                 <div class="mt-2 grid gap-2">
                     <Button
@@ -1014,11 +1301,55 @@ onUnmounted(() => {
                     </div>
                 </div>
 
-                <Button class="w-full" :disabled="customMealForm.processing">
-                    Add {{ customCalories }} kcal
-                </Button>
+                <div :class="analysisContext ? 'grid grid-cols-2 gap-2' : ''">
+                    <Button v-if="analysisContext" type="button" variant="surface" :disabled="customMealForm.processing" @click="cancelAnalysis">
+                        Cancel
+                    </Button>
+                    <Button class="w-full" :disabled="customMealForm.processing">
+                        {{ analysisContext ? 'Save' : 'Add' }} {{ customCalories }} kcal
+                    </Button>
+                </div>
             </form>
         </Card>
+
+        <dialog
+            ref="analysisFollowUpDialog"
+            class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 text-inherit backdrop:bg-foreground/30"
+            aria-labelledby="analysis-follow-up-title"
+            @cancel.prevent="closeFollowUpModal"
+        >
+            <div class="flex h-full items-end justify-center px-4 pb-4 sm:items-center sm:py-4" @click.self="closeFollowUpModal">
+                <Card class="w-full max-w-md sm:max-w-lg">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <h2 id="analysis-follow-up-title" class="text-xl font-semibold">Follow up on estimate</h2>
+                            <p class="mt-1 text-sm text-muted-foreground">Tell Buff what it got wrong. You can add another follow-up after each update.</p>
+                        </div>
+                        <Button type="button" variant="ghost" size="icon" aria-label="Close follow-up" :disabled="analysisFollowUpLoading" @click="closeFollowUpModal">
+                            <X :size="20" />
+                        </Button>
+                    </div>
+
+                    <form class="mt-4 space-y-3" @submit.prevent="followUpAnalysis">
+                        <label for="analysis-follow-up" class="block text-xs font-semibold uppercase text-muted-foreground">Correction</label>
+                        <Textarea
+                            id="analysis-follow-up"
+                            v-model="analysisFollowUp"
+                            rows="3"
+                            maxlength="1000"
+                            autofocus
+                            placeholder="It was blue cheese, not feta…"
+                            :disabled="analysisFollowUpLoading"
+                        />
+                        <p v-if="analysisFollowUpError" class="text-sm text-destructive" role="alert">{{ analysisFollowUpError }}</p>
+                        <Button class="w-full" :disabled="analysisFollowUpLoading || !analysisFollowUp.trim()">
+                            <LoaderCircle v-if="analysisFollowUpLoading" :size="18" class="animate-spin" />
+                            {{ analysisFollowUpLoading ? 'Updating estimate…' : 'Update estimate' }}
+                        </Button>
+                    </form>
+                </Card>
+            </div>
+        </dialog>
 
         <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">

@@ -1,19 +1,24 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
+import axios from 'axios';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Dumbbell, Home, Pencil, Plus, Scale, Search, Settings, ScanBarcode, X, Target } from '@lucide/vue';
+import { Camera, Dumbbell, Home, Pencil, Plus, Scale, Search, Settings, ScanBarcode, X, Target } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import Button from '../Components/ui/button/Button.vue';
 
 const page = usePage<{
     summary?: { date: string };
     flash?: { message?: string };
+    buff: {
+        needs_sign_in: boolean;
+    };
 }>();
 const addDrawerOpen = ref(false);
 const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
 const toastTimer = ref<number | null>(null);
 let removeFlashToastListener: (() => void) | null = null;
+let syncInProgress = false;
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home, match: '/' },
@@ -127,6 +132,33 @@ function showFallbackToast(message: string) {
     }, 4000);
 }
 
+function handleToast(event: Event) {
+    showFlashToast((event as CustomEvent<string>).detail);
+}
+
+async function syncOnResume() {
+    if (page.props.buff.needs_sign_in || !navigator.onLine || syncInProgress) {
+        return;
+    }
+
+    syncInProgress = true;
+
+    try {
+        await axios.post('/sync/resume');
+        router.reload();
+    } catch {
+        router.reload({only: ['buff']});
+    } finally {
+        syncInProgress = false;
+    }
+}
+
+function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+        syncOnResume();
+    }
+}
+
 async function showFlashToast(message?: string) {
     if (!message) {
         return;
@@ -144,6 +176,11 @@ onMounted(() => {
     window.addEventListener('popstate', handlePopState);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
     handleShortcutDrawerFlag();
+    syncOnResume();
+    window.addEventListener('focus', syncOnResume);
+    window.addEventListener('online', syncOnResume);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('buff:toast', handleToast);
 
     showFlashToast(page.props.flash?.message);
 
@@ -157,6 +194,10 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('popstate', handlePopState);
+    window.removeEventListener('focus', syncOnResume);
+    window.removeEventListener('online', syncOnResume);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
+    window.removeEventListener('buff:toast', handleToast);
     clearFallbackToast();
 
     if (window.__buffHandleAndroidBack === handleNativeAndroidBack) {
@@ -274,6 +315,20 @@ onUnmounted(() => {
                     <span>
                         <span class="block font-semibold">Custom food</span>
                         <span class="block text-sm font-medium text-muted-foreground">Log your own macros</span>
+                    </span>
+                </Button>
+
+                <Button
+                    variant="surface"
+                    class="h-auto justify-start p-4 text-left"
+                    @click="openAddMode('photo')"
+                >
+                    <span class="grid h-11 w-11 place-items-center rounded-md bg-food text-primary-foreground">
+                        <Camera :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-semibold">Photo meal</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Estimate editable macros</span>
                     </span>
                 </Button>
 

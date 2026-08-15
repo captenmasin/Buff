@@ -71,7 +71,7 @@ class HealthConnectWorkoutImporter
             }
 
             $deletedCount = (clone $deleteQuery)->count();
-            $deleteQuery->delete();
+            $deleteQuery->get()->each->delete();
 
             HealthConnectSyncState::query()->updateOrCreate(
                 ['source_type' => HealthConnectSyncState::SOURCE_TYPE],

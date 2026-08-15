@@ -17,14 +17,14 @@ return new class extends Migration
             $table->dateTime('ended_at')->nullable()->after('started_at');
             $table->unsignedInteger('duration_seconds')->nullable()->after('ended_at');
             $table->dateTime('imported_at')->nullable()->after('duration_seconds');
-            $table->unique(['source_type', 'external_id']);
+            $table->index(['source_type', 'external_id']);
         });
     }
 
     public function down(): void
     {
         Schema::table('workout_entries', function (Blueprint $table): void {
-            $table->dropUnique(['source_type', 'external_id']);
+            $table->dropIndex(['source_type', 'external_id']);
             $table->dropColumn([
                 'source_type',
                 'external_id',

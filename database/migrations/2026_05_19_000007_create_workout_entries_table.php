@@ -14,7 +14,7 @@ return new class extends Migration
             $table->string('title');
             $table->unsignedInteger('calories_burned');
             $table->dateTime('logged_at')->index();
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

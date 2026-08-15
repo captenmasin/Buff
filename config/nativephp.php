@@ -52,7 +52,7 @@ return [
     |
     */
 
-    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME'),
+    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME', 'nativephp'),
 
     /*
     |--------------------------------------------------------------------------
@@ -92,6 +92,8 @@ return [
     */
 
     'cleanup_env_keys' => [
+        'APP_KEY',
+        'APP_PREVIOUS_KEYS',
         'AWS_*',
         'GITHUB_*',
         'DO_SPACES_*',
@@ -112,6 +114,7 @@ return [
     */
 
     'cleanup_exclude_files' => [
+        'storage/app/private',
         'storage/framework/sessions',
         'storage/framework/cache',
         'storage/framework/testing',
@@ -293,8 +296,8 @@ return [
         'android' => [
             'portrait' => true,
             'upside_down' => false,
-            'landscape_left' => true,
-            'landscape_right' => true,
+            'landscape_left' => false,
+            'landscape_right' => false,
         ],
     ],
 ];

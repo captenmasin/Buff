@@ -26,8 +26,6 @@ class FoodProduct extends Model
         'protein_per_100',
         'carbs_per_100',
         'fat_per_100',
-        'raw_payload',
-        'fetched_at',
     ];
 
     protected function casts(): array
@@ -39,8 +37,6 @@ class FoodProduct extends Model
             'protein_per_100' => 'decimal:2',
             'carbs_per_100' => 'decimal:2',
             'fat_per_100' => 'decimal:2',
-            'raw_payload' => 'array',
-            'fetched_at' => 'datetime',
         ];
     }
 

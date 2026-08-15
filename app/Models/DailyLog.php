@@ -2,13 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
-
-class DailyLog extends Model
+class DailyLog extends SyncedModel
 {
-    use HasUuids;
-
     protected $fillable = [
         'date',
         'burned_calories',

@@ -18,12 +18,6 @@
             "android": "com.buff.healthconnect.HealthConnectFunctions.SyncNow",
             "android_params": ["context"],
             "description": "Queue an immediate Health Connect workout sync."
-        },
-        {
-            "name": "HealthConnect.Schedule",
-            "android": "com.buff.healthconnect.HealthConnectFunctions.Schedule",
-            "android_params": ["context"],
-            "description": "Schedule recurring Health Connect workout sync."
         }
     ],
     "android": {
@@ -40,5 +34,8 @@
                 "androidx.work:work-runtime-ktx:2.11.2"
             ]
         }
+    },
+    "ios": {
+        "min_version": "18.0"
     }
 }

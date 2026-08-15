@@ -13,7 +13,7 @@ return new class extends Migration
             $table->date('date')->index();
             $table->string('meal_type', 16)->index();
             $table->string('source_type', 16)->index();
-            $table->foreignUuid('food_product_id')->nullable()->constrained()->nullOnDelete();
+            $table->uuid('food_product_id')->nullable()->index();
             $table->string('name');
             $table->decimal('portion_quantity', 8, 2)->nullable();
             $table->string('portion_unit', 2)->nullable();
@@ -21,7 +21,7 @@ return new class extends Migration
             $table->decimal('protein_g', 8, 2);
             $table->decimal('carbs_g', 8, 2);
             $table->decimal('fat_g', 8, 2);
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

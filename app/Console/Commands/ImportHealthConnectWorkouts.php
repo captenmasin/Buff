@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\SyncState;
 use App\Services\HealthConnectWorkoutImporter;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
@@ -17,6 +18,13 @@ class ImportHealthConnectWorkouts extends Command
 
     public function handle(HealthConnectWorkoutImporter $importer): int
     {
+        if (SyncState::query()->doesntExist()) {
+            $this->line('BUFF_HEALTH_CONNECT_IMPORT_SKIPPED');
+            $this->line('BUFF_HEALTH_CONNECT_IMPORT_OK');
+
+            return self::SUCCESS;
+        }
+
         try {
             $argument = $this->argument('payload') ?: $this->option('payload');
 
@@ -28,6 +36,7 @@ class ImportHealthConnectWorkouts extends Command
             $result = $importer->import($payload);
 
             $this->components->info("Imported {$result['imported']} Health Connect workouts; deleted {$result['deleted']}.");
+            $this->line('BUFF_HEALTH_CONNECT_IMPORT_OK');
 
             return self::SUCCESS;
         } catch (Throwable $e) {

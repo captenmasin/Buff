@@ -9,6 +9,14 @@ class HealthConnectPermissionActivity : FragmentActivity() {
     private val permissionLauncher = registerForActivityResult(
         PermissionController.createRequestPermissionResultContract()
     ) {
+        try {
+            if (runBlocking { HealthConnectPlugin.hasAllPermissions(this@HealthConnectPermissionActivity) }) {
+                HealthConnectPlugin.enqueueImmediateSync(applicationContext)
+            }
+        } catch (error: Throwable) {
+            HealthConnectPlugin.logPermissionError(error)
+        }
+
         finish()
     }
 

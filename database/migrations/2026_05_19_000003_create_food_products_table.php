@@ -25,8 +25,6 @@ return new class extends Migration
             $table->decimal('protein_per_100', 8, 2);
             $table->decimal('carbs_per_100', 8, 2);
             $table->decimal('fat_per_100', 8, 2);
-            $table->json('raw_payload')->nullable();
-            $table->timestamp('fetched_at')->nullable();
             $table->timestamps();
         });
     }

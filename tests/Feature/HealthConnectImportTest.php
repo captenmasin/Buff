@@ -2,7 +2,26 @@
 
 use App\Models\HealthConnectIgnoredWorkout;
 use App\Models\HealthConnectSyncState;
+use App\Models\SyncState;
 use App\Models\WorkoutEntry;
+
+it('ignores a background import after the local account is signed out', function (): void {
+    SyncState::query()->delete();
+
+    $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
+        'records' => [[
+            'external_id' => 'signed-out-workout',
+            'calories_burned' => 300,
+            'started_at' => '2026-05-20T07:00:00+01:00',
+        ]],
+    ])])
+        ->expectsOutputToContain('BUFF_HEALTH_CONNECT_IMPORT_SKIPPED')
+        ->expectsOutputToContain('BUFF_HEALTH_CONNECT_IMPORT_OK')
+        ->assertSuccessful();
+
+    $this->assertDatabaseEmpty('workout_entries');
+    $this->assertDatabaseEmpty('health_connect_sync_states');
+});
 
 it('imports health connect workouts', function (): void {
     $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
@@ -19,7 +38,9 @@ it('imports health connect workouts', function (): void {
                 'source_package' => 'com.google.android.apps.fitness',
             ],
         ],
-    ])])->assertSuccessful();
+    ])])
+        ->expectsOutputToContain('BUFF_HEALTH_CONNECT_IMPORT_OK')
+        ->assertSuccessful();
 
     $workout = WorkoutEntry::query()->first();
 

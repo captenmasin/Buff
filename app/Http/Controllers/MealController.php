@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\FoodProduct;
 use App\Models\MealEntry;
+use App\Models\PendingMealAnalysisConfirmation;
+use App\Services\BuffSyncService;
 use App\Services\NutritionCalculator;
 use App\Services\OpenFoodFactsService;
 use App\Services\PortionParser;
@@ -29,6 +31,7 @@ class MealController extends Controller
         };
 
         $meal = $request->string('meal')->toString();
+        $availableModes = ['food', 'custom', 'workout', 'photo'];
 
         return Inertia::render('Add', [
             'date' => $request->filled('date')
@@ -36,7 +39,7 @@ class MealController extends Controller
                 : today()->toDateString(),
             'mealTypes' => MealEntry::MEAL_TYPES,
             'meal' => $meal,
-            'mode' => in_array($mode, ['food', 'custom', 'workout'], true) ? $mode : 'choose',
+            'mode' => in_array($mode, $availableModes, true) ? $mode : 'choose',
             'autoScan' => $request->boolean('scan'),
             'previousFoodEntries' => $this->previousFoodEntries(),
             'previousCustomMeals' => $this->previousCustomMeals(),
@@ -104,7 +107,7 @@ class MealController extends Controller
         return response()->json(['products' => $results]);
     }
 
-    public function storeCustom(Request $request, NutritionCalculator $calculator): RedirectResponse
+    public function storeCustom(Request $request, NutritionCalculator $calculator, BuffSyncService $sync): RedirectResponse
     {
         $validated = $request->validate([
             'date' => ['required', 'date'],
@@ -115,15 +118,31 @@ class MealController extends Controller
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'analysis_id' => ['nullable', 'uuid'],
         ]);
 
-        MealEntry::query()->create([
+        $analysisId = $validated['analysis_id'] ?? null;
+        unset($validated['analysis_id']);
+
+        $meal = MealEntry::query()->create([
             ...$validated,
             'source_type' => MealEntry::SOURCE_CUSTOM,
             'calories' => $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
         ]);
 
-        return redirect('/?date='.$validated['date'])->with('message', 'Custom food added.');
+        if (is_string($analysisId)) {
+            PendingMealAnalysisConfirmation::query()->updateOrCreate(
+                ['analysis_id' => $analysisId],
+                ['meal_record_id' => $meal->id, 'last_error' => null],
+            );
+
+            defer(fn () => $sync->sync(), 'buff-sync');
+        }
+
+        return redirect('/?date='.$validated['date'])->with(
+            'message',
+            $analysisId ? 'Meal added. Its photos will attach after sync.' : 'Custom food added.',
+        );
     }
 
     public function storeBarcode(Request $request, NutritionCalculator $calculator): RedirectResponse

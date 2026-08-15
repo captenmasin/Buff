@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import {Head, useForm} from '@inertiajs/vue3';
+import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {Download, Link2, Moon, Smartphone, Sun, Upload} from '@lucide/vue';
+import {Download, Link2, Moon, RefreshCw, Smartphone, Sun, Upload} from '@lucide/vue';
 import {applyAppearance, saveAppearance, storedAppearance, type Appearance} from '../appearance';
 import Card from '../Components/Card.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import Switch from '../Components/ui/switch/Switch.vue';
 import {heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit} from '../bodyUnits';
+
+type MealType = 'breakfast' | 'lunch' | 'dinner';
+
+type MealReminders = Record<MealType, {
+    enabled: boolean;
+    time: string;
+}>;
 
 const props = defineProps<{
     settings: {
@@ -20,6 +28,7 @@ const props = defineProps<{
         weight_unit: WeightUnit;
         height_unit: HeightUnit;
     };
+    mealReminders: MealReminders;
     healthConnect: HealthConnectState;
 }>();
 
@@ -39,6 +48,23 @@ interface HealthConnectState {
     background_granted?: boolean | null;
 }
 
+interface BuffAccount {
+    id: string;
+    name: string;
+    email: string;
+    timezone: string;
+    email_verified: boolean;
+}
+
+const page = usePage<{
+    buff: {
+        account: BuffAccount | null;
+        needs_sign_in: boolean;
+        has_local_account: boolean;
+        sync: {last_succeeded_at: string | null; last_error: string | null; pending: number} | null;
+    };
+}>();
+
 const bodyTargetForm = useForm({
     target_weight_kg: weightFromKg(props.settings.target_weight_kg, props.preferences.weight_unit) ?? '',
     target_body_fat_percent: props.settings.target_body_fat_percent ?? '',
@@ -53,22 +79,42 @@ const unitForm = useForm({
     height_unit: props.preferences.height_unit,
 });
 
+const mealReminderForm = useForm<MealReminders>({
+    breakfast: {...props.mealReminders.breakfast},
+    lunch: {...props.mealReminders.lunch},
+    dinner: {...props.mealReminders.dinner},
+});
+
 const importForm = useForm<{
     export: File | null;
 }>({
     export: null,
 });
+const accountForm = useForm({
+    name: page.props.buff.account?.name ?? '',
+    email: page.props.buff.account?.email ?? '',
+    timezone: page.props.buff.account?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC',
+});
+const logoutForm = useForm({});
+const deleteAccountForm = useForm({password: ''});
 
 const appearance = ref<Appearance>(storedAppearance());
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
 const importInput = ref<HTMLInputElement | null>(null);
+const syncLoading = ref(false);
+const syncMessage = ref('');
 
 const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof Sun }> = [
     {value: 'system', label: 'System', icon: Smartphone},
     {value: 'light', label: 'Light', icon: Sun},
     {value: 'dark', label: 'Dark', icon: Moon},
+];
+const mealReminderOptions: Array<{ id: MealType; label: string }> = [
+    {id: 'breakfast', label: 'Breakfast'},
+    {id: 'lunch', label: 'Lunch'},
+    {id: 'dinner', label: 'Dinner'},
 ];
 
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
@@ -101,6 +147,15 @@ const healthConnectButtonLabel = computed(() => {
     if (canSyncHealthConnect.value) return 'Sync now';
     return 'Connect Health Connect';
 });
+const syncDetail = computed(() => {
+    if (syncMessage.value) return syncMessage.value;
+    if (page.props.buff.sync?.last_error) return page.props.buff.sync.last_error;
+    if (page.props.buff.sync?.last_succeeded_at) {
+        return `Last synced ${new Date(page.props.buff.sync.last_succeeded_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
+    }
+
+    return `${page.props.buff.sync?.pending ?? 0} changes waiting to sync`;
+});
 
 function saveBodyTargets() {
     bodyTargetForm
@@ -122,6 +177,35 @@ function saveHeight() {
 
 function saveUnits() {
     unitForm.put('/settings/units', {preserveScroll: true});
+}
+
+function saveMealReminders() {
+    mealReminderForm.put('/settings/meal-reminders', {preserveScroll: true});
+}
+
+function saveAccount() {
+    accountForm.patch('/account', {preserveScroll: true});
+}
+
+async function syncNow() {
+    syncLoading.value = true;
+    syncMessage.value = '';
+
+    try {
+        await axios.post('/sync');
+        syncMessage.value = 'Sync complete.';
+        router.reload();
+    } catch (error) {
+        syncMessage.value = axios.isAxiosError(error)
+            ? error.response?.data?.message || 'Could not sync Buff.'
+            : 'Could not sync Buff.';
+    } finally {
+        syncLoading.value = false;
+    }
+}
+
+function mealReminderError(meal: MealType, field: 'enabled' | 'time') {
+    return mealReminderForm.errors[`${meal}.${field}`];
 }
 
 function chooseImportFile() {
@@ -265,6 +349,59 @@ watch(
             </div>
         </Card>
 
+        <Card>
+            <template v-if="page.props.buff.account">
+                <form class="space-y-3" @submit.prevent="saveAccount">
+                    <div>
+                        <h2 class="font-semibold">Buff account</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">{{ syncDetail }}</p>
+                    </div>
+                    <label class="block">
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                        <Input v-model="accountForm.name" autocomplete="name" required class="mt-1" />
+                        <span v-if="accountForm.errors.name" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.name }}</span>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Email</span>
+                        <Input v-model="accountForm.email" type="email" autocomplete="email" required class="mt-1" />
+                        <span v-if="accountForm.errors.email" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.email }}</span>
+                    </label>
+                    <label class="block">
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Timezone</span>
+                        <Input v-model="accountForm.timezone" required class="mt-1" />
+                        <span v-if="accountForm.errors.timezone" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.timezone }}</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <Button :disabled="accountForm.processing">Save account</Button>
+                        <Button type="button" variant="surface" :disabled="syncLoading" @click="syncNow">
+                            <RefreshCw :size="18" :class="{'animate-spin': syncLoading}" />
+                            Sync now
+                        </Button>
+                    </div>
+                </form>
+
+                <div class="mt-5 grid gap-2 border-t border-border pt-4">
+                    <form @submit.prevent="logoutForm.post('/account/logout')">
+                        <Button variant="surface" class="w-full" :disabled="logoutForm.processing">Sign out and remove local data</Button>
+                    </form>
+                    <form class="space-y-2" @submit.prevent="deleteAccountForm.delete('/account')">
+                        <Input v-model="deleteAccountForm.password" type="password" autocomplete="current-password" placeholder="Password to delete account" required />
+                        <span v-if="deleteAccountForm.errors.password" class="block text-sm text-destructive">{{ deleteAccountForm.errors.password }}</span>
+                        <Button variant="destructive" class="w-full" :disabled="deleteAccountForm.processing">Delete account</Button>
+                    </form>
+                </div>
+            </template>
+
+            <div v-else class="space-y-3">
+                <h2 class="font-semibold">Account sync paused</h2>
+                <p class="text-sm text-muted-foreground">Your offline data remains on this device. Sign in before the next sync.</p>
+                <Button :as="Link" href="/account/login" class="w-full">Sign in</Button>
+                <form v-if="page.props.buff.has_local_account" @submit.prevent="logoutForm.post('/account/logout')">
+                    <Button variant="surface" class="w-full" :disabled="logoutForm.processing">Remove local account data</Button>
+                </form>
+            </div>
+        </Card>
+
         <Card v-if="showHealthConnect">
             <div class="flex items-start gap-3">
                 <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">
@@ -284,6 +421,49 @@ watch(
             >
                 {{ healthConnectButtonLabel }}
             </Button>
+        </Card>
+
+        <Card>
+            <form class="space-y-3" @submit.prevent="saveMealReminders">
+                <div>
+                    <h2 class="font-semibold">Meal reminders</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
+                </div>
+
+                <div
+                    v-for="meal in mealReminderOptions"
+                    :key="meal.id"
+                    class="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 rounded-md border border-border p-3"
+                >
+                    <label :for="`${meal.id}-reminder-enabled`" class="font-medium">{{ meal.label }}</label>
+                    <Switch
+                        :id="`${meal.id}-reminder-enabled`"
+                        v-model="mealReminderForm[meal.id].enabled"
+                        :aria-label="`Enable ${meal.label.toLowerCase()} reminder`"
+                    />
+
+                    <label :for="`${meal.id}-reminder-time`" class="col-span-2">
+                        <span class="text-xs font-semibold uppercase text-muted-foreground">Time</span>
+                        <Input
+                            :id="`${meal.id}-reminder-time`"
+                            v-model="mealReminderForm[meal.id].time"
+                            type="time"
+                            class="mt-1"
+                        />
+                    </label>
+
+                    <span v-if="mealReminderError(meal.id, 'enabled')" class="col-span-2 text-sm text-destructive">
+                        {{ mealReminderError(meal.id, 'enabled') }}
+                    </span>
+                    <span v-if="mealReminderError(meal.id, 'time')" class="col-span-2 text-sm text-destructive">
+                        {{ mealReminderError(meal.id, 'time') }}
+                    </span>
+                </div>
+
+                <Button class="w-full" :disabled="mealReminderForm.processing">
+                    Save reminders
+                </Button>
+            </form>
         </Card>
 
         <Card>

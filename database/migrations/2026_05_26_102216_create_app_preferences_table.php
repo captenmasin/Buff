@@ -12,10 +12,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('app_preferences', function (Blueprint $table): void {
-            $table->id();
+            $table->uuid('id')->primary();
             $table->string('weight_unit', 2)->default('kg');
             $table->string('height_unit', 2)->default('cm');
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

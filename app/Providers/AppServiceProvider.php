@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Observers\SyncableObserver;
+use App\Services\BuffCredentialStore;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -11,7 +13,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(BuffCredentialStore::class);
     }
 
     /**
@@ -19,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        foreach (array_keys(config('buff.sync_models')) as $model) {
+            $model::observe(SyncableObserver::class);
+        }
     }
 }

@@ -1,0 +1,24 @@
+{
+    "name": "buff/background-tasks",
+    "description": "Android background scheduling for Laravel commands in Buff.",
+    "version": "1.0.0",
+    "type": "nativephp-plugin",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "Buff\\BackgroundTasks\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Buff\\BackgroundTasks\\BackgroundTasksServiceProvider"
+            ]
+        },
+        "nativephp": {
+            "manifest": "nativephp.json"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}

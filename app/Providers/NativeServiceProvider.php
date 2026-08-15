@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Buff\BackgroundTasks\BackgroundTasksServiceProvider;
 use Buff\CameraPermissions\CameraPermissionsServiceProvider;
 use Buff\HealthConnect\HealthConnectServiceProvider;
 use Buff\NativeRefresh\NativeRefreshServiceProvider;
@@ -28,6 +29,7 @@ class NativeServiceProvider extends ServiceProvider
             CameraPermissionsServiceProvider::class,
             HealthConnectServiceProvider::class,
             NativeRefreshServiceProvider::class,
+            BackgroundTasksServiceProvider::class,
         ];
     }
 }

@@ -1,7 +1,6 @@
 package com.buff.healthconnect
 
 import android.content.Context
-import android.util.Base64
 import android.util.Log
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
@@ -12,11 +11,11 @@ import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
+import com.nativephp.mobile.bridge.LaravelEnvironment
 import com.nativephp.mobile.bridge.PHPBridge
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
-import java.security.SecureRandom
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -44,7 +43,7 @@ class HealthConnectSyncWorker(
             val file = File(applicationContext.cacheDir, "buff-health-connect-${System.currentTimeMillis()}.json")
             file.writeText(payload.toString())
 
-            initializeLaravelEnvironment()
+            LaravelEnvironment(applicationContext).initializeForBackground()
             try {
                 val output = runImportCommand(file)
                 Log.d("BuffHealthConnect", "Import output: ${output.take(300)}")
@@ -59,120 +58,6 @@ class HealthConnectSyncWorker(
         }
     }
 
-    private fun initializeLaravelEnvironment() {
-        val bridge = PHPBridge(applicationContext)
-        val appStorageDir = applicationContext.getDir("storage", Context.MODE_PRIVATE)
-        val laravelDir = File(appStorageDir, "laravel")
-        val persistedDir = File(appStorageDir, "persisted_data")
-        val storageDir = File(persistedDir, "storage")
-        val databaseDir = File(persistedDir, "database")
-        val databaseFile = File(databaseDir, "database.sqlite")
-        val appKeyFile = File(persistedDir, "appkey.txt")
-        val phpSessionDir = File(appStorageDir, "php_sessions")
-
-        listOf(
-            File(storageDir, "framework/views"),
-            File(storageDir, "framework/sessions"),
-            File(storageDir, "framework/cache"),
-            File(storageDir, "logs"),
-            File(storageDir, "app/public"),
-            databaseDir,
-            phpSessionDir,
-        ).forEach { directory ->
-            directory.mkdirs()
-            directory.setReadable(true, true)
-            directory.setWritable(true, true)
-            directory.setExecutable(true, true)
-        }
-
-        if (!databaseFile.exists()) {
-            databaseFile.createNewFile()
-        }
-
-        if (!appKeyFile.exists() || !appKeyFile.readText().trim().startsWith("base64:")) {
-            appKeyFile.parentFile?.mkdirs()
-            appKeyFile.writeText(generateLaravelAppKey())
-        }
-
-        copyPhpIniAssets()
-
-        val appKey = appKeyFile.readText().trim()
-        setEnvironmentVariables(
-            bridge,
-            "APP_KEY" to appKey,
-            "DOCUMENT_ROOT" to laravelDir.absolutePath,
-            "LARAVEL_BASE_PATH" to laravelDir.absolutePath,
-            "COMPOSER_VENDOR_DIR" to File(laravelDir, "vendor").absolutePath,
-            "COMPOSER_AUTOLOADER_PATH" to File(laravelDir, "vendor/autoload.php").absolutePath,
-            "LARAVEL_STORAGE_PATH" to storageDir.absolutePath,
-            "LARAVEL_BOOTSTRAP_PATH" to File(laravelDir, "bootstrap").absolutePath,
-            "VIEW_COMPILED_PATH" to File(storageDir, "framework/views").absolutePath,
-            "CACHE_PATH" to File(storageDir, "framework/cache").absolutePath,
-            "APP_URL" to "http://127.0.0.1",
-            "ASSET_URL" to "http://127.0.0.1/_assets",
-            "DB_CONNECTION" to "sqlite",
-            "DB_DATABASE" to databaseFile.absolutePath,
-            "CACHE_DRIVER" to "file",
-            "CACHE_STORE" to "file",
-            "QUEUE_CONNECTION" to "database",
-            "NATIVEPHP_PLATFORM" to "android",
-            "NATIVEPHP_TEMPDIR" to applicationContext.cacheDir.absolutePath,
-            "COOKIE_PATH" to "/",
-            "COOKIE_DOMAIN" to "127.0.0.1",
-            "COOKIE_SECURE" to "false",
-            "COOKIE_HTTP_ONLY" to "true",
-            "SESSION_DRIVER" to "file",
-            "SESSION_DOMAIN" to "127.0.0.1",
-            "SESSION_SECURE_COOKIE" to "false",
-            "SESSION_HTTP_ONLY" to "true",
-            "SESSION_SAME_SITE" to "lax",
-            "PHP_INI_SCAN_DIR" to appStorageDir.absolutePath,
-            "CA_CERT_DIR" to applicationContext.filesDir.absolutePath,
-            "PHPRC" to applicationContext.filesDir.absolutePath,
-            "REMOTE_ADDR" to "127.0.0.1",
-            "SERVER_NAME" to "127.0.0.1",
-            "SERVER_PORT" to "80",
-            "SERVER_PROTOCOL" to "HTTP/1.1",
-            "REQUEST_SCHEME" to "http",
-            "SESSION_SAVE_PATH" to phpSessionDir.absolutePath,
-        )
-    }
-
-    private fun generateLaravelAppKey(): String {
-        val key = ByteArray(32)
-        SecureRandom().nextBytes(key)
-
-        return "base64:${Base64.encodeToString(key, Base64.NO_WRAP)}"
-    }
-
-    private fun copyPhpIniAssets() {
-        try {
-            applicationContext.assets.open("cacert.pem").use { input ->
-                File(applicationContext.filesDir, "cacert.pem").outputStream().use { output ->
-                    input.copyTo(output)
-                }
-            }
-        } catch (_: Exception) {
-            // Importing Health Connect data does not need outbound TLS, but keep
-            // the PHP ini path aligned with foreground NativePHP boot when present.
-        }
-
-        File(applicationContext.filesDir, "php.ini").writeText(
-            """
-            curl.cainfo="${applicationContext.filesDir.absolutePath}/cacert.pem"
-            openssl.cafile="${applicationContext.filesDir.absolutePath}/cacert.pem"
-            """.trimIndent()
-        )
-    }
-
-    private fun setEnvironmentVariables(bridge: PHPBridge, vararg pairs: Pair<String, String>) {
-        pairs.forEach { (name, value) ->
-            if (bridge.nativeSetEnv(name, value, 1) != 0) {
-                throw IllegalStateException("Could not set NativePHP environment variable: $name")
-            }
-        }
-    }
-
     private fun runImportCommand(file: File): String {
         val bridge = PHPBridge(applicationContext)
         val bootstrap = "${bridge.getLaravelPath()}/vendor/nativephp/mobile/bootstrap/android/persistent.php"
@@ -182,12 +67,12 @@ class HealthConnectSyncWorker(
         }
 
         return try {
-            val migrateOutput = bridge.nativeEphemeralArtisan("migrate --force")
-            val importOutput = bridge.nativeEphemeralArtisan("health-connect:import --payload=${file.absolutePath}")
-            val output = "$migrateOutput\n$importOutput"
+            val output = bridge.nativeEphemeralArtisan("health-connect:import --payload=${file.absolutePath}")
 
-            if (output.contains("Ephemeral artisan error:")) {
-                throw IllegalStateException(output.trim())
+            if (!output.contains("BUFF_HEALTH_CONNECT_IMPORT_OK")) {
+                throw IllegalStateException(output.trim().ifEmpty {
+                    "Health Connect import did not report success."
+                })
             }
 
             output

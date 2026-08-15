@@ -2,13 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Concerns\HasUuids;
-use Illuminate\Database\Eloquent\Model;
-
-class WorkoutEntry extends Model
+class WorkoutEntry extends SyncedModel
 {
-    use HasUuids;
-
     public const SOURCE_MANUAL = 'manual';
 
     public const SOURCE_HEALTH_CONNECT = 'health_connect';

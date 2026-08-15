@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, useForm } from '@inertiajs/vue3';
+import { Head, Link, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { ArrowLeft, ArrowRight, Check } from '@lucide/vue';
 import Card from '../Components/Card.vue';
@@ -22,9 +22,24 @@ const props = defineProps<{
     };
 }>();
 
+const page = usePage<{
+    buff: {
+        needs_sign_in: boolean;
+        has_local_account: boolean;
+    };
+}>();
 const step = ref(0);
 const weightDisplay = ref('');
 const heightDisplay = ref('');
+const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+
+const registrationForm = useForm({
+    name: '',
+    email: '',
+    password: '',
+    password_confirmation: '',
+    timezone,
+});
 
 const form = useForm({
     calories: props.defaults.calories,
@@ -38,7 +53,12 @@ const form = useForm({
     height_unit: props.defaults.height_unit,
 });
 
-const steps = ['Units', 'Goals', 'Body'];
+const requiresRegistration = computed(() => page.props.buff.needs_sign_in
+    && !page.props.buff.has_local_account);
+const steps = computed(() => requiresRegistration.value
+    ? ['Account', 'Units', 'Goals', 'Body']
+    : ['Units', 'Goals', 'Body']);
+const currentStep = computed(() => steps.value[step.value]);
 const macroCalories = computed(() => Math.round((Number(form.protein_g) * 4) + (Number(form.carbs_g) * 4) + (Number(form.fat_g) * 9)));
 const macrosMatch = computed(() => macroCalories.value === Number(form.calories));
 
@@ -53,9 +73,15 @@ function syncStoredFromDisplay(weightUnit: WeightUnit = form.weight_unit, height
 }
 
 function nextStep() {
+    if (currentStep.value === 'Account') {
+        registrationForm.post('/account/register');
+
+        return;
+    }
+
     syncStoredFromDisplay();
 
-    if (step.value < steps.length - 1) {
+    if (step.value < steps.value.length - 1) {
         step.value += 1;
     }
 }
@@ -84,13 +110,13 @@ syncDisplayFromStored();
 <template>
     <Head title="Set up Buff" />
 
-    <section class="space-y-5">
+    <form class="space-y-5" @submit.prevent="currentStep === 'Body' ? finish() : nextStep()">
         <header>
             <p class="text-sm text-muted-foreground">Welcome</p>
             <h1 class="text-3xl font-semibold tracking-normal text-foreground">Set up Buff</h1>
         </header>
 
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid gap-2" :class="steps.length === 4 ? 'grid-cols-4' : 'grid-cols-3'">
             <div
                 v-for="(label, index) in steps"
                 :key="label"
@@ -101,7 +127,33 @@ syncDisplayFromStored();
             </div>
         </div>
 
-        <Card v-if="step === 0">
+        <Card v-if="currentStep === 'Account'">
+            <div class="space-y-3">
+                <h2 class="font-semibold">Create your account</h2>
+                <label class="block">
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                    <Input v-model="registrationForm.name" autocomplete="name" required class="mt-1" />
+                    <span v-if="registrationForm.errors.name" class="mt-1 block text-sm text-destructive">{{ registrationForm.errors.name }}</span>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Email</span>
+                    <Input v-model="registrationForm.email" type="email" autocomplete="email" required class="mt-1" />
+                    <span v-if="registrationForm.errors.email" class="mt-1 block text-sm text-destructive">{{ registrationForm.errors.email }}</span>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Password</span>
+                    <Input v-model="registrationForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
+                    <span v-if="registrationForm.errors.password" class="mt-1 block text-sm text-destructive">{{ registrationForm.errors.password }}</span>
+                </label>
+                <label class="block">
+                    <span class="text-xs font-semibold uppercase text-muted-foreground">Confirm password</span>
+                    <Input v-model="registrationForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
+                </label>
+                <p class="text-center text-sm">Already registered? <Link href="/account/login" class="text-primary">Sign in</Link></p>
+            </div>
+        </Card>
+
+        <Card v-if="currentStep === 'Units'">
             <div class="space-y-3">
                 <h2 class="font-semibold">Choose units</h2>
                 <label class="block">
@@ -121,7 +173,7 @@ syncDisplayFromStored();
             </div>
         </Card>
 
-        <Card v-if="step === 1">
+        <Card v-if="currentStep === 'Goals'">
             <div class="space-y-3">
                 <h2 class="font-semibold">Daily targets</h2>
                 <label class="block">
@@ -149,7 +201,7 @@ syncDisplayFromStored();
             </div>
         </Card>
 
-        <Card v-if="step === 2">
+        <Card v-if="currentStep === 'Body'">
             <div class="space-y-3">
                 <h2 class="font-semibold">Body profile</h2>
                 <div class="grid grid-cols-2 gap-3">
@@ -177,14 +229,18 @@ syncDisplayFromStored();
                 <ArrowLeft :size="18" />
                 Back
             </Button>
-            <Button v-if="step < steps.length - 1" type="button" :disabled="step === 1 && !macrosMatch" @click="nextStep">
-                Next
+            <Button
+                v-if="step < steps.length - 1"
+                type="submit"
+                :disabled="(currentStep === 'Goals' && !macrosMatch) || registrationForm.processing"
+            >
+                {{ registrationForm.processing ? 'Creating...' : 'Next' }}
                 <ArrowRight :size="18" />
             </Button>
-            <Button v-else type="button" :disabled="form.processing" @click="finish">
+            <Button v-else type="submit" :disabled="form.processing">
                 <Check :size="18" />
                 Start
             </Button>
         </div>
-    </section>
+    </form>
 </template>

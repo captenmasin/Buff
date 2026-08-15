@@ -70,15 +70,4 @@ object HealthConnectFunctions {
         }
     }
 
-    class Schedule(private val context: Context) : BridgeFunction {
-        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
-            HealthConnectPlugin.schedulePeriodicSync(context)
-
-            return BridgeResponse.success(mapOf(
-                "supported" to true,
-                "available" to HealthConnectPlugin.isAvailable(context),
-                "status" to "scheduled"
-            ))
-        }
-    }
 }

@@ -10,9 +10,9 @@ return new class extends Migration
     {
         Schema::create('daily_logs', function (Blueprint $table): void {
             $table->uuid('id')->primary();
-            $table->date('date')->unique();
+            $table->date('date')->index();
             $table->unsignedInteger('burned_calories')->default(0);
-            $table->timestamps();
+            $table->timestamps(6);
         });
     }
 

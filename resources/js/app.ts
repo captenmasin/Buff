@@ -19,10 +19,11 @@ createInertiaApp({
     // @ts-ignore
     resolve: async (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue');
-        const page = await pages[`./Pages/${name}.vue`]();
+        const page = await pages[`./Pages/${name}.vue`]() as {default: {layout?: unknown}};
 
-        // @ts-ignore
-        page.default.layout = page.default.layout || AppShell;
+        if (!Object.prototype.hasOwnProperty.call(page.default, 'layout')) {
+            page.default.layout = AppShell;
+        }
 
         return page;
     },

@@ -1,176 +1,114 @@
 <?php
 
+use App\Services\BuffCredentialStore;
+use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
 
-it('fetches and normalizes a barcode product', function (): void {
-    Http::fake([
-        'world.openfoodfacts.org/api/v2/product/737628064502.json*' => Http::response([
-            'status' => 1,
-            'product' => [
-                'code' => '737628064502',
-                'product_name' => 'Example Bar',
-                'brands' => 'Buff Foods',
-                'serving_size' => '38g',
-                'quantity' => '152g',
-                'image_url' => 'https://example.com/bar.jpg',
-                'nutriments' => [
-                    'energy-kcal_100g' => 420,
-                    'proteins_100g' => 20,
-                    'carbohydrates_100g' => 48,
-                    'fat_100g' => 12,
-                ],
-            ],
-        ]),
+beforeEach(function (): void {
+    app(BuffCredentialStore::class)->store('food-token', [
+        'id' => '10000000-0000-4000-8000-000000000001',
+        'email_verified' => true,
     ]);
+});
 
-    $this->postJson('/barcode/lookup', [
-        'barcode' => '737628064502',
-    ])->assertOk()
+it('fetches and stores a normalized barcode product from buff-server', function (): void {
+    Http::fake(['*/foods/barcodes/737628064502' => Http::response([
+        'product' => productPayload(),
+        'portion_options' => [],
+    ])]);
+
+    $this->postJson('/barcode/lookup', ['barcode' => '737628064502'])
+        ->assertOk()
         ->assertJsonPath('product.name', 'Example Bar')
         ->assertJsonPath('portion_options.0.quantity', 38)
         ->assertJsonPath('portion_options.1.quantity', 152);
 
     $this->assertDatabaseHas('food_products', [
+        'id' => '20000000-0000-4000-8000-000000000002',
         'barcode' => '737628064502',
         'name' => 'Example Bar',
     ]);
 });
 
-it('removes whitespace from barcode before lookup validation and search', function (): void {
-    Http::fake([
-        'world.openfoodfacts.org/api/v2/product/737628064502.json*' => Http::response([
-            'status' => 1,
-            'product' => [
-                'code' => '737628064502',
-                'product_name' => 'Example Bar',
-                'brands' => 'Buff Foods',
-                'serving_size' => '38g',
-                'quantity' => '152g',
-                'image_url' => 'https://example.com/bar.jpg',
-                'nutriments' => [
-                    'energy-kcal_100g' => 420,
-                    'proteins_100g' => 20,
-                    'carbohydrates_100g' => 48,
-                    'fat_100g' => 12,
-                ],
-            ],
-        ]),
-    ]);
+it('removes whitespace before requesting the barcode proxy', function (): void {
+    Http::fake(['*/foods/barcodes/737628064502' => Http::response([
+        'product' => productPayload(),
+        'portion_options' => [],
+    ])]);
 
-    $this->postJson('/barcode/lookup', [
-        'barcode' => "737 628 064 502 \n  ",
-    ])->assertOk()
+    $this->postJson('/barcode/lookup', ['barcode' => "737 628 064 502 \n"])
+        ->assertOk()
         ->assertJsonPath('product.barcode', '737628064502');
 
-    Http::assertSent(fn ($request): bool => str_starts_with($request->url(), 'https://world.openfoodfacts.org/api/v2/product/737628064502.json'));
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/foods/barcodes/737628064502'
+        && $request->hasHeader('Authorization', 'Bearer food-token'));
 });
 
-it('uses millilitres for liquid packaged products', function (): void {
-    Http::fake([
-        'world.openfoodfacts.org/api/v2/product/5000181036312.json*' => Http::response([
-            'status' => 1,
-            'product' => [
-                'code' => '5000181036312',
-                'product_name' => 'Arla B.O.B',
-                'brands' => 'Arla',
-                'serving_size' => '1 portion (200 g)',
-                'serving_quantity' => 200,
-                'serving_quantity_unit' => 'g',
-                'quantity' => '2l',
-                'product_quantity' => 2000,
-                'product_quantity_unit' => 'ml',
-                'nutrition_data_per' => '100g',
-                'nutriments' => [
-                    'energy-kcal_100g' => 41.5,
-                    'proteins_100g' => 4.55,
-                    'carbohydrates_100g' => 4.9,
-                    'fat_100g' => 0.4,
-                ],
-            ],
+it('keeps server-normalized millilitre portions', function (): void {
+    Http::fake(['*/foods/barcodes/5000181036312' => Http::response([
+        'product' => productPayload([
+            'id' => '30000000-0000-4000-8000-000000000003',
+            'barcode' => '5000181036312',
+            'name' => 'Arla B.O.B',
+            'serving_label' => '200ml',
+            'serving_quantity' => 200,
+            'serving_unit' => 'ml',
+            'package_label' => '2l',
+            'package_quantity' => 2000,
+            'package_unit' => 'ml',
+            'nutrition_unit' => 'ml',
         ]),
-    ]);
+        'portion_options' => [],
+    ])]);
 
-    $this->postJson('/barcode/lookup', [
-        'barcode' => '5000181036312',
-    ])->assertOk()
-        ->assertJsonPath('product.name', 'Arla B.O.B')
+    $this->postJson('/barcode/lookup', ['barcode' => '5000181036312'])
+        ->assertOk()
         ->assertJsonPath('product.nutrition_unit', 'ml')
         ->assertJsonPath('portion_options.0.label', '1 serving (200ml)')
-        ->assertJsonPath('portion_options.0.unit', 'ml')
         ->assertJsonPath('portion_options.1.label', 'Whole thing (2l)')
-        ->assertJsonPath('portion_options.1.unit', 'ml')
         ->assertJsonPath('portion_options.2.label', '100ml');
-
-    $this->assertDatabaseHas('food_products', [
-        'barcode' => '5000181036312',
-        'nutrition_unit' => 'ml',
-        'serving_unit' => 'ml',
-        'package_unit' => 'ml',
-    ]);
 });
 
-it('searches open food facts products', function (): void {
-    Http::fake([
-        'world.openfoodfacts.org/cgi/search.pl*' => Http::response([
-            'products' => [
-                [
-                    'code' => '737628064502',
-                    'product_name' => 'Example Bar',
-                    'brands' => 'Buff Foods',
-                    'serving_size' => '38g',
-                    'nutriments' => [
-                        'energy-kcal_100g' => 420,
-                        'proteins_100g' => 20,
-                        'carbohydrates_100g' => 48,
-                        'fat_100g' => 12,
-                    ],
-                ],
-            ],
-        ]),
-    ]);
+it('searches through the buff-server proxy and stores returned products', function (): void {
+    Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
 
     $this->getJson('/food-products/search?q=example')
         ->assertOk()
         ->assertJsonPath('products.0.name', 'Example Bar');
 
-    $this->assertDatabaseHas('food_products', [
+    $this->assertDatabaseHas('food_products', ['barcode' => '737628064502']);
+});
+
+it('uses stored products when the remote search is unavailable', function (): void {
+    Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
+    $this->getJson('/food-products/search?q=example')->assertOk();
+
+    Http::fake(['*/foods/search*' => Http::failedConnection()]);
+
+    $this->getJson('/food-products/search?q=example')
+        ->assertOk()
+        ->assertJsonPath('products.0.name', 'Example Bar');
+});
+
+/** @param array<string, mixed> $overrides */
+function productPayload(array $overrides = []): array
+{
+    return [...[
+        'id' => '20000000-0000-4000-8000-000000000002',
         'barcode' => '737628064502',
         'name' => 'Example Bar',
-    ]);
-});
-
-it('uses cached open food facts search results', function (): void {
-    Http::fake([
-        'world.openfoodfacts.org/cgi/search.pl*' => Http::response([
-            'products' => [
-                [
-                    'code' => '737628064502',
-                    'product_name' => 'Example Bar',
-                    'brands' => 'Buff Foods',
-                    'serving_size' => '38g',
-                    'nutriments' => [
-                        'energy-kcal_100g' => 420,
-                        'proteins_100g' => 20,
-                        'carbohydrates_100g' => 48,
-                        'fat_100g' => 12,
-                    ],
-                ],
-            ],
-        ]),
-    ]);
-
-    $this->getJson('/food-products/search?q=Example')
-        ->assertOk()
-        ->assertJsonPath('products.0.name', 'Example Bar');
-
-    $this->getJson('/food-products/search?q=example')
-        ->assertOk()
-        ->assertJsonPath('products.0.name', 'Example Bar');
-
-    Http::assertSentCount(1);
-
-    $this->assertDatabaseHas('open_food_facts_search_results', [
-        'query' => 'example',
-        'limit' => 20,
-    ]);
-});
+        'brand' => 'Buff Foods',
+        'image_url' => 'https://example.com/bar.jpg',
+        'serving_label' => '38g',
+        'serving_quantity' => 38,
+        'serving_unit' => 'g',
+        'package_label' => '152g',
+        'package_quantity' => 152,
+        'package_unit' => 'g',
+        'nutrition_unit' => 'g',
+        'calories_per_100' => 420,
+        'protein_per_100' => 20,
+        'carbs_per_100' => 48,
+        'fat_per_100' => 12,
+    ], ...$overrides];
+}

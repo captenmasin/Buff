@@ -1,7 +1,12 @@
 <?php
 
 use App\Models\DailyGoal;
+use App\Models\SyncState;
 use Inertia\Testing\AssertableInertia as Assert;
+
+beforeEach(function (): void {
+    SyncState::query()->delete();
+});
 
 it('renders onboarding for a new local user', function (): void {
     $this->get('/onboarding')
