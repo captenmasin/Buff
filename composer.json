@@ -6,15 +6,15 @@
     "keywords": ["laravel", "framework"],
     "license": "MIT",
     "require": {
-        "php": "^8.3",
-        "buff/background-tasks": "*",
-        "buff/camera-permissions": "*",
-        "buff/health-connect": "*",
-        "buff/native-refresh": "*",
+        "php": "^8.4",
+        "buff/background-tasks": "^1.0",
+        "buff/camera-permissions": "^1.0",
+        "buff/health-connect": "^1.0",
+        "buff/native-refresh": "^1.0",
         "inertiajs/inertia-laravel": "^3.1",
         "laravel/framework": "^13.8",
         "laravel/tinker": "^3.0",
-        "nativephp/mobile": "^3.3"
+        "nativephp/mobile": "~4.2.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -113,7 +113,7 @@
     "config": {
         "optimize-autoloader": true,
         "platform": {
-            "php": "8.3.31"
+            "php": "8.4.0"
         },
         "preferred-install": "dist",
         "sort-packages": true,

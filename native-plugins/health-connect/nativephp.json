@@ -1,5 +1,6 @@
 {
     "namespace": "HealthConnect",
+    "platforms": ["android"],
     "bridge_functions": [
         {
             "name": "HealthConnect.Status",

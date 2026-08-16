@@ -1,5 +1,6 @@
 {
     "namespace": "BackgroundTasks",
+    "platforms": ["android"],
     "bridge_functions": [
         {
             "name": "BackgroundTasks.Register",

@@ -286,13 +286,20 @@ return [
     |
     | Configure which orientations your app supports on different devices.
     | This will be applied during the build process to set appropriate
-    | constraints in AndroidManifest.xml.
+    | constraints in Info.plist and AndroidManifest.xml.
     |
-    | If all orientations are false for Android, the build will fail with a
-    | helpful error message.
+    | If all orientations are false for a platform, the build will fail.
     |
     */
+    'ipad' => false,
+
     'orientation' => [
+        'iphone' => [
+            'portrait' => true,
+            'upside_down' => false,
+            'landscape_left' => false,
+            'landscape_right' => false,
+        ],
         'android' => [
             'portrait' => true,
             'upside_down' => false,

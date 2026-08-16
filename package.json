@@ -23,6 +23,7 @@
         "vue-tsc": "^3.3.10"
     },
     "dependencies": {
+        "@inertiajs/core": "^3.6.1",
         "@inertiajs/vue3": "^3.6.1",
         "@lucide/vue": "^1.31.0",
         "@vitejs/plugin-vue": "^6.0.8",

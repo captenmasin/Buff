@@ -168,10 +168,10 @@ KOTLIN;
         $original = file_get_contents($path);
         $content = $original;
 
-        if (! str_contains($content, 'webViewManager.handleCameraPermissionResult(requestCode, grantResults)')) {
+        if (! str_contains($content, 'webRenderer?.manager?.handleCameraPermissionResult(requestCode, grantResults)')) {
             $content = str_replace(
                 "        super.onRequestPermissionsResult(requestCode, permissions, grantResults)\n\n        // Post lifecycle event for each permission result\n",
-                "        super.onRequestPermissionsResult(requestCode, permissions, grantResults)\n\n        if (::webViewManager.isInitialized && webViewManager.handleCameraPermissionResult(requestCode, grantResults)) {\n            return\n        }\n\n        // Post lifecycle event for each permission result\n",
+                "        super.onRequestPermissionsResult(requestCode, permissions, grantResults)\n\n        if (webRenderer?.manager?.handleCameraPermissionResult(requestCode, grantResults) == true) {\n            return\n        }\n\n        // Post lifecycle event for each permission result\n",
                 $content
             );
         }

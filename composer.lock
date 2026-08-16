@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "9cdb068badaef7e4852d9c0efc8c834e",
+    "content-hash": "383ca0b56289b332416a1c8bcd92dd46",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -2565,16 +2565,16 @@
         },
         {
             "name": "nativephp/mobile",
-            "version": "3.3.7",
+            "version": "4.2.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/NativePHP/mobile-air.git",
-                "reference": "e8ea89813206002ea6acab6d6dca3c38b473bf0b"
+                "reference": "bf4fd2a47f7f6b99d661e65ee5f7fddb318e50d1"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/NativePHP/mobile-air/zipball/e8ea89813206002ea6acab6d6dca3c38b473bf0b",
-                "reference": "e8ea89813206002ea6acab6d6dca3c38b473bf0b",
+                "url": "https://api.github.com/repos/NativePHP/mobile-air/zipball/bf4fd2a47f7f6b99d661e65ee5f7fddb318e50d1",
+                "reference": "bf4fd2a47f7f6b99d661e65ee5f7fddb318e50d1",
                 "shasum": ""
             },
             "require": {
@@ -2585,10 +2585,16 @@
                 "illuminate/contracts": "^10.0|^11.0|^12.0|^13.0",
                 "illuminate/support": "^10.0|^11.0|^12.0|^13.0",
                 "laravel/prompts": "^0.1.1|^0.2|^0.3",
-                "php": "^8.3",
+                "php": "^8.4",
                 "react/datagram": "^1.10",
                 "spatie/laravel-package-tools": "^1.14.0",
                 "workerman/workerman": "^4.1"
+            },
+            "conflict": {
+                "nativephp/mobile-device": "*",
+                "nativephp/mobile-dialog": "*",
+                "nativephp/mobile-file": "*",
+                "nativephp/mobile-system": "*"
             },
             "require-dev": {
                 "larastan/larastan": "^2.0",
@@ -2603,6 +2609,9 @@
                 "phpstan/phpstan-phpunit": "^1.0",
                 "spatie/laravel-ray": "^1.26"
             },
+            "suggest": {
+                "ext-zip": "Required by native:install to validate and extract the downloaded Android PHP binary archives"
+            },
             "type": "library",
             "extra": {
                 "laravel": {
@@ -2612,6 +2621,9 @@
                 }
             },
             "autoload": {
+                "files": [
+                    "src/helpers.php"
+                ],
                 "psr-4": {
                     "Native\\Mobile\\": "src/"
                 }
@@ -2642,9 +2654,9 @@
             ],
             "support": {
                 "issues": "https://github.com/NativePHP/mobile-air/issues",
-                "source": "https://github.com/NativePHP/mobile-air/tree/3.3.7"
+                "source": "https://github.com/NativePHP/mobile-air/tree/4.2.0"
             },
-            "time": "2026-08-04T05:56:50+00:00"
+            "time": "2026-08-14T00:44:18+00:00"
         },
         {
             "name": "nesbot/carbon",
@@ -10911,11 +10923,11 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
-        "php": "^8.3"
+        "php": "^8.4"
     },
     "platform-dev": {},
     "platform-overrides": {
-        "php": "8.3.31"
+        "php": "8.4.0"
     },
     "plugin-api-version": "2.9.0"
 }

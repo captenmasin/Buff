@@ -50,8 +50,8 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
 
                 if (! str_contains($content, 'private var swipeRefreshLayout: SwipeRefreshLayout? = null')) {
                     $content = str_replace(
-                        "    private lateinit var webViewManager: WebViewManager\n",
-                        "    private lateinit var webViewManager: WebViewManager\n    private var swipeRefreshLayout: SwipeRefreshLayout? = null\n",
+                        "    private var webRenderer by mutableStateOf<com.nativephp.mobile.network.WebRenderer?>(null)\n",
+                        "    private var webRenderer by mutableStateOf<com.nativephp.mobile.network.WebRenderer?>(null)\n    private var swipeRefreshLayout: SwipeRefreshLayout? = null\n",
                         $content
                     );
                 }
@@ -66,8 +66,8 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
 
                 if (! str_contains($content, 'SwipeRefreshLayout(context).apply')) {
                     $content = str_replace(
-                        "                        AndroidView(\n                            factory = { webView },",
-                        "                        AndroidView(\n                            factory = { context ->\n                                SwipeRefreshLayout(context).apply {\n                                    swipeRefreshLayout = this\n                                    setColorSchemeColors(android.graphics.Color.rgb(37, 61, 44))\n                                    setOnRefreshListener { webView.reload() }\n                                    (webView.parent as? ViewGroup)?.removeView(webView)\n                                    addView(\n                                        webView,\n                                        ViewGroup.LayoutParams(\n                                            ViewGroup.LayoutParams.MATCH_PARENT,\n                                            ViewGroup.LayoutParams.MATCH_PARENT\n                                        )\n                                    )\n                                }\n                            },",
+                        "                                AndroidView(\n                                    factory = { renderer.webView },",
+                        "                                AndroidView(\n                                    factory = { context ->\n                                        SwipeRefreshLayout(context).apply {\n                                            swipeRefreshLayout = this\n                                            setColorSchemeColors(android.graphics.Color.rgb(37, 61, 44))\n                                            val webView = renderer.webView\n                                            setOnRefreshListener { webView.reload() }\n                                            (webView.parent as? ViewGroup)?.removeView(webView)\n                                            addView(\n                                                webView,\n                                                ViewGroup.LayoutParams(\n                                                    ViewGroup.LayoutParams.MATCH_PARENT,\n                                                    ViewGroup.LayoutParams.MATCH_PARENT\n                                                )\n                                            )\n                                        }\n                                    },",
                         $content
                     );
                 }
@@ -97,8 +97,27 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
     private function installAndroidAddShortcut(): void
     {
         $this->patchFile(
-            $this->buildPath().'/app/src/main/res/xml/shortcuts.xml',
-            fn (string $content): string => <<<'XML'
+            $this->buildPath().'/app/src/main/AndroidManifest.xml',
+            function (string $content): string {
+                if (str_contains($content, 'android.app.shortcuts')) {
+                    return $content;
+                }
+
+                return str_replace(
+                    "            </intent-filter>\n        </activity>",
+                    "            </intent-filter>\n            <meta-data\n                android:name=\"android.app.shortcuts\"\n                android:resource=\"@xml/shortcuts\" />\n        </activity>",
+                    $content
+                );
+            }
+        );
+
+        $shortcutsPath = $this->buildPath().'/app/src/main/res/xml/shortcuts.xml';
+
+        if (! is_dir(dirname($shortcutsPath))) {
+            mkdir(dirname($shortcutsPath), 0755, true);
+        }
+
+        file_put_contents($shortcutsPath, <<<'XML'
 <?xml version="1.0" encoding="utf-8"?>
 <shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
     <shortcut
