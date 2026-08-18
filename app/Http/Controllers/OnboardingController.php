@@ -4,8 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\AppPreference;
 use App\Models\DailyGoal;
-use App\Models\SyncState;
-use App\Services\BuffCredentialStore;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -16,12 +14,8 @@ use Inertia\Response;
 
 class OnboardingController extends Controller
 {
-    public function create(BuffCredentialStore $credentials): Response|RedirectResponse
+    public function create(): Response|RedirectResponse
     {
-        if ($credentials->token() === null && ($credentials->account() !== null || SyncState::query()->exists())) {
-            return redirect()->route('account.login');
-        }
-
         if (DailyGoal::query()->exists()) {
             return redirect('/');
         }

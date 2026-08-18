@@ -33,13 +33,13 @@ class AccountController extends Controller
         return $this->page('login');
     }
 
-    public function registerPage(): RedirectResponse
+    public function registerPage(): Response|RedirectResponse
     {
-        if ($this->credentials->account() !== null) {
-            return $this->accountRedirect();
+        if ($redirect = $this->registrationRedirect()) {
+            return $redirect;
         }
 
-        return redirect('/onboarding');
+        return $this->page('register');
     }
 
     public function forgotPasswordPage(): Response
@@ -72,6 +72,10 @@ class AccountController extends Controller
 
     public function register(Request $request): RedirectResponse
     {
+        if ($redirect = $this->registrationRedirect()) {
+            return $redirect;
+        }
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:255'],
@@ -200,7 +204,7 @@ class AccountController extends Controller
         $this->credentials->clear();
         $localData->wipe();
 
-        return redirect('/onboarding')->with('message', 'Your Buff account was deleted.');
+        return redirect()->route('account.register')->with('message', 'Your Buff account was deleted.');
     }
 
     private function finishAuthentication(BuffApiResult $result): void
@@ -252,6 +256,19 @@ class AccountController extends Controller
     private function accountRedirect(): RedirectResponse
     {
         return redirect('/');
+    }
+
+    private function registrationRedirect(): ?RedirectResponse
+    {
+        if ($this->credentials->token() !== null) {
+            return $this->accountRedirect();
+        }
+
+        if ($this->credentials->account() !== null || SyncState::query()->exists()) {
+            return redirect()->route('account.login')->with('message', 'This device already contains local account data. Sign in to continue.');
+        }
+
+        return null;
     }
 
     /** @param array<string, mixed> $props */

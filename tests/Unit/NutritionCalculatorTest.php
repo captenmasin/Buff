@@ -12,6 +12,12 @@ it('calculates macro calories', function (): void {
         ->and($calculator->goalMatchesCalories(1900, 170, 195, 60))->toBeFalse();
 });
 
+it('matches rounded odd-calorie macro totals', function (): void {
+    $calculator = new NutritionCalculator;
+
+    expect($calculator->goalMatchesCalories(1999, 174.91, 224.89, 44.42))->toBeTrue();
+});
+
 it('calculates product portions from per 100 values', function (): void {
     $calculator = new NutritionCalculator;
     $product = new FoodProduct([

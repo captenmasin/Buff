@@ -25,13 +25,13 @@ Route::get('/account/forgot-password', [AccountController::class, 'forgotPasswor
 Route::post('/account/forgot-password', [AccountController::class, 'forgotPassword']);
 Route::get('/reset-password', [AccountController::class, 'resetPasswordPage']);
 Route::post('/reset-password', [AccountController::class, 'resetPassword']);
-Route::get('/onboarding', [OnboardingController::class, 'create']);
 
 Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/account/verify', [AccountController::class, 'verificationPage'])->name('account.verify');
     Route::get('/account/verification-status', [AccountController::class, 'verificationStatus']);
     Route::post('/account/verification/resend', [AccountController::class, 'resendVerification']);
     Route::post('/account/logout', [AccountController::class, 'logout']);
+    Route::get('/onboarding', [OnboardingController::class, 'create']);
     Route::post('/onboarding', [OnboardingController::class, 'store']);
 
     Route::get('/', DashboardController::class);
@@ -44,8 +44,6 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/settings', [SettingsController::class, 'edit']);
     Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
     Route::put('/settings/meal-reminders', [SettingsController::class, 'updateMealReminders']);
-    Route::put('/settings/body-targets', [SettingsController::class, 'updateBodyTargets']);
-    Route::put('/settings/height', [SettingsController::class, 'updateHeight']);
     Route::get('/settings/export', [DataTransferController::class, 'export']);
     Route::post('/settings/import', [DataTransferController::class, 'import']);
     Route::patch('/account', [AccountController::class, 'update']);
@@ -55,7 +53,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
 
     Route::get('/progress', [ProgressController::class, 'index']);
     Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
-    Route::put('/progress/height', [ProgressController::class, 'updateHeight']);
+    Route::put('/progress/body-profile', [ProgressController::class, 'updateBodyProfile']);
     Route::delete('/progress/body-metrics/{bodyMetric}', [ProgressController::class, 'destroy']);
 
     Route::get('/add', [MealController::class, 'create']);

@@ -20,6 +20,10 @@ class DashboardController extends Controller
             return redirect('/onboarding');
         }
 
+        if ($request->query('add') === '1') {
+            return redirect('/add'.($request->filled('date') ? '?date='.$request->string('date')->toString() : ''));
+        }
+
         $date = $request->filled('date')
             ? Carbon::parse($request->string('date')->toString())
             : today();

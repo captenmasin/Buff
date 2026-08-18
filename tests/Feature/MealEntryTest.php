@@ -25,6 +25,23 @@ it('creates a custom meal and calculates calories', function (): void {
         ->and($entry->source_type)->toBe(MealEntry::SOURCE_CUSTOM);
 });
 
+it('deletes a meal', function (): void {
+    $entry = MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'lunch',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Lunch',
+        'calories' => 500,
+        'protein_g' => 30,
+        'carbs_g' => 50,
+        'fat_g' => 15,
+    ]);
+
+    $this->delete("/meals/{$entry->id}")->assertRedirect('/?date=2026-05-19');
+
+    $this->assertDatabaseMissing('meal_entries', ['id' => $entry->id]);
+});
+
 it('creates a barcode meal from a product portion', function (): void {
     $product = FoodProduct::query()->create([
         'barcode' => '1234567890123',
@@ -87,6 +104,16 @@ it('opens the add page in scan mode', function (): void {
         );
 });
 
+it('opens the add launcher with its chooser and preserves dates', function (): void {
+    $this->get('/add?date=2026-05-19')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->where('mode', 'choose')
+            ->where('date', '2026-05-19')
+        );
+});
+
 it('passes unique recent previous custom meals to add page', function (): void {
     $olderDuplicate = MealEntry::query()->create([
         'date' => '2026-05-17',
@@ -133,6 +160,7 @@ it('passes unique recent previous custom meals to add page', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Add')
+            ->where('mode', 'custom')
             ->has('previousCustomMeals', 2)
             ->where('previousCustomMeals.0.name', 'Protein snack')
             ->where('previousCustomMeals.0.portion_quantity', 90)

@@ -64,6 +64,63 @@ it('redirects new users to onboarding until goals exist', function (): void {
         );
 });
 
+it('returns only populated meal groups', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'dinner',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Dinner',
+        'calories' => 500,
+        'protein_g' => 30,
+        'carbs_g' => 50,
+        'fat_g' => 15,
+    ]);
+
+    $this->get('/?date=2026-05-19')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('summary.entries.dinner', 1)
+            ->missing('summary.entries.breakfast')
+            ->has('summary.workouts', 0)
+        );
+});
+
+it('returns an empty goal-backed summary without meal or workout groups', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    $this->get('/?date=2026-05-19')
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('summary.entries', 0)
+            ->has('summary.workouts', 0)
+        );
+});
+
+it('redirects legacy add shortcuts to the canonical add page', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    $this->get('/?add=1')->assertRedirect('/add');
+    $this->get('/?add=1&date=2026-05-19')->assertRedirect('/add?date=2026-05-19');
+});
+
 it('reports monday first week statuses with burned calorie offset', function (): void {
     DailyGoal::query()->create([
         'calories' => 2000,

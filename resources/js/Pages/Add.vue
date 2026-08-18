@@ -917,7 +917,7 @@ onUnmounted(() => {
                 </span>
                 <span>
                     <span class="block font-semibold">Food</span>
-                    <span class="block text-sm font-medium text-muted-foreground">Search or scan</span>
+                    <span class="block text-sm font-medium text-muted-foreground">Search, scan, or custom</span>
                 </span>
             </Button>
 

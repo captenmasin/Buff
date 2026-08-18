@@ -146,9 +146,6 @@ textarea {
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
 }
 
-.bottom-drawer {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
-}
 
 .app-sidebar {
     min-height: 100dvh;
@@ -165,9 +162,6 @@ textarea {
         padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
     }
 
-    .bottom-drawer {
-        padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 0.75rem) + 1rem);
-    }
 
     .app-sidebar {
         padding-top: calc(max(env(safe-area-inset-top, 0px), 1rem) + 1rem);

@@ -9,7 +9,7 @@ import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
 import Switch from '../Components/ui/switch/Switch.vue';
-import {heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit} from '../bodyUnits';
+import {type HeightUnit, type WeightUnit} from '../bodyUnits';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
 
@@ -19,11 +19,6 @@ type MealReminders = Record<MealType, {
 }>;
 
 const props = defineProps<{
-    settings: {
-        height_cm: number | null;
-        target_weight_kg: number | null;
-        target_body_fat_percent: number | null;
-    };
     preferences: {
         weight_unit: WeightUnit;
         height_unit: HeightUnit;
@@ -64,15 +59,6 @@ const page = usePage<{
         sync: {last_succeeded_at: string | null; last_error: string | null; pending: number} | null;
     };
 }>();
-
-const bodyTargetForm = useForm({
-    target_weight_kg: weightFromKg(props.settings.target_weight_kg, props.preferences.weight_unit) ?? '',
-    target_body_fat_percent: props.settings.target_body_fat_percent ?? '',
-});
-
-const heightForm = useForm({
-    height_cm: heightFromCm(props.settings.height_cm, props.preferences.height_unit) ?? '',
-});
 
 const unitForm = useForm({
     weight_unit: props.preferences.weight_unit,
@@ -156,24 +142,6 @@ const syncDetail = computed(() => {
 
     return `${page.props.buff.sync?.pending ?? 0} changes waiting to sync`;
 });
-
-function saveBodyTargets() {
-    bodyTargetForm
-        .transform((data) => ({
-            ...data,
-            target_weight_kg: weightToKg(data.target_weight_kg, unitForm.weight_unit),
-        }))
-        .put('/settings/body-targets', {preserveScroll: true});
-}
-
-function saveHeight() {
-    heightForm
-        .transform((data) => ({
-            ...data,
-            height_cm: heightToCm(data.height_cm, unitForm.height_unit),
-        }))
-        .put('/settings/height', {preserveScroll: true});
-}
 
 function saveUnits() {
     unitForm.put('/settings/units', {preserveScroll: true});
@@ -312,16 +280,6 @@ onBeforeUnmount(() => {
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 
-watch(
-    () => [unitForm.weight_unit, unitForm.height_unit] as const,
-    (_currentUnits, [previousWeightUnit, previousHeightUnit]) => {
-        const currentTargetWeightKg = weightToKg(bodyTargetForm.target_weight_kg, previousWeightUnit);
-        const currentHeightCm = heightToCm(heightForm.height_cm, previousHeightUnit);
-
-        bodyTargetForm.target_weight_kg = currentTargetWeightKg === '' ? '' : weightFromKg(Number(currentTargetWeightKg), unitForm.weight_unit) ?? '';
-        heightForm.height_cm = currentHeightCm === '' ? '' : heightFromCm(Number(currentHeightCm), unitForm.height_unit) ?? '';
-    },
-);
 </script>
 
 <template>
@@ -492,65 +450,6 @@ watch(
 
                 <Button class="w-full" :disabled="unitForm.processing">
                     Save units
-                </Button>
-            </form>
-        </Card>
-
-        <Card>
-            <form class="space-y-3" @submit.prevent="saveBodyTargets">
-                <h2 class="font-semibold">Body targets</h2>
-
-                <div class="grid grid-cols-2 gap-3">
-                    <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Weight {{ unitForm.weight_unit }}</span>
-                        <Input
-                            v-model.number="bodyTargetForm.target_weight_kg"
-                            type="number"
-                            min="1"
-                            :max="unitForm.weight_unit === 'lb' ? 2200 : 1000"
-                            step="0.1"
-                            class="mt-1"
-                        />
-                        <span v-if="bodyTargetForm.errors.target_weight_kg" class="mt-1 block text-sm text-destructive">{{ bodyTargetForm.errors.target_weight_kg }}</span>
-                    </label>
-
-                    <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Body fat %</span>
-                        <Input
-                            v-model.number="bodyTargetForm.target_body_fat_percent"
-                            type="number"
-                            min="1"
-                            max="80"
-                            step="0.1"
-                            class="mt-1"
-                        />
-                        <span v-if="bodyTargetForm.errors.target_body_fat_percent" class="mt-1 block text-sm text-destructive">{{ bodyTargetForm.errors.target_body_fat_percent }}</span>
-                    </label>
-                </div>
-
-                <Button class="w-full" :disabled="bodyTargetForm.processing">
-                    Save targets
-                </Button>
-            </form>
-        </Card>
-
-        <Card>
-            <form class="space-y-3" @submit.prevent="saveHeight">
-                <h2 class="font-semibold">Height</h2>
-                <label class="block">
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Height {{ unitForm.height_unit }}</span>
-                    <Input
-                        v-model.number="heightForm.height_cm"
-                        type="number"
-                        :min="unitForm.height_unit === 'in' ? 20 : 50"
-                        :max="unitForm.height_unit === 'in' ? 102 : 260"
-                        step="0.1"
-                        class="mt-1"
-                    />
-                    <span v-if="heightForm.errors.height_cm" class="mt-1 block text-sm text-destructive">{{ heightForm.errors.height_cm }}</span>
-                </label>
-                <Button class="w-full" :disabled="heightForm.processing">
-                    Save height
                 </Button>
             </form>
         </Card>

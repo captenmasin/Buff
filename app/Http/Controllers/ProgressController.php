@@ -68,26 +68,28 @@ class ProgressController extends Controller
         return back()->with('message', 'Progress updated.');
     }
 
-    public function updateHeight(Request $request): RedirectResponse
+    public function updateBodyProfile(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'height_cm' => ['nullable', 'numeric', 'min:50', 'max:260'],
+            'height_cm' => ['present', 'nullable', 'numeric', 'min:50', 'max:260'],
+            'target_weight_kg' => ['present', 'nullable', 'numeric', 'min:1', 'max:1000'],
+            'target_body_fat_percent' => ['present', 'nullable', 'numeric', 'min:1', 'max:80'],
         ]);
 
-        $goal = DailyGoal::query()->first();
+        $goal = DailyGoal::query()->latest('updated_at')->first();
 
         $goal
-            ? $goal->update(['height_cm' => $validated['height_cm'] ?? null])
+            ? $goal->update($validated)
             : DailyGoal::query()->create([
                 'calories' => 2000,
                 'protein_g' => 170,
                 'carbs_g' => 195,
                 'fat_g' => 60,
                 'macro_calories' => 2000,
-                'height_cm' => $validated['height_cm'] ?? null,
+                ...$validated,
             ]);
 
-        return back()->with('message', 'Height updated.');
+        return back()->with('message', 'Body profile saved.');
     }
 
     public function destroy(BodyMetric $bodyMetric): RedirectResponse

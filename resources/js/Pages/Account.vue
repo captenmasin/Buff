@@ -9,7 +9,7 @@ import Input from '../Components/ui/input/Input.vue';
 defineOptions({ layout: null });
 
 const props = withDefaults(defineProps<{
-    screen: 'login' | 'forgot' | 'reset' | 'verify';
+    screen: 'login' | 'register' | 'forgot' | 'reset' | 'verify';
     email?: string | null;
     token?: string;
 }>(), {
@@ -20,6 +20,7 @@ const props = withDefaults(defineProps<{
 const page = usePage<{ flash?: { message?: string } }>();
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const loginForm = useForm({ email: '', password: '', timezone });
+const registerForm = useForm({ name: '', email: '', password: '', password_confirmation: '', timezone });
 const forgotForm = useForm({ email: props.email || '' });
 const resetForm = useForm({
     email: props.email || '',
@@ -33,6 +34,7 @@ let verificationTimer: number | null = null;
 
 const title = computed(() => ({
     login: 'Sign in',
+    register: 'Create account',
     forgot: 'Reset password',
     reset: 'Choose a new password',
     verify: 'Check your email',
@@ -110,8 +112,19 @@ onBeforeUnmount(() => {
                     <Button class="w-full" :disabled="loginForm.processing">Sign in</Button>
                     <div class="flex justify-between text-sm">
                         <Link href="/account/forgot-password" class="text-primary">Forgot password?</Link>
-                        <Link href="/onboarding" class="text-primary">Create account</Link>
+                        <Link href="/account/register" class="text-primary">Create account</Link>
                     </div>
+                </form>
+            </Card>
+
+            <Card v-else-if="screen === 'register'">
+                <form class="space-y-4" @submit.prevent="registerForm.post('/account/register')">
+                    <label class="block"><span class="text-sm font-semibold">Name</span><Input v-model="registerForm.name" autocomplete="name" required class="mt-1" /><span v-if="registerForm.errors.name" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.name }}</span></label>
+                    <label class="block"><span class="text-sm font-semibold">Email</span><Input v-model="registerForm.email" type="email" autocomplete="email" required class="mt-1" /><span v-if="registerForm.errors.email" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.email }}</span></label>
+                    <label class="block"><span class="text-sm font-semibold">Password</span><Input v-model="registerForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /><span v-if="registerForm.errors.password" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.password }}</span></label>
+                    <label class="block"><span class="text-sm font-semibold">Confirm password</span><Input v-model="registerForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /></label>
+                    <Button class="w-full" :disabled="registerForm.processing">Create account</Button>
+                    <p class="text-center text-sm"><Link href="/account/login" class="text-primary">Back to sign in</Link></p>
                 </form>
             </Card>
 

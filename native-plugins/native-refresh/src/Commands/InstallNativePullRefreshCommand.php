@@ -128,7 +128,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         android:shortcutLongLabel="@string/shortcut_add_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="nativephp:///?add=1" />
+            android:data="nativephp://add" />
     </shortcut>
     <shortcut
         android:shortcutId="scan"

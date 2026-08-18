@@ -1,14 +1,21 @@
 <?php
 
+use App\Http\Middleware\EnsureBuffAccount;
 use App\Models\DailyGoal;
 use App\Models\SyncState;
+use App\Services\BuffCredentialStore;
 use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
+    $this->withMiddleware(EnsureBuffAccount::class);
     SyncState::query()->delete();
+    app(BuffCredentialStore::class)->store('onboarding-token', [
+        'id' => '1', 'name' => 'Mason', 'email' => 'mason@example.com', 'timezone' => 'Europe/London', 'email_verified' => false,
+    ]);
+    SyncState::current('1');
 });
 
-it('renders onboarding for a new local user', function (): void {
+it('renders onboarding for an authenticated user', function (): void {
     $this->get('/onboarding')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page

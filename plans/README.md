@@ -10,11 +10,11 @@ At generation time this entire `plans/` directory is also untracked. Prefer comm
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Make `/add` the sole add launcher | P1 | M | — | TODO |
-| 002 | Collapse Today meals into one list and one sheet | P1 | L | — | TODO |
-| 003 | Make Progress the home for body tracking | P1 | L | — | TODO |
-| 004 | Separate registration from onboarding | P1 | L | — | TODO |
-| 005 | Replace macro wheels with presets and a balanced custom split | P2 | M | — | TODO |
+| 001 | Make `/add` the sole add launcher | P1 | M | — | DONE |
+| 002 | Collapse Today meals into one list and one sheet | P1 | L | — | DONE |
+| 003 | Make Progress the home for body tracking | P1 | L | — | DONE |
+| 004 | Separate registration from onboarding | P1 | L | — | DONE |
+| 005 | Replace macro wheels with presets and a balanced custom split | P2 | M | — | DONE |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) | REJECTED (with one-line rationale)
 

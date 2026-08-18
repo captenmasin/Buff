@@ -13,6 +13,36 @@ use Inertia\Testing\AssertableInertia as Assert;
 beforeEach(function (): void {
     $this->withMiddleware(EnsureBuffAccount::class);
     SyncState::query()->delete();
+    Http::preventStrayRequests();
+});
+
+it('blocks registration while an active token exists without remote requests', function (): void {
+    app(BuffCredentialStore::class)->store('token', [
+        'id' => '1', 'name' => 'Mason', 'email' => 'mason@example.com', 'timezone' => 'Europe/London', 'email_verified' => false,
+    ]);
+
+    $this->get('/account/register')->assertRedirect('/');
+    $this->post('/account/register', [])->assertRedirect('/');
+    Http::assertNothingSent();
+});
+
+it('blocks registration when local identity data exists without remote requests', function (): void {
+    app(BuffCredentialStore::class)->store('token', [
+        'id' => '1', 'name' => 'Mason', 'email' => 'mason@example.com', 'timezone' => 'Europe/London', 'email_verified' => false,
+    ]);
+    app(BuffCredentialStore::class)->clearToken();
+
+    $this->get('/account/register')->assertRedirect('/account/login');
+    $this->post('/account/register', [])->assertRedirect('/account/login');
+    Http::assertNothingSent();
+});
+
+it('blocks registration when sync state exists without credentials or remote requests', function (): void {
+    SyncState::current('1');
+
+    $this->get('/account/register')->assertRedirect('/account/login');
+    $this->post('/account/register', [])->assertRedirect('/account/login');
+    Http::assertNothingSent();
 });
 
 it('keeps local credentials and their encryption key out of native bundles', function (): void {
@@ -23,7 +53,7 @@ it('keeps local credentials and their encryption key out of native bundles', fun
 
 it('requires sign in even when offline account data exists', function (): void {
     $this->get('/')->assertRedirect('/account/login');
-    $this->get('/account/register')->assertRedirect('/onboarding');
+    $this->get('/account/register')->assertOk();
 
     SyncState::current('10000000-0000-4000-8000-000000000001');
 
@@ -61,11 +91,11 @@ it('registers during onboarding without blocking unverified accounts', function 
         ]),
     ]);
 
-    $this->get('/onboarding')
+    $this->get('/account/register')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->component('Onboarding')
-            ->where('buff.needs_sign_in', true));
+            ->component('Account')
+            ->where('screen', 'register'));
 
     $this->post('/account/register', [
         'name' => 'Mason',
@@ -340,7 +370,7 @@ it('requires a successful server deletion before wiping local data', function ()
 
     $deletionAllowed = true;
     $this->delete('/account', ['password' => 'password123'])
-        ->assertRedirect('/onboarding');
+        ->assertRedirect('/account/register');
     $this->assertDatabaseEmpty('daily_goals');
     Storage::disk('local')->assertMissing('buff/credentials.enc');
 });

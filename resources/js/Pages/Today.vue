@@ -1,14 +1,12 @@
 <script setup lang="ts">
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {Apple, Calendar, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Info, Link2, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
+import {computed, nextTick, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {Apple, Calendar, Coffee, Drumstick, Dumbbell, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import Card from "../Components/Card.vue";
 import Button from '../Components/ui/button/Button.vue';
-import DropdownMenu from '../Components/ui/dropdown-menu/DropdownMenu.vue';
-import DropdownMenuItem from '../Components/ui/dropdown-menu/DropdownMenuItem.vue';
 import Input from '../Components/ui/input/Input.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -143,6 +141,7 @@ const mealIcons = {
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
+const populatedMealTypes = computed(() => props.mealTypes.filter((mealType) => Boolean(props.summary.entries[mealType]?.length)));
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
@@ -155,10 +154,11 @@ const healthConnectSummaryRefreshMarker = ref(healthConnectSummaryMarker(healthC
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
 const selectedMeal = ref<SelectedMeal | null>(null);
-const editingMeal = ref<SelectedMeal | null>(null);
-const openMealActions = ref<string | null>(null);
+const mealSheetMode = ref<'details' | 'edit' | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
 const mealPhotosLoading = ref(false);
+const mealSheet = ref<HTMLElement | null>(null);
+let mealRowTrigger: HTMLElement | null = null;
 let mealPhotoRequest = 0;
 const calorieProgress = computed(() => {
     if (!hasGoal.value || props.summary.goal.calories === 0) return 0;
@@ -204,11 +204,9 @@ function macroProgress(consumed: number, goal?: number) {
 }
 
 function removeEntry(id: string) {
-    openMealActions.value = null;
-
     if (window.confirm('Delete this meal?')) {
         hapticImpact();
-        router.delete(`/meals/${id}`, {preserveScroll: true});
+        router.delete(`/meals/${id}`, {preserveScroll: true, onSuccess: closeMeal});
     }
 }
 
@@ -398,11 +396,13 @@ function selectDate(event: Event) {
     }
 }
 
-function openMeal(entry: MealEntry, mealType: MealType) {
-    openMealActions.value = null;
+function openMeal(entry: MealEntry, mealType: MealType, event: Event) {
     hapticImpact();
+    mealRowTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     selectedMeal.value = {...entry, meal_type: mealType};
+    mealSheetMode.value = 'details';
     loadMealPhotos(entry.id);
+    focusMealSheet();
 }
 
 async function loadMealPhotos(mealId: string) {
@@ -433,34 +433,43 @@ function closeMeal() {
     selectedMeal.value = null;
     selectedMealPhotos.value = [];
     mealPhotosLoading.value = false;
-}
-
-function startEditingMeal(entry: MealEntry, mealType: MealType) {
-    openMealActions.value = null;
-    hapticImpact();
-    editingMeal.value = {...entry, meal_type: mealType};
-    editMealForm.defaults({
-        date: props.summary.date,
-        meal_type: mealType,
-        name: entry.name,
-        protein_g: entry.protein_g,
-        carbs_g: entry.carbs_g,
-        fat_g: entry.fat_g,
-    });
     editMealForm.reset();
     editMealForm.clearErrors();
+    mealSheetMode.value = null;
+    mealRowTrigger?.focus();
+    mealRowTrigger = null;
 }
 
-function saveMealEdit() {
-    if (!editingMeal.value) {
+function startEditingMeal() {
+    if (!selectedMeal.value) {
         return;
     }
 
     hapticImpact();
-    editMealForm.put(`/meals/${editingMeal.value.id}`, {
+    editMealForm.defaults({
+        date: props.summary.date,
+        meal_type: selectedMeal.value.meal_type,
+        name: selectedMeal.value.name,
+        protein_g: selectedMeal.value.protein_g,
+        carbs_g: selectedMeal.value.carbs_g,
+        fat_g: selectedMeal.value.fat_g,
+    });
+    editMealForm.reset();
+    editMealForm.clearErrors();
+    mealSheetMode.value = 'edit';
+    focusMealSheet();
+}
+
+function saveMealEdit() {
+    if (!selectedMeal.value) {
+        return;
+    }
+
+    hapticImpact();
+    editMealForm.put(`/meals/${selectedMeal.value.id}`, {
         preserveScroll: true,
         onSuccess: () => {
-            editingMeal.value = null;
+            closeMeal();
         },
     });
 }
@@ -483,9 +492,37 @@ function weekdayLabel(value: string, format: 'short' | 'long') {
     return (format === 'short' ? shortWeekdayFormatter : longWeekdayFormatter).format(date);
 }
 
-function toggleMealActions(entryId: string) {
-    openMealActions.value = openMealActions.value === entryId ? null : entryId;
-    hapticImpact(18);
+function handleMealSheetKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+        closeMeal();
+        return;
+    }
+
+    if (event.key !== 'Tab' || !mealSheet.value) {
+        return;
+    }
+
+    const focusable = Array.from(mealSheet.value.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href]'));
+    const first = focusable[0];
+    const last = focusable.at(-1);
+
+    if (!first || !last) {
+        return;
+    }
+
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+    }
+}
+
+function focusMealSheet() {
+    nextTick(() => {
+        mealSheet.value?.querySelector<HTMLElement>('button:not([disabled]), input:not([disabled])')?.focus();
+    });
 }
 
 watch(() => props.healthConnect, (healthConnect) => {
@@ -605,64 +642,31 @@ onBeforeUnmount(() => {
             </div>
         </Card>
 
-        <section class="space-y-1">
-            <div>
+        <section v-if="hasMeals" class="space-y-1">
+            <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold">Meals</h2>
+                <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" size="sm"><Plus class="w-4" />Add food</Button>
             </div>
 
-            <Card v-for="mealType in mealTypes" :key="mealType">
+            <Card>
+                <div v-for="mealType in populatedMealTypes" :key="mealType" class="py-2 first:pt-0 last:pb-0">
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2">
                         <component :is="mealIcons[mealType]" class="w-4"></component>
                         <h3 class="font-semibold">{{ mealLabels[mealType] }}</h3>
                     </div>
-                    <Button
-                        :as="Link"
-                        size="sm"
-                        :href="`/add?mode=food&meal=${mealType}`">
-                        <Plus class="w-4"/>
-                        Add
-                    </Button>
                 </div>
 
-                <div v-if="summary.entries[mealType]?.length" class="mt-2 divide-y divide-border/70">
+                <div class="mt-2 divide-y divide-border/70">
                     <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2">
-                        <Button variant="ghost" class="h-auto min-w-0 flex-1 flex-col items-start gap-0 p-0 text-left" @click="openMeal(entry, mealType)">
+                        <Button variant="ghost" class="h-auto min-w-0 flex-1 flex-col items-start gap-0 p-0 text-left" :aria-label="`View ${entry.name}`" @click="openMeal(entry, mealType, $event)">
                             <p class="truncate">{{ entry.name }}</p>
                             <p class="text-xs text-muted-foreground">
                                 {{ entry.calories }} kcal · {{ entry.portion_quantity }}{{ entry.portion_unit }}
                             </p>
                         </Button>
-                        <DropdownMenu
-                            :model-value="openMealActions === entry.id"
-                            class="flex-none"
-                            data-meal-actions
-                            @update:model-value="openMealActions = $event ? entry.id : null"
-                        >
-                            <template #trigger>
-                                <Button variant="ghost" size="icon" class="h-9 w-9 text-muted-foreground/70" aria-label="Meal actions" @click="toggleMealActions(entry.id)">
-                                    <EllipsisVertical :size="18"/>
-                                </Button>
-                            </template>
-
-                            <DropdownMenuItem @click="openMeal(entry, mealType)">
-                                    <Info :size="16"/>
-                                    Info
-                            </DropdownMenuItem>
-                            <DropdownMenuItem @click="startEditingMeal(entry, mealType)">
-                                    <Pencil :size="16"/>
-                                    Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem variant="destructive" @click="removeEntry(entry.id)">
-                                    <Trash2 :size="16"/>
-                                    Delete
-                            </DropdownMenuItem>
-                        </DropdownMenu>
                     </div>
                 </div>
-
-                <div v-else>
-                    <p class="mt-2 text-sm text-center text-muted-foreground">No entries yet.</p>
                 </div>
             </Card>
         </section>
@@ -734,12 +738,13 @@ onBeforeUnmount(() => {
             <span class="text-sm text-muted-foreground">Calories & macros</span>
         </Button>
 
-        <div v-if="selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="closeMeal">
-            <Card class="w-full max-w-md overflow-hidden sm:max-w-lg">
+        <div v-if="mealSheetMode && selectedMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="closeMeal" @keydown="handleMealSheetKeydown">
+            <Card ref="mealSheet" role="dialog" aria-modal="true" aria-labelledby="meal-sheet-title" tabindex="-1" class="w-full max-w-md overflow-hidden sm:max-w-lg">
+                <template v-if="mealSheetMode === 'details'">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                         <p class="text-xs font-semibold uppercase text-muted-foreground">{{ mealLabels[selectedMeal.meal_type] }}</p>
-                        <h2 class="truncate text-xl font-semibold">{{ selectedMeal.name }}</h2>
+                        <h2 id="meal-sheet-title" class="truncate text-xl font-semibold">{{ selectedMeal.name }}</h2>
                     </div>
                     <Button variant="ghost" size="icon" class="flex-none" aria-label="Close meal details" @click="closeMeal">
                         <X :size="20"/>
@@ -777,14 +782,15 @@ onBeforeUnmount(() => {
                         <p class="truncate text-xs  text-muted-foreground">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
                     </div>
                 </div>
-            </Card>
-        </div>
-
-        <div v-if="editingMeal" class="fixed inset-0 z-50 grid place-items-end bg-foreground/30 px-4 pb-4 sm:place-items-center sm:py-4" @click.self="editingMeal = null">
-            <Card class="w-full max-w-md sm:max-w-lg">
+                <div class="mt-4 grid grid-cols-2 gap-2">
+                    <Button type="button" variant="surface" @click="startEditingMeal"><Pencil :size="18" />Edit</Button>
+                    <Button type="button" variant="destructive" @click="removeEntry(selectedMeal.id)"><Trash2 :size="18" />Delete</Button>
+                </div>
+                </template>
+                <template v-else>
                 <div class="mb-4 flex items-center justify-between gap-3">
-                    <h2 class="text-xl font-semibold">Edit meal</h2>
-                    <Button variant="ghost" size="icon" aria-label="Close meal editor" @click="editingMeal = null">
+                    <h2 id="meal-sheet-title" class="text-xl font-semibold">Edit meal</h2>
+                    <Button variant="ghost" size="icon" aria-label="Close meal editor" @click="closeMeal">
                         <X :size="20"/>
                     </Button>
                 </div>
@@ -819,6 +825,7 @@ onBeforeUnmount(() => {
                         Save meal
                     </Button>
                 </form>
+                </template>
             </Card>
         </div>
     </section>

@@ -44,6 +44,7 @@ it('patches the NativePHP v4 Android shell', function (): void {
             ->and($files->get($buildPath.'/app/src/main/AndroidManifest.xml'))
             ->toContain('android.app.shortcuts')
             ->and($files->get($buildPath.'/app/src/main/res/xml/shortcuts.xml'))
+            ->toContain('nativephp://add')
             ->toContain('nativephp://add?mode=food&amp;scan=1');
     } finally {
         $files->deleteDirectory($buildPath);

@@ -7,7 +7,7 @@ use App\Services\HealthConnectBridge;
 use App\Services\MealReminderBridge;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('renders body and height settings', function (): void {
+it('renders unit and reminder settings without body profile data', function (): void {
     app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
         androidDetector: fn (): bool => false,
     ));
@@ -27,9 +27,7 @@ it('renders body and height settings', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Settings')
-            ->where('settings.height_cm', 178)
-            ->where('settings.target_weight_kg', 80)
-            ->where('settings.target_body_fat_percent', 15)
+            ->missing('settings')
             ->where('preferences.weight_unit', 'kg')
             ->where('preferences.height_unit', 'cm')
             ->where('mealReminders.breakfast.enabled', false)
@@ -41,28 +39,6 @@ it('renders body and height settings', function (): void {
             ->where('healthConnect.is_android', false)
             ->where('healthConnect.supported', false)
         );
-});
-
-it('updates body targets from settings', function (): void {
-    $this->put('/settings/body-targets', [
-        'target_weight_kg' => 82,
-        'target_body_fat_percent' => 14.5,
-    ])->assertRedirect();
-
-    $this->assertDatabaseHas('daily_goals', [
-        'target_weight_kg' => 82,
-        'target_body_fat_percent' => 14.5,
-    ]);
-});
-
-it('updates height from settings', function (): void {
-    $this->put('/settings/height', [
-        'height_cm' => 178,
-    ])->assertRedirect();
-
-    $this->assertDatabaseHas('daily_goals', [
-        'height_cm' => 178,
-    ]);
 });
 
 it('updates unit preferences from settings', function (): void {
