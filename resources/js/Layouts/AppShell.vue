@@ -2,7 +2,9 @@
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Home, Plus, Scale, Settings, Target } from '@lucide/vue';
+import { Camera, Dumbbell, Home, Pencil, Plus, Scale, ScanBarcode, Search, Settings, Target, X } from '@lucide/vue';
+import { hapticImpact } from '../haptics';
+import AppSheet from '../Components/AppSheet.vue';
 import Button from '../Components/ui/button/Button.vue';
 
 const page = usePage<{
@@ -12,6 +14,8 @@ const page = usePage<{
         needs_sign_in: boolean;
     };
 }>();
+const addDrawerOpen = ref(false);
+const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
 const toastTimer = ref<number | null>(null);
 let removeFlashToastListener: (() => void) | null = null;
@@ -25,14 +29,58 @@ const navItems = [
 ];
 
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
-const isAddActive = computed(() => path.value === '/add');
-const addHref = computed(() => page.props.summary?.date ? `/add?date=${encodeURIComponent(page.props.summary.date)}` : '/add');
+const isAddActive = computed(() => path.value === '/add' || addDrawerOpen.value);
 
 function isActive(match: string) {
     return path.value === match;
 }
 
+function openAddDrawer(pushHistory = true) {
+    if (addDrawerOpen.value) {
+        return;
+    }
+
+    hapticImpact();
+
+    if (pushHistory) {
+        window.history.pushState({ ...(window.history.state || {}), buffAddDrawer: true }, '');
+        drawerHistoryActive.value = true;
+    }
+
+    addDrawerOpen.value = true;
+}
+
+function closeDrawerImmediately() {
+    addDrawerOpen.value = false;
+    drawerHistoryActive.value = false;
+}
+
+function closeAddDrawer() {
+    if (drawerHistoryActive.value) {
+        closeDrawerImmediately();
+        window.history.back();
+
+        return;
+    }
+
+    closeDrawerImmediately();
+}
+
+function handlePopState() {
+    if (!addDrawerOpen.value) {
+        return;
+    }
+
+    closeDrawerImmediately();
+}
+
 function handleNativeAndroidBack() {
+    if (addDrawerOpen.value) {
+        closeAddDrawer();
+
+        return true;
+    }
+
     if (window.history.length > 1) {
         window.history.back();
 
@@ -40,6 +88,20 @@ function handleNativeAndroidBack() {
     }
 
     return false;
+}
+
+function openAddMode(mode: string, extra: Record<string, string> = {}) {
+    hapticImpact();
+    closeDrawerImmediately();
+
+    const params = new URLSearchParams({ mode, ...extra });
+    const selectedDate = page.props.summary?.date;
+
+    if (selectedDate) {
+        params.set('date', selectedDate);
+    }
+
+    router.visit(`/add?${params.toString()}`);
 }
 
 function clearFallbackToast() {
@@ -102,6 +164,7 @@ async function showFlashToast(message?: string) {
 }
 
 onMounted(() => {
+    window.addEventListener('popstate', handlePopState);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
     syncOnResume();
     window.addEventListener('focus', syncOnResume);
@@ -119,6 +182,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+    window.removeEventListener('popstate', handlePopState);
     window.removeEventListener('focus', syncOnResume);
     window.removeEventListener('online', syncOnResume);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
@@ -138,10 +202,9 @@ onUnmounted(() => {
 
 <template>
     <div class="app-shell flex bg-background sm:pl-64">
-        <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border bg-card/80 px-4 py-5 backdrop-blur sm:flex sm:flex-col">
-            <div class="mb-6 px-2">
-                <p class="text-sm text-muted-foreground">Buff</p>
-                <p class="text-2xl font-semibold text-foreground">Daily log</p>
+        <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
+            <div class="mb-8 px-2">
+                <p class="page-title text-[1.65rem]">Buff</p>
             </div>
 
             <nav class="grid gap-1" aria-label="Primary">
@@ -151,18 +214,17 @@ onUnmounted(() => {
                     :as="Link"
                     :href="item.href"
                     :variant="isActive(item.match) ? 'secondary' : 'ghost'"
-                    class="h-11 justify-start px-3 text-sm"
+                    class="h-11 justify-start rounded-xl px-3 text-sm"
                 >
                     <component :is="item.icon" :size="19" stroke-width="2.2" />
                     <span>{{ item.label }}</span>
                 </Button>
 
                 <Button
-                    :as="Link"
-                    :href="addHref"
                     :variant="isAddActive ? 'default' : 'surface'"
-                    class="mt-3 h-11 justify-start px-3 text-sm"
+                    class="mt-4 h-11 justify-start px-3 text-sm"
                     aria-label="Add"
+                    @click="openAddDrawer()"
                 >
                     <Plus :size="19" stroke-width="2.4" />
                     <span>Add</span>
@@ -184,7 +246,7 @@ onUnmounted(() => {
         >
             <div
                 v-if="fallbackToast"
-                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-md bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-xl"
+                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-card"
                 role="status"
                 aria-live="polite"
             >
@@ -192,14 +254,74 @@ onUnmounted(() => {
             </div>
         </Transition>
 
-        <nav class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border bg-card/95 shadow-lg backdrop-blur sm:hidden">
-            <div class="mx-auto grid max-w-md grid-cols-5 gap-1 px-3 pt-2">
+        <AppSheet
+            :open="addDrawerOpen"
+            labelled-by="add-drawer-title"
+            variant="drawer"
+            class="bottom-drawer"
+            @close="closeAddDrawer"
+        >
+            <div class="mb-4 flex items-center justify-between">
+                <h2 id="add-drawer-title" class="text-lg font-semibold">Add</h2>
+                <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close add drawer" @click="closeAddDrawer">
+                    <X :size="20" />
+                </Button>
+            </div>
+
+            <div class="grid gap-3">
+                <div class="grid grid-cols-3 gap-2">
+                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('food')">
+                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+                            <Search :size="22" />
+                        </span>
+                        <span class="text-sm font-semibold">Search</span>
+                    </Button>
+
+                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('food', { scan: '1' })">
+                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
+                            <ScanBarcode :size="22" />
+                        </span>
+                        <span class="text-sm font-semibold">Scan</span>
+                    </Button>
+
+                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('custom')">
+                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
+                            <Pencil :size="22" />
+                        </span>
+                        <span class="text-sm font-semibold">Custom</span>
+                    </Button>
+                </div>
+
+                <Button variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left" @click="openAddMode('workout')">
+                    <span class="grid h-11 w-11 place-items-center rounded-xl bg-workout text-primary-foreground">
+                        <Dumbbell :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-semibold">Workout</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
+                    </span>
+                </Button>
+
+                <Button variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left" @click="openAddMode('photo')">
+                    <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
+                        <Camera :size="22" />
+                    </span>
+                    <span>
+                        <span class="block font-semibold">Photo meal</span>
+                        <span class="block text-sm font-medium text-muted-foreground">Estimate editable macros</span>
+                    </span>
+                </Button>
+            </div>
+        </AppSheet>
+
+        <nav class="bottom-nav fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-border/70 bg-card/80 shadow-card backdrop-blur-xl sm:hidden">
+            <div class="mx-auto grid max-w-md grid-cols-5 items-end gap-1 px-2 pt-1.5">
                 <Button
                     :as="Link"
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
-                    class="flex"
+                    class="flex rounded-xl"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[0].label }}</span>
@@ -210,21 +332,20 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
-                    class="flex"
+                    class="flex rounded-xl"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[1].label }}</span>
                 </Button>
 
                 <Button
-                    :as="Link"
-                    :href="addHref"
                     size="icon"
-                    :variant="isAddActive ? 'default' : 'default'"
-                    class="relative z-10 mx-auto -mt-5 h-16 w-16 rounded-full border-4 border-card shadow-none active:translate-y-0.5 active:bg-primary"
+                    variant="default"
+                    class="relative z-10 mx-auto -mt-6 h-[3.6rem] w-[3.6rem] rounded-full border-[5px] border-card shadow-card active:scale-95"
                     aria-label="Add"
+                    @click="openAddDrawer()"
                 >
-                    <Plus :size="28" stroke-width="2.4" />
+                    <Plus :size="26" stroke-width="2.4" />
                 </Button>
 
                 <Button
@@ -232,7 +353,7 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
-                    class="flex"
+                    class="flex rounded-xl"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[2].label }}</span>
@@ -243,7 +364,7 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
-                    class="flex"
+                    class="flex rounded-xl"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[3].label }}</span>

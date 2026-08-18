@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\DataTransferController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
 use App\Http\Controllers\MacroController;
@@ -44,8 +43,6 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/settings', [SettingsController::class, 'edit']);
     Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
     Route::put('/settings/meal-reminders', [SettingsController::class, 'updateMealReminders']);
-    Route::get('/settings/export', [DataTransferController::class, 'export']);
-    Route::post('/settings/import', [DataTransferController::class, 'import']);
     Route::patch('/account', [AccountController::class, 'update']);
     Route::delete('/account', [AccountController::class, 'destroy']);
     Route::post('/sync', [SyncController::class, 'store']);

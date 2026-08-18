@@ -25,15 +25,15 @@ const variants: Record<ButtonVariant, string> = {
     ghost: 'text-muted-foreground active:bg-muted',
     destructive: 'text-destructive active:bg-danger-soft',
     inverse: 'bg-card text-foreground active:bg-muted',
-    surface: 'border border-border bg-muted text-foreground active:bg-muted',
+    surface: 'border border-border/80 bg-muted/80 text-foreground active:bg-muted',
 };
 
 const sizes: Record<ButtonSize, string> = {
     default: 'h-12 px-4 py-3',
-    sm: 'h-8 px-3 text-sm',
+    sm: 'h-9 px-3 text-sm',
     lg: 'h-14 px-4 py-4 text-base',
-    icon: 'grid h-10 w-10 place-items-center p-0',
-    nav: 'min-h-14 flex-col gap-1 px-2 py-2 text-[11px]',
+    icon: 'grid h-11 w-11 place-items-center p-0',
+    nav: 'min-h-12 flex-col gap-0.5 px-1 py-1.5 text-xs font-semibold tracking-wide',
 };
 </script>
 
@@ -42,7 +42,7 @@ const sizes: Record<ButtonSize, string> = {
         :is="component"
         v-bind="$attrs"
         :class="cn(
-            'inline-flex items-center justify-center gap-2 rounded-md transition disabled:cursor-not-allowed disabled:opacity-60',
+            'inline-flex items-center justify-center gap-2 rounded-xl font-medium transition-[transform,background-color,opacity] duration-150 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
             variants[props.variant || 'default'],
             sizes[props.size || 'default'],
             props.class,

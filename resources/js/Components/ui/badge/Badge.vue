@@ -20,7 +20,7 @@ const variants: Record<BadgeVariant, string> = {
 </script>
 
 <template>
-    <span :class="cn('inline-flex items-center rounded-md px-3 py-2 text-xs font-semibold', variants[variant], props.class)">
+    <span :class="cn('inline-flex items-center rounded-full px-3 py-1.5 text-xs font-semibold', variants[variant], props.class)">
         <slot />
     </span>
 </template>

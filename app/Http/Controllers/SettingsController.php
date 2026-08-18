@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AppPreference;
 use App\Services\MealReminderBridge;
+use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -23,6 +24,7 @@ class SettingsController extends Controller
             ],
             'mealReminders' => $preferences->mealReminders(),
             'healthConnect' => HealthConnectController::sharedStatus(),
+            'timezones' => timezone_identifiers_list(DateTimeZone::ALL),
         ]);
     }
 
@@ -35,7 +37,7 @@ class SettingsController extends Controller
 
         AppPreference::current()->update($validated);
 
-        return back()->with('message', 'Unit preferences saved.');
+        return back();
     }
 
     public function updateMealReminders(Request $request, MealReminderBridge $bridge): RedirectResponse
@@ -56,9 +58,9 @@ class SettingsController extends Controller
             'permission_requested' => 'Meal reminders saved. Allow notifications when prompted.',
             'notifications_disabled' => 'Meal reminders saved, but Android notifications are off.',
             'error' => 'Meal reminder settings saved, but reminders could not be scheduled.',
-            default => 'Meal reminders saved.',
+            default => null,
         };
 
-        return back()->with('message', $message);
+        return $message ? back()->with('message', $message) : back();
     }
 }

@@ -14,7 +14,7 @@ function formatMacro(value: number) {
 </script>
 
 <template>
-    <div class="grid grid-cols-4 gap-2 rounded-md border border-border bg-muted p-3 text-center">
+    <div class="grid grid-cols-4 gap-2 rounded-xl bg-muted/80 p-3 text-center">
         <div>
             <p class="text-xs font-semibold uppercase text-muted-foreground">Kcal</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ macros.calories }}</p>

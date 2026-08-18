@@ -6,10 +6,16 @@ import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import MacroSummary from '../Components/Add/MacroSummary.vue';
+import AppSheet from '../Components/AppSheet.vue';
 import Card from "../Components/Card.vue";
+import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import SelectContent from '../Components/ui/select/SelectContent.vue';
+import SelectItem from '../Components/ui/select/SelectItem.vue';
+import SelectTrigger from '../Components/ui/select/SelectTrigger.vue';
+import SelectValue from '../Components/ui/select/SelectValue.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -172,7 +178,7 @@ const photoNote = ref('');
 const photoAnalysisLoading = ref(false);
 const photoAnalysisError = ref('');
 const analysisContext = ref<AnalysisContext | null>(null);
-const analysisFollowUpDialog = ref<HTMLDialogElement | null>(null);
+const analysisFollowUpOpen = ref(false);
 const analysisFollowUp = ref('');
 const analysisFollowUpLoading = ref(false);
 const analysisFollowUpError = ref('');
@@ -766,7 +772,7 @@ async function followUpAnalysis() {
 
 function openFollowUpModal() {
     analysisFollowUpError.value = '';
-    analysisFollowUpDialog.value?.showModal();
+    analysisFollowUpOpen.value = true;
 }
 
 function closeFollowUpModal() {
@@ -774,7 +780,7 @@ function closeFollowUpModal() {
         return;
     }
 
-    analysisFollowUpDialog.value?.close();
+    analysisFollowUpOpen.value = false;
     analysisFollowUp.value = '';
     analysisFollowUpError.value = '';
 }
@@ -841,22 +847,15 @@ onUnmounted(() => {
     <Head title="Add" />
 
     <section class="space-y-5">
-        <header>
-            <div>
-                <p class="text-sm  text-muted-foreground">{{ displayDate }}</p>
-                <h1 class="text-3xl font-semibold tracking-normal text-foreground">
-                    {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Workout' : 'Add' }}
-                    <span v-if="meal">
-                         - {{ meal }}
-                    </span>
-                </h1>
-            </div>
-        </header>
+        <PageHeader :kicker="displayDate">
+            {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Workout' : 'Add' }}
+            <span v-if="meal"> — {{ meal }}</span>
+        </PageHeader>
 
         <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-primary-foreground">
             <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
-                    <p class="text-sm  text-primary-foreground/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
+                    <p class="text-sm text-primary-foreground/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
                     <h2 class="truncate text-xl font-semibold">{{ scannerStarting ? 'Opening camera...' : manualBarcodeOpen ? 'Enter barcode' : 'Point camera at barcode' }}</h2>
                 </div>
                 <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-primary-foreground/10 text-primary-foreground active:bg-primary-foreground/15" aria-label="Close scanner" @click="stopWebScan">
@@ -884,9 +883,9 @@ onUnmounted(() => {
                 />
 
                 <div v-if="manualBarcodeOpen" class="flex h-full items-center px-4">
-                    <div class="w-full rounded-md bg-card p-4 text-foreground">
+                    <div class="w-full rounded-xl bg-card p-4 text-foreground">
                         <label class="block">
-                            <span class="text-xs font-semibold uppercase text-muted-foreground">Barcode</span>
+                            <span class="field-label">Barcode</span>
                             <Input
                                 v-model="barcode"
                                 type="text"
@@ -911,8 +910,8 @@ onUnmounted(() => {
         </div>
 
         <article v-if="mode === 'choose'" class="grid gap-3">
-            <Button :as="Link" :href="addModeUrl('food')" variant="outline" class="h-auto justify-start p-4 text-left">
-                <span class="grid h-11 w-11 place-items-center rounded-md bg-primary text-primary-foreground">
+            <Button :as="Link" :href="addModeUrl('food')" variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
                     <Utensils :size="22" />
                 </span>
                 <span>
@@ -921,8 +920,8 @@ onUnmounted(() => {
                 </span>
             </Button>
 
-            <Button :as="Link" :href="addModeUrl('workout')" variant="outline" class="h-auto justify-start p-4 text-left">
-                <span class="grid h-11 w-11 place-items-center rounded-md bg-workout text-primary-foreground">
+            <Button :as="Link" :href="addModeUrl('workout')" variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-workout text-primary-foreground">
                     <Dumbbell :size="22" />
                 </span>
                 <span>
@@ -935,9 +934,9 @@ onUnmounted(() => {
                 :as="Link"
                 :href="addModeUrl('photo')"
                 variant="outline"
-                class="h-auto justify-start p-4 text-left"
+                class="h-auto justify-start rounded-2xl p-4 text-left"
             >
-                <span class="grid h-11 w-11 place-items-center rounded-md bg-food text-primary-foreground">
+                <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
                     <Camera :size="22" />
                 </span>
                 <span>
@@ -955,7 +954,7 @@ onUnmounted(() => {
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
             <div v-if="selectedPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
-                <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-md bg-muted">
+                <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-xl bg-muted">
                     <img :src="photo.preview" alt="Selected meal" class="h-full w-full object-cover">
                     <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removePhoto(index)">
                         <X :size="16" />
@@ -984,11 +983,11 @@ onUnmounted(() => {
             </Button>
 
             <label class="mt-4 block">
-                <span class="text-xs font-semibold uppercase text-muted-foreground">Context (optional)</span>
+                <span class="field-label">Context (optional)</span>
                 <Textarea v-model="photoNote" maxlength="1000" rows="3" class="mt-1" placeholder="Sauce, hidden ingredients, or portion notes" />
             </label>
 
-            <p v-if="photoAnalysisError" class="mt-3 rounded-md bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
+            <p v-if="photoAnalysisError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
                 {{ photoAnalysisError }}
             </p>
 
@@ -1012,6 +1011,31 @@ onUnmounted(() => {
                 <h2 class="font-semibold">Food</h2>
             </div>
 
+            <div class="mt-4 grid grid-cols-3 gap-2">
+                <Button variant="default" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3">
+                    <Search :size="22" />
+                    <span class="text-sm font-semibold">Search</span>
+                </Button>
+                <Button
+                    variant="outline"
+                    class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3"
+                    :disabled="scannerStarting"
+                    @click="startScan"
+                >
+                    <Camera :size="22" />
+                    <span class="text-sm font-semibold">{{ scannerStarting ? 'Opening...' : 'Scan' }}</span>
+                </Button>
+                <Button
+                    :as="Link"
+                    :href="`/add?date=${date}&mode=custom`"
+                    variant="outline"
+                    class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3"
+                >
+                    <Pencil :size="22" />
+                    <span class="text-sm font-semibold">Custom</span>
+                </Button>
+            </div>
+
             <form class="mt-4 flex gap-2" @submit.prevent="searchFoodProducts">
                 <Input
                     v-model="foodSearch"
@@ -1019,30 +1043,16 @@ onUnmounted(() => {
                     placeholder="Search..."
                     class="min-w-0 flex-1"
                 />
-                <Button class="aspect-square h-[50px] shrink-0 px-0 py-0" :disabled="foodSearchLoading" aria-label="Search">
+                <Button class="aspect-square h-[50px] shrink-0 px-0 py-0" :disabled="foodSearchLoading" aria-label="Search foods">
                     <LoaderCircle v-if="foodSearchLoading" :size="21" class="animate-spin" />
                     <Search v-else :size="21" />
                 </Button>
             </form>
 
-            <div class="flex gap-2">
-            <Button class="mt-3 w-full" :disabled="scannerStarting" @click="startScan">
-                <Camera :size="20" />
-                {{ scannerStarting ? 'Opening...' : 'Scan' }}
-            </Button>
-            <Button
-                :as="Link"
-                :href="`/add?date=${date}&mode=custom`"
-                class="mt-3 w-full">
-                <Pencil :size="20" />
-                Custom
-            </Button>
-            </div>
+            <p v-if="nativeMessage" class="mt-3 rounded-xl bg-muted p-3 text-sm text-foreground/80">{{ nativeMessage }}</p>
+            <p v-if="lookupError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground">{{ lookupError }}</p>
 
-            <p v-if="nativeMessage" class="mt-3 rounded-md bg-muted p-3 text-sm  text-foreground/80">{{ nativeMessage }}</p>
-            <p v-if="lookupError" class="mt-3 rounded-md bg-danger-soft p-3 text-sm  text-danger-soft-foreground">{{ lookupError }}</p>
-
-            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-md bg-muted p-3 text-sm  text-muted-foreground" role="status" aria-live="polite">
+            <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground" role="status" aria-live="polite">
                 <LoaderCircle :size="17" class="animate-spin text-primary" />
                 Searching...
             </div>
@@ -1056,8 +1066,8 @@ onUnmounted(() => {
                     class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                     @click="selectFoodResult(result)"
                 >
-                    <img v-if="result.image_url" :src="result.image_url" alt="" class="h-12 w-12 shrink-0 rounded-md object-cover">
-                    <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                    <img v-if="result.image_url" :src="result.image_url" alt="" class="h-12 w-12 shrink-0 rounded-xl object-cover">
+                    <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                         <Utensils v-if="result.type === 'previous_meal'" :size="20" />
                         <Barcode v-else :size="20" />
                     </span>
@@ -1071,7 +1081,7 @@ onUnmounted(() => {
             </div>
 
             <div v-else-if="!foodSearchQuery && previousFoodEntries.length" class="mt-4">
-                <p class="text-xs font-semibold uppercase text-muted-foreground">Previous food entries</p>
+                <p class="field-label">Previous food entries</p>
                 <div class="mt-2 grid gap-2">
                     <Button
                         v-for="entry in previousFoodEntries"
@@ -1081,8 +1091,8 @@ onUnmounted(() => {
                         class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                         @click="selectPreviousMeal(entry)"
                     >
-                        <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-12 w-12 shrink-0 rounded-md object-cover">
-                        <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                        <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-12 w-12 shrink-0 rounded-xl object-cover">
+                        <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                             <Utensils :size="20" />
                         </span>
                         <span class="min-w-0 flex-1 overflow-hidden">
@@ -1095,24 +1105,17 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-md bg-muted p-3 text-sm  text-muted-foreground">
+            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
                 No products found.
             </p>
         </Card>
 
-        <div
-            v-if="foodAddSheetOpen"
-            class="fixed inset-0 z-40 bg-foreground/30"
-            @click="closeFoodAddSheet"
-        />
-
-        <section
-            v-if="foodAddSheetOpen"
-            class="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[88vh] max-w-md overflow-y-auto rounded-t-lg bg-card px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-6 shadow-2xl transition-transform duration-200 sm:left-64 sm:max-w-lg"
-            :class="foodAddSheetOpen ? 'translate-y-0' : 'translate-y-full'"
-            :aria-hidden="!foodAddSheetOpen"
-            :inert="!foodAddSheetOpen"
-            aria-label="Add food"
+        <AppSheet
+            :open="foodAddSheetOpen"
+            labelled-by="food-add-title"
+            variant="drawer"
+            class="max-h-[88vh] px-6 pt-6"
+            @close="closeFoodAddSheet"
         >
             <Button variant="ghost" size="icon" class="absolute right-4 top-4 h-10 w-10 shrink-0" aria-label="Close add food" @click="closeFoodAddSheet">
                 <X :size="24" />
@@ -1120,13 +1123,13 @@ onUnmounted(() => {
 
             <div v-if="selectedPreviousMeal || product" class="space-y-5">
                 <div class="flex gap-4">
-                    <img v-if="(selectedPreviousMeal || product)?.image_url" :src="(selectedPreviousMeal || product)?.image_url || ''" alt="" class="h-20 w-20 rounded-md object-cover">
-                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                    <img v-if="(selectedPreviousMeal || product)?.image_url" :src="(selectedPreviousMeal || product)?.image_url || ''" alt="" class="h-20 w-20 rounded-xl object-cover">
+                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
                         <Utensils v-if="selectedPreviousMeal" :size="26" />
                         <Barcode v-else :size="26" />
                     </span>
                     <div class="min-w-0 flex-1">
-                        <p class="truncate text-lg font-semibold text-foreground">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
+                        <p id="food-add-title" class="truncate text-lg font-semibold text-foreground">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
                         <p class="truncate text-base text-muted-foreground">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>
                         <p v-if="selectedPreviousMeal" class="mt-1 text-sm text-foreground">
                             {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ formatMacro(Number(selectedPreviousMeal.portion_quantity)) }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ formatMacro(Number(selectedPreviousMeal.protein_g)) }}g · C {{ formatMacro(Number(selectedPreviousMeal.carbs_g)) }}g · F {{ formatMacro(Number(selectedPreviousMeal.fat_g)) }}g
@@ -1159,15 +1162,17 @@ onUnmounted(() => {
                         class="py-2.5 text-lg"
                         @input="selectedPortionKey = ''"
                     />
-                    <Select
-                        v-model="activeFoodPortionUnit"
-                        class="py-2.5 text-lg"
-                    >
-                        <option :value="activeFoodUnit">{{ activeFoodUnit }}</option>
+                    <Select v-model="activeFoodPortionUnit">
+                        <SelectTrigger class="py-2.5 text-lg">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem :value="activeFoodUnit">{{ activeFoodUnit }}</SelectItem>
+                        </SelectContent>
                     </Select>
                 </div>
 
-                <div class="rounded-md border border-border bg-muted p-3">
+                <div class="rounded-xl border border-border bg-muted p-3">
                     <p class="text-base font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <Button
@@ -1195,7 +1200,7 @@ onUnmounted(() => {
                     Add {{ activeFoodCalories }} kcal
                 </Button>
             </div>
-        </section>
+        </AppSheet>
 
         <Card v-if="mode === 'custom' || analysisContext">
             <div class="flex items-center gap-2">
@@ -1203,7 +1208,7 @@ onUnmounted(() => {
                 <h2 class="font-semibold">{{ analysisContext ? 'Review meal estimate' : 'Custom food' }}</h2>
             </div>
 
-            <div v-if="analysisContext" class="mt-4 rounded-md bg-muted p-3 text-sm">
+            <div v-if="analysisContext" class="mt-4 rounded-xl bg-muted p-3 text-sm">
                 <p><strong>Confidence:</strong> {{ Math.round(analysisContext.confidence * 100) }}%</p>
                 <p v-if="analysisContext.recognized_components.length" class="mt-1 text-muted-foreground">
                     Recognized: {{ analysisContext.recognized_components.join(', ') }}
@@ -1217,7 +1222,7 @@ onUnmounted(() => {
             </Button>
 
             <div v-if="previousCustomMeals.length && !analysisContext" class="mt-4">
-                <p class="text-xs font-semibold uppercase text-muted-foreground">Previous custom foods</p>
+                <p class="field-label">Previous custom foods</p>
                 <div class="mt-2 grid gap-2">
                     <Button
                         v-for="meal in previousCustomMeals"
@@ -1228,7 +1233,7 @@ onUnmounted(() => {
                         @click="selectPreviousCustomMeal(meal)"
                     >
                         <span class="block font-semibold">{{ meal.name }}</span>
-                        <span class="block text-sm  text-muted-foreground">
+                        <span class="block text-sm text-muted-foreground">
                             {{ meal.calories }} kcal<span v-if="meal.portion_quantity"> · {{ meal.portion_quantity }}{{ meal.portion_unit }}</span> · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
                         </span>
                     </Button>
@@ -1237,18 +1242,18 @@ onUnmounted(() => {
 
             <form class="mt-4 space-y-4" @submit.prevent="addCustomMeal">
                 <label class="block">
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                    <span class="field-label">Name</span>
                     <Input
                         v-model="customMealForm.name"
                         type="text"
                         class="mt-1"
                     />
-                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.name }}</span>
+                    <span v-if="customMealForm.errors.name" class="mt-1 block text-sm text-destructive">{{ customMealForm.errors.name }}</span>
                 </label>
 
                 <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Portion</span>
+                        <span class="field-label">Portion</span>
                         <Input
                             v-model.number="customMealForm.portion_quantity"
                             type="number"
@@ -1256,25 +1261,27 @@ onUnmounted(() => {
                             step="0.1"
                             class="mt-1 text-right font-semibold"
                         />
-                        <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.portion_quantity }}</span>
+                        <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm text-destructive">{{ customMealForm.errors.portion_quantity }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Unit</span>
-                        <Select
-                            v-model="customMealForm.portion_unit"
-                            class="mt-1 px-2 font-semibold"
-                        >
-                            <option value="g">g</option>
-                            <option value="ml">ml</option>
+                        <span class="field-label">Unit</span>
+                        <Select v-model="customMealForm.portion_unit" class="mt-1">
+                            <SelectTrigger class="px-2 font-semibold">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="g">g</SelectItem>
+                                <SelectItem value="ml">ml</SelectItem>
+                            </SelectContent>
                         </Select>
-                        <span v-if="customMealForm.errors.portion_unit" class="mt-1 block text-sm  text-destructive">{{ customMealForm.errors.portion_unit }}</span>
+                        <span v-if="customMealForm.errors.portion_unit" class="mt-1 block text-sm text-destructive">{{ customMealForm.errors.portion_unit }}</span>
                     </label>
                 </div>
 
                 <div class="grid grid-cols-3 gap-2">
                     <label v-for="field in customMealMacroFields" :key="field[0]">
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">{{ field[1] }}</span>
+                        <span class="field-label">{{ field[1] }}</span>
                         <Input
                             v-model.number="customMealForm[field[0]]"
                             type="number"
@@ -1285,7 +1292,7 @@ onUnmounted(() => {
                     </label>
                 </div>
 
-                <div class="rounded-md border border-border bg-muted p-3">
+                <div class="rounded-xl border border-border bg-muted p-3">
                     <p class="text-sm font-semibold">When did you have it?</p>
                     <div class="mt-3 grid grid-cols-2 gap-2">
                         <Button
@@ -1312,44 +1319,35 @@ onUnmounted(() => {
             </form>
         </Card>
 
-        <dialog
-            ref="analysisFollowUpDialog"
-            class="fixed inset-0 m-0 h-dvh max-h-none w-full max-w-none bg-transparent p-0 text-inherit backdrop:bg-foreground/30"
-            aria-labelledby="analysis-follow-up-title"
-            @cancel.prevent="closeFollowUpModal"
-        >
-            <div class="flex h-full items-end justify-center px-4 pb-4 sm:items-center sm:py-4" @click.self="closeFollowUpModal">
-                <Card class="w-full max-w-md sm:max-w-lg">
-                    <div class="flex items-start justify-between gap-3">
-                        <div>
-                            <h2 id="analysis-follow-up-title" class="text-xl font-semibold">Follow up on estimate</h2>
-                            <p class="mt-1 text-sm text-muted-foreground">Tell Buff what it got wrong. You can add another follow-up after each update.</p>
-                        </div>
-                        <Button type="button" variant="ghost" size="icon" aria-label="Close follow-up" :disabled="analysisFollowUpLoading" @click="closeFollowUpModal">
-                            <X :size="20" />
-                        </Button>
-                    </div>
-
-                    <form class="mt-4 space-y-3" @submit.prevent="followUpAnalysis">
-                        <label for="analysis-follow-up" class="block text-xs font-semibold uppercase text-muted-foreground">Correction</label>
-                        <Textarea
-                            id="analysis-follow-up"
-                            v-model="analysisFollowUp"
-                            rows="3"
-                            maxlength="1000"
-                            autofocus
-                            placeholder="It was blue cheese, not feta…"
-                            :disabled="analysisFollowUpLoading"
-                        />
-                        <p v-if="analysisFollowUpError" class="text-sm text-destructive" role="alert">{{ analysisFollowUpError }}</p>
-                        <Button class="w-full" :disabled="analysisFollowUpLoading || !analysisFollowUp.trim()">
-                            <LoaderCircle v-if="analysisFollowUpLoading" :size="18" class="animate-spin" />
-                            {{ analysisFollowUpLoading ? 'Updating estimate…' : 'Update estimate' }}
-                        </Button>
-                    </form>
-                </Card>
+        <AppSheet :open="analysisFollowUpOpen" labelled-by="analysis-follow-up-title" @close="closeFollowUpModal">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="analysis-follow-up-title" class="text-xl font-semibold">Follow up on estimate</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Tell Buff what it got wrong. You can add another follow-up after each update.</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" aria-label="Close follow-up" :disabled="analysisFollowUpLoading" @click="closeFollowUpModal">
+                    <X :size="20" />
+                </Button>
             </div>
-        </dialog>
+
+            <form class="mt-4 space-y-3" @submit.prevent="followUpAnalysis">
+                <label for="analysis-follow-up" class="block field-label">Correction</label>
+                <Textarea
+                    id="analysis-follow-up"
+                    v-model="analysisFollowUp"
+                    rows="3"
+                    maxlength="1000"
+                    autofocus
+                    placeholder="It was blue cheese, not feta…"
+                    :disabled="analysisFollowUpLoading"
+                />
+                <p v-if="analysisFollowUpError" class="text-sm text-destructive" role="alert">{{ analysisFollowUpError }}</p>
+                <Button class="w-full" :disabled="analysisFollowUpLoading || !analysisFollowUp.trim()">
+                    <LoaderCircle v-if="analysisFollowUpLoading" :size="18" class="animate-spin" />
+                    {{ analysisFollowUpLoading ? 'Updating estimate…' : 'Update estimate' }}
+                </Button>
+            </form>
+        </AppSheet>
 
         <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">
@@ -1359,18 +1357,18 @@ onUnmounted(() => {
 
             <form class="mt-4 space-y-4" @submit.prevent="addWorkout">
                 <label class="block">
-                    <span class="text-xs font-semibold uppercase text-muted-foreground">Title</span>
+                    <span class="field-label">Title</span>
                     <Input
                         v-model="workoutForm.title"
                         type="text"
                         class="mt-1"
                     />
-                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.title }}</span>
+                    <span v-if="workoutForm.errors.title" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.title }}</span>
                 </label>
 
                 <div class="grid grid-cols-2 gap-2">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Calories burnt</span>
+                        <span class="field-label">Calories burnt</span>
                         <Input
                             v-model.number="workoutForm.calories_burned"
                             type="number"
@@ -1378,17 +1376,17 @@ onUnmounted(() => {
                             step="1"
                             class="mt-1 text-right font-semibold"
                         />
-                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.calories_burned }}</span>
+                        <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.calories_burned }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Time</span>
+                        <span class="field-label">Time</span>
                         <Input
                             v-model="workoutForm.time"
                             type="time"
                             class="mt-1 font-semibold"
                         />
-                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm  text-destructive">{{ workoutForm.errors.time }}</span>
+                        <span v-if="workoutForm.errors.time" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.time }}</span>
                     </label>
                 </div>
 

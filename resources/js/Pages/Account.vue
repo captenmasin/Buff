@@ -83,15 +83,14 @@ onBeforeUnmount(() => {
     <main class="grid min-h-dvh place-items-center bg-background px-4 py-10 text-foreground">
         <Head :title="title" />
 
-        <div class="w-full max-w-sm space-y-5">
+        <div class="w-full max-w-sm space-y-6">
             <header class="text-center">
-                <p class="text-sm font-semibold text-primary">Buff</p>
-                <h1 class="mt-1 text-3xl font-semibold">{{ title }}</h1>
+                <h1 class="page-title">{{ title }}</h1>
             </header>
 
             <p
                 v-if="page.props.flash?.message"
-                class="rounded-md bg-secondary px-4 py-3 text-sm"
+                class="rounded-xl bg-secondary px-4 py-3 text-sm"
                 role="status"
             >
                 {{ page.props.flash.message }}
@@ -100,12 +99,12 @@ onBeforeUnmount(() => {
             <Card v-if="screen === 'login'">
                 <form class="space-y-4" @submit.prevent="loginForm.post('/account/login')">
                     <label class="block">
-                        <span class="text-sm font-semibold">Email</span>
+                        <span class="field-label">Email</span>
                         <Input v-model="loginForm.email" type="email" autocomplete="email" required class="mt-1" />
                         <span v-if="loginForm.errors.email" class="mt-1 block text-sm text-destructive">{{ loginForm.errors.email }}</span>
                     </label>
                     <label class="block">
-                        <span class="text-sm font-semibold">Password</span>
+                        <span class="field-label">Password</span>
                         <Input v-model="loginForm.password" type="password" autocomplete="current-password" required class="mt-1" />
                         <span v-if="loginForm.errors.password" class="mt-1 block text-sm text-destructive">{{ loginForm.errors.password }}</span>
                     </label>
@@ -119,10 +118,10 @@ onBeforeUnmount(() => {
 
             <Card v-else-if="screen === 'register'">
                 <form class="space-y-4" @submit.prevent="registerForm.post('/account/register')">
-                    <label class="block"><span class="text-sm font-semibold">Name</span><Input v-model="registerForm.name" autocomplete="name" required class="mt-1" /><span v-if="registerForm.errors.name" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.name }}</span></label>
-                    <label class="block"><span class="text-sm font-semibold">Email</span><Input v-model="registerForm.email" type="email" autocomplete="email" required class="mt-1" /><span v-if="registerForm.errors.email" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.email }}</span></label>
-                    <label class="block"><span class="text-sm font-semibold">Password</span><Input v-model="registerForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /><span v-if="registerForm.errors.password" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.password }}</span></label>
-                    <label class="block"><span class="text-sm font-semibold">Confirm password</span><Input v-model="registerForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /></label>
+                    <label class="block"><span class="field-label">Name</span><Input v-model="registerForm.name" autocomplete="name" required class="mt-1" /><span v-if="registerForm.errors.name" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.name }}</span></label>
+                    <label class="block"><span class="field-label">Email</span><Input v-model="registerForm.email" type="email" autocomplete="email" required class="mt-1" /><span v-if="registerForm.errors.email" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.email }}</span></label>
+                    <label class="block"><span class="field-label">Password</span><Input v-model="registerForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /><span v-if="registerForm.errors.password" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.password }}</span></label>
+                    <label class="block"><span class="field-label">Confirm password</span><Input v-model="registerForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /></label>
                     <Button class="w-full" :disabled="registerForm.processing">Create account</Button>
                     <p class="text-center text-sm"><Link href="/account/login" class="text-primary">Back to sign in</Link></p>
                 </form>
@@ -132,7 +131,7 @@ onBeforeUnmount(() => {
                 <form class="space-y-4" @submit.prevent="forgotForm.post('/account/forgot-password')">
                     <p class="text-sm text-muted-foreground">We’ll email a link if the account exists.</p>
                     <label class="block">
-                        <span class="text-sm font-semibold">Email</span>
+                        <span class="field-label">Email</span>
                         <Input v-model="forgotForm.email" type="email" autocomplete="email" required class="mt-1" />
                         <span v-if="forgotForm.errors.email" class="mt-1 block text-sm text-destructive">{{ forgotForm.errors.email }}</span>
                     </label>
@@ -144,17 +143,17 @@ onBeforeUnmount(() => {
             <Card v-else-if="screen === 'reset'">
                 <form class="space-y-4" @submit.prevent="resetForm.post('/reset-password')">
                     <label class="block">
-                        <span class="text-sm font-semibold">Email</span>
+                        <span class="field-label">Email</span>
                         <Input v-model="resetForm.email" type="email" autocomplete="email" required class="mt-1" />
                         <span v-if="resetForm.errors.email" class="mt-1 block text-sm text-destructive">{{ resetForm.errors.email }}</span>
                     </label>
                     <label class="block">
-                        <span class="text-sm font-semibold">New password</span>
+                        <span class="field-label">New password</span>
                         <Input v-model="resetForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
                         <span v-if="resetForm.errors.password" class="mt-1 block text-sm text-destructive">{{ resetForm.errors.password }}</span>
                     </label>
                     <label class="block">
-                        <span class="text-sm font-semibold">Confirm password</span>
+                        <span class="field-label">Confirm password</span>
                         <Input v-model="resetForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
                     </label>
                     <Button class="w-full" :disabled="resetForm.processing">Reset password</Button>

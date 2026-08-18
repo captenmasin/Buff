@@ -51,7 +51,7 @@ onBeforeUnmount(() => {
         <div
             v-if="open"
             :class="cn(
-                'absolute top-full z-50 mt-2 rounded-md border border-border bg-card p-3 text-foreground shadow-md',
+                'absolute top-full z-50 mt-2 rounded-xl border border-border/80 bg-card p-3 text-foreground shadow-card',
                 props.align === 'end' ? 'right-0' : 'left-0',
                 props.contentClass,
             )"

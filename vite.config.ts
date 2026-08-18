@@ -13,7 +13,7 @@ export default defineConfig({
             hotFile: nativephpHotFile(),
             fonts: [
                 bunny('Instrument Sans', {
-                    weights: [400, 500, 600],
+                    weights: [400, 500, 600, 700],
                 }),
             ],
         }),

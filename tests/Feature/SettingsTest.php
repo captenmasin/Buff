@@ -38,6 +38,7 @@ it('renders unit and reminder settings without body profile data', function (): 
             ->where('mealReminders.dinner.time', '18:00')
             ->where('healthConnect.is_android', false)
             ->where('healthConnect.supported', false)
+            ->where('timezones', timezone_identifiers_list(DateTimeZone::ALL))
         );
 });
 
@@ -72,8 +73,7 @@ it('updates and schedules meal reminders', function (): void {
     ];
 
     $this->put('/settings/meal-reminders', $reminders)
-        ->assertRedirect()
-        ->assertSessionHas('message', 'Meal reminders saved.');
+        ->assertRedirect();
 
     expect(AppPreference::current()->fresh()->mealReminders())->toBe($reminders)
         ->and($calls)->toBe([[

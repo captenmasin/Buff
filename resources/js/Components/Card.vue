@@ -4,17 +4,13 @@ import { cn } from '../utils';
 const props = defineProps({
     class: {
         type: String,
-        default: ""
-    }
-})
+        default: '',
+    },
+});
 </script>
 
 <template>
-    <article :class="cn('rounded-md border border-border bg-card p-4 text-foreground', props.class)">
+    <article :class="cn('rounded-xl border border-border/80 bg-card p-5 text-foreground shadow-card', props.class)">
         <slot />
     </article>
 </template>
-
-<style scoped>
-
-</style>

@@ -2,12 +2,18 @@
 import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {Download, Link2, Moon, RefreshCw, Smartphone, Sun, Upload} from '@lucide/vue';
+import {Link2, Moon, RefreshCw, Smartphone, Sun, X} from '@lucide/vue';
 import {applyAppearance, saveAppearance, storedAppearance, type Appearance} from '../appearance';
+import AppSheet from '../Components/AppSheet.vue';
 import Card from '../Components/Card.vue';
+import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
+import SelectContent from '../Components/ui/select/SelectContent.vue';
+import SelectItem from '../Components/ui/select/SelectItem.vue';
+import SelectTrigger from '../Components/ui/select/SelectTrigger.vue';
+import SelectValue from '../Components/ui/select/SelectValue.vue';
 import Switch from '../Components/ui/switch/Switch.vue';
 import {type HeightUnit, type WeightUnit} from '../bodyUnits';
 
@@ -25,6 +31,7 @@ const props = defineProps<{
     };
     mealReminders: MealReminders;
     healthConnect: HealthConnectState;
+    timezones: string[];
 }>();
 
 interface HealthConnectState {
@@ -71,11 +78,6 @@ const mealReminderForm = useForm<MealReminders>({
     dinner: {...props.mealReminders.dinner},
 });
 
-const importForm = useForm<{
-    export: File | null;
-}>({
-    export: null,
-});
 const accountForm = useForm({
     name: page.props.buff.account?.name ?? '',
     email: page.props.buff.account?.email ?? '',
@@ -88,7 +90,7 @@ const appearance = ref<Appearance>(storedAppearance());
 const healthConnectState = ref({...props.healthConnect});
 const healthConnectLoading = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
-const importInput = ref<HTMLInputElement | null>(null);
+const deleteAccountOpen = ref(false);
 const syncLoading = ref(false);
 const syncMessage = ref('');
 
@@ -102,6 +104,15 @@ const mealReminderOptions: Array<{ id: MealType; label: string }> = [
     {id: 'lunch', label: 'Lunch'},
     {id: 'dinner', label: 'Dinner'},
 ];
+const timezoneOptions = computed(() => {
+    const timezones = [...props.timezones];
+
+    if (accountForm.timezone && !timezones.includes(accountForm.timezone)) {
+        timezones.unshift(accountForm.timezone);
+    }
+
+    return timezones;
+});
 
 const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status ?? ''));
@@ -144,15 +155,49 @@ const syncDetail = computed(() => {
 });
 
 function saveUnits() {
+    if (unitForm.processing) {
+        return;
+    }
+
     unitForm.put('/settings/units', {preserveScroll: true});
 }
 
 function saveMealReminders() {
+    if (mealReminderForm.processing) {
+        return;
+    }
+
     mealReminderForm.put('/settings/meal-reminders', {preserveScroll: true});
 }
 
 function saveAccount() {
     accountForm.patch('/account', {preserveScroll: true});
+}
+
+function openDeleteAccountModal() {
+    deleteAccountForm.reset();
+    deleteAccountForm.clearErrors();
+    deleteAccountOpen.value = true;
+}
+
+function closeDeleteAccountModal() {
+    if (deleteAccountForm.processing) {
+        return;
+    }
+
+    deleteAccountForm.reset();
+    deleteAccountForm.clearErrors();
+    deleteAccountOpen.value = false;
+}
+
+function submitDeleteAccount() {
+    deleteAccountForm.delete('/account', {
+        preserveScroll: true,
+        onError: () => {
+            deleteAccountOpen.value = true;
+        },
+        onSuccess: () => closeDeleteAccountModal(),
+    });
 }
 
 async function syncNow() {
@@ -174,32 +219,6 @@ async function syncNow() {
 
 function mealReminderError(meal: MealType, field: 'enabled' | 'time') {
     return mealReminderForm.errors[`${meal}.${field}`];
-}
-
-function chooseImportFile() {
-    importInput.value?.click();
-}
-
-function importData(event: Event) {
-    const target = event.target instanceof HTMLInputElement ? event.target : null;
-    const file = target?.files?.[0] ?? null;
-
-    if (!file) {
-        return;
-    }
-
-    importForm.export = file;
-    importForm.post('/settings/import', {
-        forceFormData: true,
-        preserveScroll: true,
-        onFinish: () => {
-            importForm.reset();
-
-            if (target) {
-                target.value = '';
-            }
-        },
-    });
 }
 
 function selectAppearance(value: Appearance) {
@@ -268,10 +287,27 @@ function handleVisibilityChange() {
     }
 }
 
+watch(() => deleteAccountForm.errors.password, (error) => {
+    if (error) {
+        deleteAccountOpen.value = true;
+    }
+});
+
+watch(
+    () => [unitForm.weight_unit, unitForm.height_unit] as const,
+    () => {
+        saveUnits();
+    },
+);
+
 onMounted(() => {
     refreshHealthConnectStatus();
     window.addEventListener('focus', handleHealthConnectResume);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    if (deleteAccountForm.errors.password) {
+        deleteAccountOpen.value = true;
+    }
 });
 
 onBeforeUnmount(() => {
@@ -286,24 +322,26 @@ onBeforeUnmount(() => {
     <Head title="Settings"/>
 
     <section class="space-y-5">
-        <header>
-            <p class="text-sm text-muted-foreground">Preferences</p>
-            <h1 class="text-3xl font-semibold tracking-normal text-foreground">Settings</h1>
-        </header>
+        <PageHeader>Settings</PageHeader>
 
         <Card>
             <h2 class="font-semibold">Appearance</h2>
-            <div class="mt-3 grid grid-cols-3 gap-2">
-                <Button
-                    v-for="option in appearanceOptions"
-                    :key="option.value"
-                    type="button"
-                    class="flex-col px-2 text-sm"
-                    :variant="appearance === option.value ? 'default' : 'surface'"
-                    @click="selectAppearance(option.value)"
-                >
-                    {{ option.label }}
-                </Button>
+            <div class="mt-3 rounded-xl bg-muted/80 p-1">
+                <div class="grid grid-cols-3 gap-1" role="group" aria-label="Appearance">
+                    <Button
+                        v-for="option in appearanceOptions"
+                        :key="option.value"
+                        type="button"
+                        size="sm"
+                        class="h-10 w-full gap-1.5 rounded-lg px-2"
+                        :variant="appearance === option.value ? 'default' : 'ghost'"
+                        :aria-pressed="appearance === option.value"
+                        @click="selectAppearance(option.value)"
+                    >
+                        <component :is="option.icon" :size="16" stroke-width="2.2" />
+                        <span>{{ option.label }}</span>
+                    </Button>
+                </div>
             </div>
         </Card>
 
@@ -311,43 +349,37 @@ onBeforeUnmount(() => {
             <template v-if="page.props.buff.account">
                 <form class="space-y-3" @submit.prevent="saveAccount">
                     <div>
-                        <h2 class="font-semibold">Buff account</h2>
+                        <h2 class="font-semibold">Your account</h2>
                         <p class="mt-1 text-sm text-muted-foreground">{{ syncDetail }}</p>
                     </div>
                     <label class="block">
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Name</span>
+                        <span class="field-label">Name</span>
                         <Input v-model="accountForm.name" autocomplete="name" required class="mt-1" />
                         <span v-if="accountForm.errors.name" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.name }}</span>
                     </label>
                     <label class="block">
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Email</span>
+                        <span class="field-label">Email</span>
                         <Input v-model="accountForm.email" type="email" autocomplete="email" required class="mt-1" />
                         <span v-if="accountForm.errors.email" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.email }}</span>
                     </label>
                     <label class="block">
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Timezone</span>
-                        <Input v-model="accountForm.timezone" required class="mt-1" />
+                        <span class="field-label">Timezone</span>
+                        <Select v-model="accountForm.timezone" class="mt-1">
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select timezone" />
+                            </SelectTrigger>
+                            <SelectContent class="max-h-72">
+                                <SelectItem v-for="timezone in timezoneOptions" :key="timezone" :value="timezone">
+                                    {{ timezone.replaceAll('_', ' ') }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
                         <span v-if="accountForm.errors.timezone" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.timezone }}</span>
                     </label>
-                    <div class="grid grid-cols-2 gap-2">
+                    <div class="grid gap-2">
                         <Button :disabled="accountForm.processing">Save account</Button>
-                        <Button type="button" variant="surface" :disabled="syncLoading" @click="syncNow">
-                            <RefreshCw :size="18" :class="{'animate-spin': syncLoading}" />
-                            Sync now
-                        </Button>
                     </div>
                 </form>
-
-                <div class="mt-5 grid gap-2 border-t border-border pt-4">
-                    <form @submit.prevent="logoutForm.post('/account/logout')">
-                        <Button variant="surface" class="w-full" :disabled="logoutForm.processing">Sign out and remove local data</Button>
-                    </form>
-                    <form class="space-y-2" @submit.prevent="deleteAccountForm.delete('/account')">
-                        <Input v-model="deleteAccountForm.password" type="password" autocomplete="current-password" placeholder="Password to delete account" required />
-                        <span v-if="deleteAccountForm.errors.password" class="block text-sm text-destructive">{{ deleteAccountForm.errors.password }}</span>
-                        <Button variant="destructive" class="w-full" :disabled="deleteAccountForm.processing">Delete account</Button>
-                    </form>
-                </div>
             </template>
 
             <div v-else class="space-y-3">
@@ -362,7 +394,7 @@ onBeforeUnmount(() => {
 
         <Card v-if="showHealthConnect">
             <div class="flex items-start gap-3">
-                <div class="grid h-10 w-10 flex-none place-items-center rounded-md bg-primary text-primary-foreground">
+                <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-primary text-primary-foreground">
                     <Link2 :size="18"/>
                 </div>
                 <div class="min-w-0 flex-1">
@@ -382,92 +414,124 @@ onBeforeUnmount(() => {
         </Card>
 
         <Card>
-            <form class="space-y-3" @submit.prevent="saveMealReminders">
+            <div class="space-y-3">
                 <div>
                     <h2 class="font-semibold">Meal reminders</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
                 </div>
 
-                <div
-                    v-for="meal in mealReminderOptions"
-                    :key="meal.id"
-                    class="grid grid-cols-[1fr_auto] items-center gap-x-3 gap-y-2 rounded-md border border-border p-3"
-                >
-                    <label :for="`${meal.id}-reminder-enabled`" class="font-medium">{{ meal.label }}</label>
-                    <Switch
-                        :id="`${meal.id}-reminder-enabled`"
-                        v-model="mealReminderForm[meal.id].enabled"
-                        :aria-label="`Enable ${meal.label.toLowerCase()} reminder`"
-                    />
+                <div class="divide-y divide-border/60">
+                    <div v-for="meal in mealReminderOptions" :key="meal.id" class="py-3 first:pt-1 last:pb-1">
+                        <div class="flex items-center gap-3">
+                            <label :for="`${meal.id}-reminder-enabled`" class="min-w-0 flex-1 font-medium">
+                                {{ meal.label }}
+                            </label>
+                            <Input
+                                :id="`${meal.id}-reminder-time`"
+                                v-model="mealReminderForm[meal.id].time"
+                                type="time"
+                                :aria-label="`${meal.label} reminder time`"
+                                class="w-[7.5rem] shrink-0 border-0 bg-transparent px-0 py-1 text-right text-sm tabular-nums shadow-none focus:border-transparent focus:bg-transparent focus-visible:ring-2 focus-visible:ring-ring"
+                                @change="saveMealReminders"
+                            />
+                            <Switch
+                                :id="`${meal.id}-reminder-enabled`"
+                                v-model="mealReminderForm[meal.id].enabled"
+                                :aria-label="`Enable ${meal.label.toLowerCase()} reminder`"
+                                class="shrink-0"
+                                @change="saveMealReminders"
+                            />
+                        </div>
 
-                    <label :for="`${meal.id}-reminder-time`" class="col-span-2">
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Time</span>
-                        <Input
-                            :id="`${meal.id}-reminder-time`"
-                            v-model="mealReminderForm[meal.id].time"
-                            type="time"
-                            class="mt-1"
-                        />
-                    </label>
-
-                    <span v-if="mealReminderError(meal.id, 'enabled')" class="col-span-2 text-sm text-destructive">
-                        {{ mealReminderError(meal.id, 'enabled') }}
-                    </span>
-                    <span v-if="mealReminderError(meal.id, 'time')" class="col-span-2 text-sm text-destructive">
-                        {{ mealReminderError(meal.id, 'time') }}
-                    </span>
+                        <span v-if="mealReminderError(meal.id, 'enabled')" class="mt-1 block text-sm text-destructive">
+                            {{ mealReminderError(meal.id, 'enabled') }}
+                        </span>
+                        <span v-if="mealReminderError(meal.id, 'time')" class="mt-1 block text-sm text-destructive">
+                            {{ mealReminderError(meal.id, 'time') }}
+                        </span>
+                    </div>
                 </div>
-
-                <Button class="w-full" :disabled="mealReminderForm.processing">
-                    Save reminders
-                </Button>
-            </form>
+            </div>
         </Card>
 
         <Card>
-            <form class="space-y-3" @submit.prevent="saveUnits">
+            <div class="space-y-3">
                 <h2 class="font-semibold">Units</h2>
 
                 <div class="grid grid-cols-2 gap-3">
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Weight</span>
+                        <span class="field-label">Weight</span>
                         <Select v-model="unitForm.weight_unit" class="mt-1">
-                            <option value="kg">Kilograms</option>
-                            <option value="lb">Pounds</option>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select weight unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="kg">Kilograms</SelectItem>
+                                <SelectItem value="lb">Pounds</SelectItem>
+                            </SelectContent>
                         </Select>
                         <span v-if="unitForm.errors.weight_unit" class="mt-1 block text-sm text-destructive">{{ unitForm.errors.weight_unit }}</span>
                     </label>
 
                     <label>
-                        <span class="text-xs font-semibold uppercase text-muted-foreground">Height</span>
+                        <span class="field-label">Height</span>
                         <Select v-model="unitForm.height_unit" class="mt-1">
-                            <option value="cm">Centimeters</option>
-                            <option value="in">Inches</option>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select height unit" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="cm">Centimeters</SelectItem>
+                                <SelectItem value="in">Inches</SelectItem>
+                            </SelectContent>
                         </Select>
                         <span v-if="unitForm.errors.height_unit" class="mt-1 block text-sm text-destructive">{{ unitForm.errors.height_unit }}</span>
                     </label>
                 </div>
-
-                <Button class="w-full" :disabled="unitForm.processing">
-                    Save units
-                </Button>
-            </form>
+            </div>
         </Card>
 
-        <Card>
-            <h2 class="font-semibold">Import / export</h2>
-            <div class="mt-3 grid grid-cols-2 gap-2">
-                <Button as="a" href="/settings/export" variant="surface" class="h-auto flex-col px-3 py-4 text-sm">
-                    <Download :size="20"/>
-                    Export
-                </Button>
-                <Button type="button" variant="surface" class="h-auto flex-col px-3 py-4 text-sm" :disabled="importForm.processing" @click="chooseImportFile">
-                    <Upload :size="20"/>
-                    Import
+        <div v-if="page.props.buff.account" class="grid gap-2">
+            <form @submit.prevent="logoutForm.post('/account/logout')">
+                <Button variant="surface" class="w-full" :disabled="logoutForm.processing">Sign out and remove local data</Button>
+            </form>
+            <Button type="button" variant="destructive" class="w-full" @click="openDeleteAccountModal">
+                Delete account
+            </Button>
+        </div>
+
+        <AppSheet :open="deleteAccountOpen" labelled-by="delete-account-title" @close="closeDeleteAccountModal">
+            <div class="flex items-start justify-between gap-3">
+                <div>
+                    <h2 id="delete-account-title" class="text-xl font-semibold">Delete account</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">This permanently deletes your Buff account and all synced data. Enter your password to confirm.</p>
+                </div>
+                <Button type="button" variant="ghost" size="icon" aria-label="Close delete account dialog" :disabled="deleteAccountForm.processing" @click="closeDeleteAccountModal">
+                    <X :size="20" />
                 </Button>
             </div>
-            <input ref="importInput" type="file" accept="application/json,.json" class="hidden" @change="importData">
-            <p v-if="importForm.errors.export" class="mt-2 text-sm text-destructive">{{ importForm.errors.export }}</p>
-        </Card>
+
+            <form class="mt-4 space-y-3" @submit.prevent="submitDeleteAccount">
+                <label for="delete-account-password" class="block field-label">Password</label>
+                <Input
+                    id="delete-account-password"
+                    v-model="deleteAccountForm.password"
+                    type="password"
+                    autocomplete="current-password"
+                    placeholder="Current password"
+                    required
+                    autofocus
+                    :disabled="deleteAccountForm.processing"
+                />
+                <p v-if="deleteAccountForm.errors.password" class="text-sm text-destructive" role="alert">{{ deleteAccountForm.errors.password }}</p>
+                <div class="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="surface" :disabled="deleteAccountForm.processing" @click="closeDeleteAccountModal">
+                        Cancel
+                    </Button>
+                    <Button variant="destructive" :disabled="deleteAccountForm.processing">
+                        Delete account
+                    </Button>
+                </div>
+            </form>
+        </AppSheet>
     </section>
 </template>

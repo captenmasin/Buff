@@ -9,69 +9,80 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    --background: #f6f7f4;
-    --foreground: #17211b;
-    --card: #ffffff;
-    --card-foreground: #17211b;
-    --popover: #ffffff;
-    --popover-foreground: #17211b;
-    --primary: #253d2c;
-    --primary-foreground: #ffffff;
-    --secondary: #dce8d4;
-    --secondary-foreground: #17211b;
-    --muted: #f5f5f4;
-    --muted-foreground: #78716c;
+    --background: #f2efe6;
+    --foreground: #1a2218;
+    --card: #fffcf6;
+    --card-foreground: #1a2218;
+    --popover: #fffcf6;
+    --popover-foreground: #1a2218;
+    --primary: #24382b;
+    --primary-foreground: #f7f4ea;
+    --secondary: #dce8d2;
+    --secondary-foreground: #1a2218;
+    --muted: #ebe6d9;
+    --muted-foreground: #4f5849;
     --accent: #6f9b58;
     --accent-foreground: #ffffff;
-    --destructive: #b91c1c;
+    --destructive: #b42318;
     --destructive-foreground: #ffffff;
-    --border: #e7e5e4;
-    --input: #e7e5e4;
+    --border: #ddd6c6;
+    --input: #ddd6c6;
     --ring: #6f9b58;
-    --success: #10b981;
-    --success-foreground: #064e3b;
-    --warning: #fbbf24;
-    --warning-foreground: #78350f;
-    --food: #d28a45;
-    --workout: #6f9b58;
-    --protein: #0ea5e9;
-    --carbs: #f97316;
-    --fat: #ef4444;
-    --danger-soft: #fef2f2;
-    --danger-soft-foreground: #991b1b;
-    --warning-soft: #fffbeb;
-    --warning-soft-foreground: #78350f;
-    --radius: 0.5rem;
+    --success: #3f8f63;
+    --success-foreground: #1b4630;
+    --success-soft: #e8f4ea;
+    --success-soft-foreground: #1b4630;
+    --warning: #e0a21b;
+    --warning-foreground: #6b4a08;
+    --food: #9a5720;
+    --workout: #3d6b32;
+    --protein: #2f8fbd;
+    --carbs: #e07a2f;
+    --fat: #d4524a;
+    --danger-soft: #fbeceb;
+    --danger-soft-foreground: #8a1f16;
+    --warning-soft: #fbf3dc;
+    --warning-soft-foreground: #6b4a08;
+    --radius: 0.9rem;
+    --card-shadow: 0 1px 2px rgb(26 34 24 / 0.04), 0 8px 24px rgb(26 34 24 / 0.04);
 }
 
 .dark {
-    --background: #101410;
+    --background: #0e130f;
     --foreground: #eef3ec;
-    --card: #181e18;
+    --card: #171d17;
     --card-foreground: #eef3ec;
-    --popover: #181e18;
+    --popover: #171d17;
     --popover-foreground: #eef3ec;
-    --primary: #bdd7ae;
+    --primary: #c5dcb8;
     --primary-foreground: #132015;
-    --secondary: #263324;
+    --secondary: #253224;
     --secondary-foreground: #eef3ec;
     --muted: #20271f;
-    --muted-foreground: #a8b2a3;
+    --muted-foreground: #a3ae9e;
     --accent: #8fbe76;
     --accent-foreground: #10200e;
     --destructive: #f87171;
     --destructive-foreground: #2f0909;
-    --border: #30392e;
-    --input: #30392e;
+    --border: #2d372c;
+    --input: #2d372c;
     --ring: #8fbe76;
-    --success: #34d399;
-    --success-foreground: #a8b2a3;
+    --success: #4ade80;
+    --success-foreground: #bbf7d0;
+    --success-soft: #163022;
+    --success-soft-foreground: #bbf7d0;
     --warning: #facc15;
-    --warning-foreground: #422006;
+    --warning-foreground: #fde68a;
     --danger-soft: #3b1212;
     --danger-soft-foreground: #fecaca;
     --warning-soft: #342607;
     --warning-soft-foreground: #fde68a;
+    --food: #e0a06a;
+    --workout: #8fbe76;
+    --protein: #6eb8d8;
+    --carbs: #f0a05a;
+    --fat: #ee7a72;
+    --card-shadow: 0 1px 2px rgb(0 0 0 / 0.24), 0 10px 28px rgb(0 0 0 / 0.18);
 }
 
 @theme inline {
@@ -98,6 +109,8 @@
     --color-ring: var(--ring);
     --color-success: var(--success);
     --color-success-foreground: var(--success-foreground);
+    --color-success-soft: var(--success-soft);
+    --color-success-soft-foreground: var(--success-soft-foreground);
     --color-warning: var(--warning);
     --color-warning-foreground: var(--warning-foreground);
     --color-food: var(--food);
@@ -109,10 +122,11 @@
     --color-danger-soft-foreground: var(--danger-soft-foreground);
     --color-warning-soft: var(--warning-soft);
     --color-warning-soft-foreground: var(--warning-soft-foreground);
-    --radius-sm: calc(var(--radius) - 2px);
+    --radius-sm: calc(var(--radius) - 4px);
     --radius-md: var(--radius);
-    --radius-lg: calc(var(--radius) + 2px);
-    --radius-xl: calc(var(--radius) + 4px);
+    --radius-lg: calc(var(--radius) + 4px);
+    --radius-xl: calc(var(--radius) + 8px);
+    --shadow-card: var(--card-shadow);
 }
 
 html,
@@ -124,6 +138,8 @@ body {
     min-height: 100vh;
     color: var(--foreground);
     font-family: var(--font-sans);
+    font-feature-settings: 'ss01' on, 'cv11' on;
+    letter-spacing: -0.011em;
 }
 
 button,
@@ -138,14 +154,17 @@ textarea {
 }
 
 .app-main {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 2rem);
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7rem);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.5rem);
 }
 
 .bottom-nav {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.35rem);
 }
 
+.bottom-drawer {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+}
 
 .app-sidebar {
     min-height: 100dvh;
@@ -153,15 +172,79 @@ textarea {
     padding-top: calc(env(safe-area-inset-top, 0px) + 1.25rem);
 }
 
+.page-kicker {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: var(--muted-foreground);
+}
+
+.page-title {
+    font-size: 1.85rem;
+    font-weight: 600;
+    letter-spacing: -0.038em;
+    line-height: 1.12;
+    color: var(--foreground);
+}
+
+.page-kicker + .page-title {
+    margin-top: 0.2rem;
+}
+
+.field-label {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+}
+
+.progress-track {
+    height: 0.45rem;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--muted);
+}
+
+.progress-fill {
+    height: 100%;
+    border-radius: inherit;
+}
+
+.sheet-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: center;
+    align-items: end;
+    background: rgb(26 34 24 / 0.38);
+    padding-inline: 1rem;
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+.sheet-scrim-drawer {
+    z-index: 40;
+    padding-inline: 0;
+    padding-bottom: 0;
+}
+
 @supports (padding-top: max(0px)) {
     .app-main {
-        padding-top: calc(max(env(safe-area-inset-top, 0px), 2rem) + 0.75rem);
+        padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 0.5rem);
     }
 
     .bottom-nav {
-        padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+        padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.45rem);
     }
 
+    .bottom-drawer {
+        padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 0.45rem) + 1rem);
+    }
 
     .app-sidebar {
         padding-top: calc(max(env(safe-area-inset-top, 0px), 1rem) + 1rem);
@@ -173,9 +256,60 @@ textarea {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
     }
 
+    .sheet-scrim {
+        align-items: center;
+        padding-block: 1rem;
+    }
+
+    .sheet-scrim-drawer {
+        left: 16rem;
+        align-items: end;
+        padding-block: 0;
+    }
+
     @supports (padding-bottom: max(0px)) {
         .app-main {
             padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 1rem) + 1rem);
         }
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .app-sidebar,
+    .bottom-nav {
+        background: var(--card);
+        backdrop-filter: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html {
+        scroll-behavior: auto;
+    }
+
+    .app-shell *,
+    .bottom-drawer,
+    .sheet-scrim,
+    .sheet-scrim * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+@media (prefers-contrast: more) {
+    :root {
+        --border: #1a2218;
+        --input: #1a2218;
+    }
+
+    .dark {
+        --border: #eef3ec;
+        --input: #eef3ec;
+    }
+
+    .app-sidebar,
+    .bottom-nav {
+        background: var(--card);
+        backdrop-filter: none;
     }
 }

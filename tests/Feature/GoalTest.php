@@ -1,6 +1,39 @@
 <?php
 
 use App\Models\DailyGoal;
+use Inertia\Testing\AssertableInertia as Assert;
+
+it('renders default calorie and macro targets when none are saved', function (): void {
+    $this->get('/goals')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Goals')
+            ->where('goal.calories', 2000)
+            ->where('goal.protein_g', 170)
+            ->where('goal.carbs_g', 195)
+            ->where('goal.fat_g', 60)
+        );
+});
+
+it('renders the goals editor with the saved daily target', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2100,
+        'protein_g' => 157.5,
+        'carbs_g' => 210,
+        'fat_g' => 70,
+        'macro_calories' => 2100,
+    ]);
+
+    $this->get('/goals')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Goals')
+            ->where('goal.calories', 2100)
+            ->where('goal.protein_g', 157.5)
+            ->where('goal.carbs_g', 210)
+            ->where('goal.fat_g', 70)
+        );
+});
 
 it('saves a goal when macro calories match', function (): void {
     $this->put('/goals', [

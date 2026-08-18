@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import { computed } from 'vue';
 import Card from '../Components/Card.vue';
+import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import { formatDisplayDate } from '../dateFormat';
 
@@ -64,29 +65,28 @@ function grams(value: number | string | null | undefined) {
     <Head :title="`${macro.label} Breakdown`" />
 
     <section class="space-y-5">
-        <header class="flex items-start gap-3">
-            <Button :as="Link" :href="`/?date=${date}`" variant="outline" size="icon" class="mt-1 flex-none" aria-label="Back to today">
-                <ArrowLeft :size="20" />
-            </Button>
-            <div class="min-w-0">
-                <p class="text-sm text-muted-foreground">{{ displayDate }}</p>
-                <h1 class="text-3xl font-semibold tracking-normal text-foreground">{{ macro.label }}</h1>
-            </div>
-        </header>
+        <PageHeader :kicker="displayDate">
+            {{ macro.label }}
+            <template #actions>
+                <Button :as="Link" :href="`/?date=${date}`" variant="outline" size="icon" class="rounded-full" aria-label="Back to today">
+                    <ArrowLeft :size="20" />
+                </Button>
+            </template>
+        </PageHeader>
 
         <Card>
             <div class="flex items-start justify-between gap-4">
                 <div>
                     <p class="text-sm text-muted-foreground">Current split</p>
-                    <p class="mt-2 text-4xl font-bold">{{ macro.current_percentage }}%</p>
+                    <p class="mt-2 text-4xl font-bold tracking-tight">{{ macro.current_percentage }}%</p>
                 </div>
                 <div class="text-right">
                     <p class="text-sm text-muted-foreground">Goal split</p>
-                    <p class="mt-2 text-2xl font-semibold text-primary">{{ macro.goal_percentage }}%</p>
+                    <p class="mt-2 text-2xl font-semibold tracking-tight text-primary">{{ macro.goal_percentage }}%</p>
                 </div>
             </div>
-            <div class="mt-4 h-3 overflow-hidden rounded bg-muted">
-                <div class="h-full rounded" :class="macroColors[macro.key]" :style="{ width: `${progressWidth}%` }" />
+            <div class="progress-track mt-4 h-2.5">
+                <div class="progress-fill" :class="macroColors[macro.key]" :style="{ width: `${progressWidth}%` }" />
             </div>
             <p class="mt-2 text-xs text-muted-foreground">
                 {{ grams(macro.consumed_g) }} eaten<span v-if="macro.goal_g"> · {{ grams(macro.goal_g) }} daily goal</span>
@@ -94,7 +94,7 @@ function grams(value: number | string | null | undefined) {
         </Card>
 
         <section class="space-y-3">
-            <h2 class="text-lg font-semibold">Foods</h2>
+            <h2 class="text-lg font-semibold tracking-tight">Foods</h2>
 
             <Card v-if="!entries.length">
                 <p class="text-sm text-muted-foreground">No food logged for this day.</p>
@@ -102,7 +102,7 @@ function grams(value: number | string | null | undefined) {
 
             <Card v-for="entry in entries" :key="entry.id">
                 <div class="flex gap-3">
-                    <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-14 w-14 flex-none rounded-md object-cover">
+                    <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-14 w-14 flex-none rounded-xl object-cover">
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
@@ -115,16 +115,16 @@ function grams(value: number | string | null | undefined) {
                         </div>
 
                         <div class="mt-3 grid grid-cols-3 gap-2">
-                            <div class="rounded-md bg-muted p-2">
-                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Protein</p>
+                            <div class="rounded-xl bg-muted p-2">
+                                <p class="field-label">Protein</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.protein_g) }}</p>
                             </div>
-                            <div class="rounded-md bg-muted p-2">
-                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Carbs</p>
+                            <div class="rounded-xl bg-muted p-2">
+                                <p class="field-label">Carbs</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.carbs_g) }}</p>
                             </div>
-                            <div class="rounded-md bg-muted p-2">
-                                <p class="text-[11px] font-semibold uppercase text-muted-foreground">Fat</p>
+                            <div class="rounded-xl bg-muted p-2">
+                                <p class="field-label">Fat</p>
                                 <p class="mt-1 font-semibold">{{ grams(entry.fat_g) }}</p>
                             </div>
                         </div>
