@@ -144,7 +144,25 @@ it('presents goals as a calorie target and named macro split', function (): void
         ->toContain('bg-protein')
         ->toContain('bg-carbs')
         ->toContain('bg-fat')
+        ->toContain('macro-wheel')
+        ->toContain('snap-y')
+        ->toContain('w-[3ch]')
+        ->toContain('role="radiogroup"')
+        ->toContain('{{ percent }}')
+        ->not->toContain('{{ percent }}%')
+        ->not->toContain('{{ customSplit.fat }}%')
+        ->toContain('macro-value')
+        ->not->toContain('mask-image')
         ->not->toContain('100% allocated');
+});
+
+it('highlights meal rows across the card instead of hugging the text', function (): void {
+    $today = file_get_contents(resource_path('js/Pages/Today.vue'));
+
+    expect($today)
+        ->toContain('-mx-5 mt-1 divide-y divide-border/60')
+        ->toContain('rounded-none px-5 py-2.5 text-left')
+        ->not->toContain('h-auto min-w-0 flex-1 items-center justify-between gap-3 p-0 text-left');
 });
 
 it('routes overlays through AppSheet', function (): void {
@@ -168,6 +186,19 @@ it('routes overlays through AppSheet', function (): void {
         ->and($progress)->toContain('AppSheet')
         ->and($add)->toContain('AppSheet')
         ->and($settings)->toContain('AppSheet');
+});
+
+it('leaves calories burnt and custom macros empty so phone number entry is not blocked', function (): void {
+    $add = file_get_contents(resource_path('js/Pages/Add.vue'));
+
+    expect($add)
+        ->toContain("calories_burned: ''")
+        ->not->toContain('calories_burned: 0')
+        ->toContain("protein_g: ''")
+        ->toContain("carbs_g: ''")
+        ->toContain("fat_g: ''")
+        ->toContain('protein_g: Number(data.protein_g || 0)')
+        ->toContain('placeholder="0"');
 });
 
 it('confirms deletes in-app', function (): void {

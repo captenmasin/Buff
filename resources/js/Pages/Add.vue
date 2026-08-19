@@ -189,9 +189,9 @@ const customMealForm = useForm({
     name: '',
     portion_quantity: 100,
     portion_unit: 'g',
-    protein_g: 0,
-    carbs_g: 0,
-    fat_g: 0,
+    protein_g: '',
+    carbs_g: '',
+    fat_g: '',
     analysis_id: '',
 });
 
@@ -206,7 +206,7 @@ const barcodeMealForm = useForm({
 const workoutForm = useForm({
     date: props.date,
     title: '',
-    calories_burned: 0,
+    calories_burned: '',
     time: currentTime(),
 });
 
@@ -631,7 +631,14 @@ function closeFoodAddSheet() {
 function addCustomMeal() {
     customMealForm.meal_type = selectedMealType.value;
     hapticImpact();
-    customMealForm.post('/meals/custom');
+    customMealForm
+        .transform((data) => ({
+            ...data,
+            protein_g: Number(data.protein_g || 0),
+            carbs_g: Number(data.carbs_g || 0),
+            fat_g: Number(data.fat_g || 0),
+        }))
+        .post('/meals/custom');
 }
 
 async function selectPhotos(event: Event) {
@@ -1287,6 +1294,7 @@ onUnmounted(() => {
                             type="number"
                             min="0"
                             step="0.1"
+                            placeholder="0"
                             class="mt-1 px-2 text-right font-semibold"
                         />
                     </label>
@@ -1374,6 +1382,7 @@ onUnmounted(() => {
                             type="number"
                             min="1"
                             step="1"
+                            placeholder="0"
                             class="mt-1 text-right font-semibold"
                         />
                         <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.calories_burned }}</span>

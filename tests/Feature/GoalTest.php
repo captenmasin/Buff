@@ -41,7 +41,7 @@ it('saves a goal when macro calories match', function (): void {
         'protein_g' => 170,
         'carbs_g' => 195,
         'fat_g' => 60,
-    ])->assertRedirect('/');
+    ])->assertRedirect('/goals');
 
     $goal = DailyGoal::query()->first();
 
@@ -62,7 +62,7 @@ it('updates the existing goal', function (): void {
         'protein_g' => 170,
         'carbs_g' => 195,
         'fat_g' => 60,
-    ])->assertRedirect('/');
+    ])->assertRedirect('/goals');
 
     $this->assertDatabaseCount('daily_goals', 1);
 
@@ -87,14 +87,14 @@ it('saves preset and odd-calorie custom macro payloads', function (): void {
         'protein_g' => 150,
         'carbs_g' => 200,
         'fat_g' => 66.67,
-    ])->assertRedirect('/');
+    ])->assertRedirect('/goals');
 
     $this->put('/goals', [
         'calories' => 1999,
         'protein_g' => 174.91,
         'carbs_g' => 224.89,
         'fat_g' => 44.42,
-    ])->assertRedirect('/');
+    ])->assertRedirect('/goals');
 
     $this->assertDatabaseCount('daily_goals', 1);
     $this->assertDatabaseHas('daily_goals', ['calories' => 1999]);

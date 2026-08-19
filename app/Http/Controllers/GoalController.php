@@ -65,6 +65,6 @@ class GoalController extends Controller
             ? $goal->update($values)
             : DailyGoal::query()->create($values);
 
-        return redirect('/')->with('message', 'Daily goals saved.');
+        return redirect('/goals')->with('message', 'Daily goals saved.');
     }
 }

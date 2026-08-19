@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { Minus, Plus } from '@lucide/vue';
+import { Check, Minus, Plus } from '@lucide/vue';
 import { computed, nextTick, ref, watch } from 'vue';
 import Card from '../Components/Card.vue';
 import PageHeader from '../Components/PageHeader.vue';
@@ -49,6 +49,11 @@ const canIncreaseCalories = computed(() => Number(form.calories) < calorieMax);
 const percentageOptions = Array.from({ length: 21 }, (_, index) => index * 5);
 const customScrollerElements: Partial<Record<'protein' | 'carbs', HTMLElement>> = {};
 const scrollerItemHeight = 40;
+const pickerColumns = [
+    { key: 'protein', color: 'text-protein', scrollable: true },
+    { key: 'carbs', color: 'text-carbs', scrollable: true },
+    { key: 'fat', color: 'text-fat', scrollable: false },
+] as const;
 const macros = computed(() => [
     { key: 'protein' as const, label: 'Protein', percent: activeSplit.value.protein, grams: generatedGrams.value.protein, color: 'bg-protein' },
     { key: 'carbs' as const, label: 'Carbs', percent: activeSplit.value.carbs, grams: generatedGrams.value.carbs, color: 'bg-carbs' },
@@ -82,7 +87,11 @@ function selectCustom(): void {
     });
 }
 
-function updateCustom(key: 'protein' | 'carbs', value: number): void {
+function updateCustom(key: 'protein' | 'carbs' | 'fat', value: number): void {
+    if (key === 'fat') {
+        return;
+    }
+
     customSplit.value = key === 'protein'
         ? { protein: value, carbs: Math.min(customSplit.value.carbs, 100 - value), fat: 100 - value - Math.min(customSplit.value.carbs, 100 - value) }
         : { protein: customSplit.value.protein, carbs: Math.min(value, 100 - customSplit.value.protein), fat: 100 - customSplit.value.protein - Math.min(value, 100 - customSplit.value.protein) };
@@ -90,7 +99,11 @@ function updateCustom(key: 'protein' | 'carbs', value: number): void {
     applySplit(customSplit.value);
 }
 
-function customOptions(key: 'protein' | 'carbs'): number[] {
+function customOptions(key: 'protein' | 'carbs' | 'fat'): number[] {
+    if (key === 'fat') {
+        return [];
+    }
+
     return percentageOptions.filter((percent) => percent <= 100 - (key === 'protein' ? customSplit.value.carbs : customSplit.value.protein));
 }
 
@@ -100,12 +113,26 @@ function setCustomScrollerRef(key: 'protein' | 'carbs', element: unknown): void 
     }
 }
 
-function scrollToCustom(key: 'protein' | 'carbs', percent: number): void {
+function bindPickerScroller(key: (typeof pickerColumns)[number]['key'], element: unknown): void {
+    if (key !== 'fat') {
+        setCustomScrollerRef(key, element);
+    }
+}
+
+function scrollToCustom(key: 'protein' | 'carbs' | 'fat', percent: number): void {
+    if (key === 'fat') {
+        return;
+    }
+
     const index = customOptions(key).indexOf(percent);
     customScrollerElements[key]?.scrollTo({ top: Math.max(0, index) * scrollerItemHeight, behavior: 'smooth' });
 }
 
-function handleCustomScroller(key: 'protein' | 'carbs', event: Event): void {
+function handleCustomScroller(key: 'protein' | 'carbs' | 'fat', event: Event): void {
+    if (key === 'fat') {
+        return;
+    }
+
     const options = customOptions(key);
     const index = Math.max(0, Math.min(options.length - 1, Math.round((event.currentTarget as HTMLElement).scrollTop / scrollerItemHeight)));
     updateCustom(key, options[index]);
@@ -187,74 +214,145 @@ watch(() => form.calories, () => applySplit(activeSplit.value));
             <Card class="space-y-4">
                 <div>
                     <h2 class="font-semibold tracking-tight">Macro split</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Protein / carbs / fat from your calorie target.</p>
+                    <p class="mt-1 text-sm text-muted-foreground">How calories divide across protein, carbs, and fat.</p>
                 </div>
 
-                <div class="divide-y divide-border/60 overflow-hidden rounded-xl border border-border/80 bg-muted/50">
-                    <Button
+                <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Macro split">
+                    <button
                         v-for="(preset, index) in macroPresets"
                         :key="index"
                         type="button"
-                        variant="ghost"
-                        class="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left"
-                        :class="activePreset === index ? 'bg-secondary text-foreground' : 'text-foreground'"
-                        :aria-pressed="activePreset === index"
+                        role="radio"
+                        class="flex flex-col rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none disabled:opacity-40"
+                        :class="activePreset === index
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground'"
+                        :aria-checked="activePreset === index"
                         :disabled="!splitWithinGramBounds(Number(form.calories), preset)"
                         @click="selectPreset(index)"
                     >
-                        <span class="min-w-0">
-                            <span class="block font-semibold">{{ presetLabels[index] }}</span>
-                            <span class="mt-0.5 block text-xs text-muted-foreground">{{ preset.protein }} / {{ preset.carbs }} / {{ preset.fat }}</span>
+                        <span class="flex items-start justify-between gap-2">
+                            <span class="min-w-0">
+                                <span class="block font-semibold">{{ presetLabels[index] }}</span>
+                                <span
+                                    class="mt-0.5 block tabular-nums"
+                                    :class="activePreset === index ? 'text-primary-foreground/70' : 'text-muted-foreground'"
+                                >{{ preset.protein }} / {{ preset.carbs }} / {{ preset.fat }}</span>
+                            </span>
+                            <Check
+                                v-if="activePreset === index"
+                                :size="16"
+                                stroke-width="2.5"
+                                class="mt-0.5 shrink-0"
+                            />
                         </span>
-                        <span class="flex h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-card" aria-hidden="true">
+                        <span
+                            class="mt-2 flex h-1 overflow-hidden rounded-full"
+                            :class="activePreset === index ? 'bg-primary-foreground/20' : 'bg-background'"
+                            aria-hidden="true"
+                        >
                             <span class="h-full bg-protein" :style="{ width: `${preset.protein}%` }" />
                             <span class="h-full bg-carbs" :style="{ width: `${preset.carbs}%` }" />
                             <span class="h-full bg-fat" :style="{ width: `${preset.fat}%` }" />
                         </span>
-                    </Button>
-                    <Button
+                    </button>
+                    <button
                         type="button"
-                        variant="ghost"
-                        class="h-auto w-full justify-between gap-3 rounded-none px-3 py-3 text-left"
-                        :class="activePreset === null ? 'bg-secondary text-foreground' : 'text-foreground'"
-                        :aria-pressed="activePreset === null"
+                        role="radio"
+                        class="flex flex-col rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                        :class="activePreset === null
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted text-foreground'"
+                        :aria-checked="activePreset === null"
                         @click="selectCustom"
                     >
-                        <span class="min-w-0">
-                            <span class="block font-semibold">Custom</span>
-                            <span class="mt-0.5 block text-xs text-muted-foreground">Set protein and carbs in 5% steps</span>
+                        <span class="flex items-start justify-between gap-2">
+                            <span class="min-w-0">
+                                <span class="block font-semibold">Custom</span>
+                                <span
+                                    class="mt-0.5 block tabular-nums"
+                                    :class="activePreset === null ? 'text-primary-foreground/70' : 'text-muted-foreground'"
+                                >{{ customSplit.protein }} / {{ customSplit.carbs }} / {{ customSplit.fat }}</span>
+                            </span>
+                            <Check
+                                v-if="activePreset === null"
+                                :size="16"
+                                stroke-width="2.5"
+                                class="mt-0.5 shrink-0"
+                            />
                         </span>
-                    </Button>
+                        <span
+                            class="mt-2 flex h-1 overflow-hidden rounded-full"
+                            :class="activePreset === null ? 'bg-primary-foreground/20' : 'bg-background'"
+                            aria-hidden="true"
+                        >
+                            <span class="h-full bg-protein" :style="{ width: `${customSplit.protein}%` }" />
+                            <span class="h-full bg-carbs" :style="{ width: `${customSplit.carbs}%` }" />
+                            <span class="h-full bg-fat" :style="{ width: `${customSplit.fat}%` }" />
+                        </span>
+                    </button>
                 </div>
 
-                <div v-if="activePreset === null" class="rounded-xl border border-border/60 bg-muted p-3">
-                    <div class="mb-2 grid grid-cols-3 text-center">
-                        <span class="field-label">Protein</span>
-                        <span class="field-label">Carbs</span>
-                        <span class="field-label">Fat</span>
+                <div v-if="activePreset === null" class="overflow-hidden rounded-xl bg-muted">
+                    <div class="grid grid-cols-3 px-2 pt-3 text-center">
+                        <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
+                            <span class="size-1.5 rounded-full bg-protein" aria-hidden="true" />
+                            Protein
+                        </span>
+                        <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
+                            <span class="size-1.5 rounded-full bg-carbs" aria-hidden="true" />
+                            Carbs
+                        </span>
+                        <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
+                            <span class="size-1.5 rounded-full bg-fat" aria-hidden="true" />
+                            Fat
+                        </span>
                     </div>
-                    <div class="relative grid grid-cols-3 -mb-3 -mx-3">
-                        <div class="pointer-events-none absolute inset-x-0 top-1/2 z-10 h-10 -translate-y-1/2 border-y border-border bg-card/75" />
+                    <div class="relative grid grid-cols-3">
+                        <div class="pointer-events-none absolute inset-x-2 top-1/2 z-0 h-10 -translate-y-1/2 rounded-lg bg-card shadow-sm ring-1 ring-border/70" />
                         <div
-                            v-for="key in ['protein', 'carbs'] as const"
-                            :key="key"
-                            :ref="(element) => setCustomScrollerRef(key, element)"
-                            class="macro-wheel h-40 snap-y snap-mandatory overflow-y-auto py-[60px] text-center"
-                            @scroll.passive="handleCustomScroller(key, $event)"
+                            v-for="column in pickerColumns"
+                            :key="column.key"
+                            class="relative z-10"
                         >
-                            <Button
-                                v-for="percent in customOptions(key)"
-                                :key="percent"
-                                type="button"
-                                variant="ghost"
-                                class="relative z-20 h-10 w-full snap-center text-xl tabular-nums"
-                                :class="customSplit[key] === percent ? (key === 'protein' ? 'text-protein' : 'text-carbs') : 'text-muted-foreground/40'"
-                                @click="updateCustom(key, percent); scrollToCustom(key, percent)"
+                            <div
+                                v-if="column.scrollable"
+                                :ref="(element) => bindPickerScroller(column.key, element)"
+                                class="macro-wheel h-40 snap-y snap-mandatory overflow-y-auto py-[60px] text-center"
+                                :aria-label="`${column.key} percent`"
+                                @scroll.passive="handleCustomScroller(column.key, $event)"
                             >
-                                {{ percent }}<span v-if="customSplit[key] === percent" class="ml-1 text-sm">%</span>
-                            </Button>
+                                <button
+                                    v-for="percent in customOptions(column.key)"
+                                    :key="percent"
+                                    type="button"
+                                    class="flex h-10 w-full appearance-none snap-center items-center justify-center bg-transparent p-0 font-normal"
+                                    :class="customSplit[column.key] === percent ? column.color : 'text-muted-foreground/35'"
+                                    @click="updateCustom(column.key, percent); scrollToCustom(column.key, percent)"
+                                >
+                                    <span class="macro-value w-[3ch] text-right">{{ percent }}</span>
+                                    <span class="w-5" aria-hidden="true" />
+                                </button>
+                            </div>
+                            <div
+                                v-else
+                                class="macro-value flex h-40 items-center justify-center"
+                                :class="column.color"
+                            >
+                                <span class="macro-value w-[3ch] text-right">{{ customSplit.fat }}</span>
+                                <span class="w-5" aria-hidden="true" />
+                            </div>
+                            <span
+                                class="macro-value pointer-events-none absolute inset-0 flex items-center justify-center"
+                                :class="column.color"
+                                aria-hidden="true"
+                            >
+                                <span class="w-[3ch]" />
+                                <span class="w-5">%</span>
+                            </span>
                         </div>
-                        <div class="grid place-items-center tabular-nums">{{ customSplit.fat }}%</div>
+                        <div class="pointer-events-none absolute inset-x-0 top-0 z-20 h-14 bg-gradient-to-b from-muted to-transparent" />
+                        <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-14 bg-gradient-to-t from-muted to-transparent" />
                     </div>
                 </div>
 
@@ -268,6 +366,15 @@ watch(() => form.calories, () => applySplit(activeSplit.value));
 </template>
 
 <style scoped>
-.macro-wheel { scrollbar-width: none; }
+.macro-wheel {
+    scrollbar-width: none;
+    overscroll-behavior: contain;
+}
 .macro-wheel::-webkit-scrollbar { display: none; }
+.macro-value {
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+}
 </style>

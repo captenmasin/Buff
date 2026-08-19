@@ -654,9 +654,14 @@ onBeforeUnmount(() => {
                     <h3 class="font-semibold text-foreground">{{ mealLabels[mealType] }}</h3>
                 </div>
 
-                <div class="mt-1 divide-y divide-border/60">
-                    <div v-for="entry in summary.entries[mealType]" :key="entry.id" class="flex min-w-0 items-center gap-3 py-2.5">
-                        <Button variant="ghost" class="h-auto min-w-0 flex-1 items-center justify-between gap-3 p-0 text-left" :aria-label="`View ${entry.name}`" @click="openMeal(entry, mealType, $event)">
+                <div class="-mx-5 mt-1 divide-y divide-border/60">
+                    <div v-for="entry in summary.entries[mealType]" :key="entry.id">
+                        <Button
+                            variant="ghost"
+                            class="h-auto w-full min-w-0 items-center justify-between gap-3 rounded-none border-0 px-5 py-2.5 text-left active:translate-y-0"
+                            :aria-label="`View ${entry.name}`"
+                            @click="openMeal(entry, mealType, $event)"
+                        >
                             <span class="min-w-0">
                                 <span class="block truncate font-medium text-foreground">{{ entry.name }}</span>
                                 <span class="block text-xs text-muted-foreground">
