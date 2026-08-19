@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
+import {Head, Link, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {Link2, Moon, RefreshCw, Smartphone, Sun, X} from '@lucide/vue';
+import {Link2, Moon, Smartphone, Sun, X} from '@lucide/vue';
 import {applyAppearance, saveAppearance, storedAppearance, type Appearance} from '../appearance';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from '../Components/Card.vue';
@@ -31,11 +31,28 @@ const props = defineProps<{
     };
     mealReminders: MealReminders;
     healthConnect: HealthConnectState;
+    appleHealth: AppleHealthState;
     timezones: string[];
 }>();
 
 interface HealthConnectState {
     is_android: boolean;
+    available: boolean | null;
+    supported: boolean;
+    status?: string | null;
+    last_successful_sync_at?: string | null;
+    last_synced_at?: string | null;
+    last_status?: string | null;
+    synced_records?: number | null;
+    last_error?: string | null;
+    message?: string | null;
+    has_permissions?: boolean | null;
+    foreground_granted?: boolean | null;
+    background_granted?: boolean | null;
+}
+
+interface AppleHealthState {
+    is_ios: boolean;
     available: boolean | null;
     supported: boolean;
     status?: string | null;
@@ -61,9 +78,7 @@ interface BuffAccount {
 const page = usePage<{
     buff: {
         account: BuffAccount | null;
-        needs_sign_in: boolean;
         has_local_account: boolean;
-        sync: {last_succeeded_at: string | null; last_error: string | null; pending: number} | null;
     };
 }>();
 
@@ -88,11 +103,10 @@ const deleteAccountForm = useForm({password: ''});
 
 const appearance = ref<Appearance>(storedAppearance());
 const healthConnectState = ref({...props.healthConnect});
+const appleHealthState = ref({...props.appleHealth});
 const healthConnectLoading = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
 const deleteAccountOpen = ref(false);
-const syncLoading = ref(false);
-const syncMessage = ref('');
 
 const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof Sun }> = [
     {value: 'system', label: 'System', icon: Smartphone},
@@ -114,44 +128,50 @@ const timezoneOptions = computed(() => {
     return timezones;
 });
 
-const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
-const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status ?? ''));
+const healthImport = computed(() => {
+    if (appleHealthState.value.is_ios === true) {
+        return {name: 'Apple Health', prefix: '/apple-health', state: appleHealthState.value};
+    }
+
+    if (healthConnectState.value.is_android === true) {
+        return {name: 'Health Connect', prefix: '/health-connect', state: healthConnectState.value};
+    }
+
+    return null;
+});
+const showHealthConnect = computed(() => healthImport.value !== null);
+const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthImport.value?.state.status ?? ''));
 const healthConnectLabel = computed(() => {
-    if (healthConnectState.value.available === false) return 'Unavailable';
-    if (healthConnectState.value.status === 'connected') return 'Connected';
-    if (healthConnectState.value.status === 'background_permission_required') return 'Background access needed';
-    if (healthConnectState.value.status === 'sync_queued') return 'Sync queued';
+    const state = healthImport.value?.state;
+
+    if (state?.available === false) return 'Unavailable';
+    if (state?.status === 'connected') return 'Connected';
+    if (state?.status === 'background_permission_required') return 'Background access needed';
+    if (state?.status === 'sync_queued') return 'Sync queued';
     return 'Permission needed';
 });
 const healthConnectDetail = computed(() => {
-    if (healthConnectState.value.message) {
-        return healthConnectState.value.message;
+    const state = healthImport.value?.state;
+
+    if (state?.message) {
+        return state.message;
     }
 
-    if (healthConnectState.value.last_successful_sync_at) {
-        return `Last synced ${new Date(healthConnectState.value.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
+    if (state?.last_successful_sync_at) {
+        return `Last synced ${new Date(state.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
     }
 
-    if (healthConnectState.value.last_error) {
-        return healthConnectState.value.last_error;
+    if (state?.last_error) {
+        return state.last_error;
     }
 
-    return 'Connect Health Connect to import workout calories automatically.';
+    return `Connect ${healthImport.value?.name ?? 'health data'} to import workout calories automatically.`;
 });
 const healthConnectButtonLabel = computed(() => {
     if (healthConnectLoading.value) return canSyncHealthConnect.value ? 'Syncing...' : 'Opening...';
-    if (healthConnectState.value.status === 'sync_queued') return 'Sync queued';
+    if (healthImport.value?.state.status === 'sync_queued') return 'Sync queued';
     if (canSyncHealthConnect.value) return 'Sync now';
-    return 'Connect Health Connect';
-});
-const syncDetail = computed(() => {
-    if (syncMessage.value) return syncMessage.value;
-    if (page.props.buff.sync?.last_error) return page.props.buff.sync.last_error;
-    if (page.props.buff.sync?.last_succeeded_at) {
-        return `Last synced ${new Date(page.props.buff.sync.last_succeeded_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
-    }
-
-    return `${page.props.buff.sync?.pending ?? 0} changes waiting to sync`;
+    return `Connect ${healthImport.value?.name ?? 'health data'}`;
 });
 
 function saveUnits() {
@@ -200,23 +220,6 @@ function submitDeleteAccount() {
     });
 }
 
-async function syncNow() {
-    syncLoading.value = true;
-    syncMessage.value = '';
-
-    try {
-        await axios.post('/sync');
-        syncMessage.value = 'Sync complete.';
-        router.reload();
-    } catch (error) {
-        syncMessage.value = axios.isAxiosError(error)
-            ? error.response?.data?.message || 'Could not sync Buff.'
-            : 'Could not sync Buff.';
-    } finally {
-        syncLoading.value = false;
-    }
-}
-
 function mealReminderError(meal: MealType, field: 'enabled' | 'time') {
     return mealReminderForm.errors[`${meal}.${field}`];
 }
@@ -227,24 +230,47 @@ function selectAppearance(value: Appearance) {
     applyAppearance(value);
 }
 
+function applyHealthImportState(data: {native?: Record<string, unknown>} & Record<string, unknown>) {
+    const nextState = {...data, ...(data.native || {})};
+
+    if (healthImport.value?.prefix === '/apple-health') {
+        appleHealthState.value = {...appleHealthState.value, ...nextState};
+        return;
+    }
+
+    healthConnectState.value = {...healthConnectState.value, ...nextState};
+}
+
 async function refreshHealthConnectStatus() {
+    const prefix = healthImport.value?.prefix;
+
+    if (!prefix) {
+        return;
+    }
+
     try {
-        const {data} = await axios.get('/health-connect/status');
-        healthConnectState.value = {...healthConnectState.value, ...data};
+        const {data} = await axios.get(`${prefix}/status`);
+        applyHealthImportState(data);
     } catch {
-        healthConnectState.value = {...healthConnectState.value, last_error: 'Could not check Health Connect.'};
+        applyHealthImportState({last_error: `Could not check ${healthImport.value?.name ?? 'health data'}.`});
     }
 }
 
 async function connectHealthConnect() {
+    const prefix = healthImport.value?.prefix;
+
+    if (!prefix) {
+        return;
+    }
+
     healthConnectLoading.value = true;
 
     try {
-        const endpoint = canSyncHealthConnect.value ? '/health-connect/sync' : '/health-connect/connect';
+        const endpoint = canSyncHealthConnect.value ? `${prefix}/sync` : `${prefix}/connect`;
         const {data} = await axios.post(endpoint);
-        healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+        applyHealthImportState(data);
 
-        if (healthConnectState.value.status === 'permission_requested') {
+        if (healthImport.value?.state.status === 'permission_requested') {
             scheduleHealthConnectStatusRefresh();
         }
     } finally {
@@ -271,7 +297,7 @@ function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
     healthConnectRefreshTimer.value = window.setTimeout(async () => {
         await refreshHealthConnectStatus();
 
-        if (healthConnectState.value.status === 'permission_requested') {
+        if (healthImport.value?.state.status === 'permission_requested') {
             scheduleHealthConnectStatusRefresh(attemptsRemaining - 1);
         }
     }, 1000);
@@ -348,10 +374,7 @@ onBeforeUnmount(() => {
         <Card>
             <template v-if="page.props.buff.account">
                 <form class="space-y-3" @submit.prevent="saveAccount">
-                    <div>
-                        <h2 class="font-semibold">Your account</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">{{ syncDetail }}</p>
-                    </div>
+                    <h2 class="font-semibold">Your account</h2>
                     <label class="block">
                         <span class="field-label">Name</span>
                         <Input v-model="accountForm.name" autocomplete="name" required class="mt-1" />
@@ -398,7 +421,7 @@ onBeforeUnmount(() => {
                     <Link2 :size="18"/>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h2 class="font-semibold">Health Connect</h2>
+                    <h2 class="font-semibold">{{ healthImport?.name }}</h2>
                     <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectLabel }}</p>
                     <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
                 </div>
@@ -406,7 +429,7 @@ onBeforeUnmount(() => {
             <Button
                 type="button"
                 class="mt-4 w-full"
-                :disabled="healthConnectLoading || healthConnectState.available === false"
+                :disabled="healthConnectLoading || healthImport?.state.available === false"
                 @click="connectHealthConnect"
             >
                 {{ healthConnectButtonLabel }}

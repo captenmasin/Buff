@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import Card from '../Components/Card.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
+import Progress from '../Components/ui/progress/Progress.vue';
 import { formatDisplayDate } from '../dateFormat';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
@@ -85,9 +86,7 @@ function grams(value: number | string | null | undefined) {
                     <p class="mt-2 text-2xl font-semibold tracking-tight text-primary">{{ macro.goal_percentage }}%</p>
                 </div>
             </div>
-            <div class="progress-track mt-4 h-2.5">
-                <div class="progress-fill" :class="macroColors[macro.key]" :style="{ width: `${progressWidth}%` }" />
-            </div>
+            <Progress class="mt-4 h-2.5" :model-value="progressWidth" :indicator-class="macroColors[macro.key]" />
             <p class="mt-2 text-xs text-muted-foreground">
                 {{ grams(macro.consumed_g) }} eaten<span v-if="macro.goal_g"> · {{ grams(macro.goal_g) }} daily goal</span>
             </p>

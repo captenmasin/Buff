@@ -1,33 +1,46 @@
 <script setup lang="ts">
-import { cn } from '../../../utils';
+import type { SwitchRootEmits, SwitchRootProps } from 'reka-ui'
+import type { HTMLAttributes } from 'vue'
+import { reactiveOmit } from '@vueuse/core'
+import {
+  SwitchRoot,
+  SwitchThumb,
+  useForwardPropsEmits,
+} from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const model = defineModel<boolean>({ required: true });
-const emit = defineEmits<{
-    change: [];
-}>();
-
-const props = withDefaults(defineProps<{
-    class?: string;
+const props = withDefaults(defineProps<SwitchRootProps & {
+  class?: HTMLAttributes['class']
+  size?: 'sm' | 'default'
 }>(), {
-    class: '',
-});
+  size: 'default',
+})
+
+const emits = defineEmits<SwitchRootEmits & { change: [] }>()
+
+const delegatedProps = reactiveOmit(props, 'class', 'size')
+
+const forwarded = useForwardPropsEmits(delegatedProps, emits)
 </script>
 
 <template>
-    <button
-        type="button"
-        role="switch"
-        :aria-checked="model"
-        :class="cn(
-            'relative inline-flex h-7 w-12 items-center rounded-full transition duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-            model ? 'bg-primary' : 'bg-muted-foreground/35',
-            props.class,
-        )"
-        @click="model = !model; emit('change')"
+  <SwitchRoot
+    v-slot="slotProps"
+    data-slot="switch"
+    :data-size="size"
+    v-bind="forwarded"
+    :class="cn(
+      'data-checked:bg-primary data-unchecked:bg-input focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:aria-invalid:border-destructive/50 dark:data-unchecked:bg-input/80 shrink-0 rounded-full border border-transparent aria-invalid:ring-3 data-[size=default]:h-7 data-[size=default]:w-12 data-[size=sm]:h-3.5 data-[size=sm]:w-6 peer group/switch relative inline-flex items-center transition-all outline-none after:absolute after:-inset-x-3 after:-inset-y-2 data-disabled:cursor-not-allowed data-disabled:opacity-50',
+      props.class,
+    )"
+    @update:model-value="emits('change')"
+    @update:checked="emits('change')"
+  >
+    <SwitchThumb
+      data-slot="switch-thumb"
+      class="bg-background dark:data-unchecked:bg-foreground dark:data-checked:bg-primary-foreground rounded-full group-data-[size=default]/switch:size-5 group-data-[size=sm]/switch:size-3 group-data-[size=default]/switch:data-checked:translate-x-6 group-data-[size=sm]/switch:data-checked:translate-x-[calc(100%-2px)] group-data-[size=default]/switch:data-unchecked:translate-x-1 group-data-[size=sm]/switch:data-unchecked:translate-x-0 pointer-events-none block ring-0 transition-transform"
     >
-        <span
-            class="h-5 w-5 rounded-full bg-card transition"
-            :class="model ? 'translate-x-6' : 'translate-x-1'"
-        />
-    </button>
+      <slot name="thumb" v-bind="slotProps" />
+    </SwitchThumb>
+  </SwitchRoot>
 </template>

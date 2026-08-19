@@ -1,63 +1,19 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue';
-import { cn } from '../../../utils';
+import type { PopoverRootEmits, PopoverRootProps } from 'reka-ui'
+import { PopoverRoot, useForwardPropsEmits } from 'reka-ui'
 
-const props = withDefaults(defineProps<{
-    align?: 'start' | 'end';
-    class?: string;
-    contentClass?: string;
-}>(), {
-    align: 'end',
-    class: '',
-    contentClass: '',
-});
+const props = defineProps<PopoverRootProps>()
+const emits = defineEmits<PopoverRootEmits>()
 
-const open = defineModel<boolean>({ default: false });
-const root = ref<HTMLElement | null>(null);
-
-function close(): void {
-    open.value = false;
-}
-
-function handleDocumentClick(event: MouseEvent): void {
-    if (!(event.target instanceof Node) || root.value?.contains(event.target)) {
-        return;
-    }
-
-    close();
-}
-
-function handleKeydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape') {
-        close();
-    }
-}
-
-onMounted(() => {
-    document.addEventListener('click', handleDocumentClick);
-    document.addEventListener('keydown', handleKeydown);
-});
-
-onBeforeUnmount(() => {
-    document.removeEventListener('click', handleDocumentClick);
-    document.removeEventListener('keydown', handleKeydown);
-});
+const forwarded = useForwardPropsEmits(props, emits)
 </script>
 
 <template>
-    <div ref="root" :class="cn('relative inline-flex', props.class)">
-        <slot name="trigger" :open="open" :toggle="() => open = !open" :close="close" />
-
-        <div
-            v-if="open"
-            :class="cn(
-                'absolute top-full z-50 mt-2 rounded-xl border border-border/80 bg-card p-3 text-foreground shadow-card',
-                props.align === 'end' ? 'right-0' : 'left-0',
-                props.contentClass,
-            )"
-            data-slot="popover-content"
-        >
-            <slot :close="close" />
-        </div>
-    </div>
+  <PopoverRoot
+    v-slot="slotProps"
+    data-slot="popover"
+    v-bind="forwarded"
+  >
+    <slot v-bind="slotProps" />
+  </PopoverRoot>
 </template>

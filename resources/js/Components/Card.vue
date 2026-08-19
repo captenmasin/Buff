@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import { cn } from '../utils';
+import { Card as UiCard } from './ui/card'
+import { cn } from '../lib/utils'
 
 const props = defineProps({
     class: {
         type: String,
         default: '',
     },
-});
+})
 </script>
 
 <template>
-    <article :class="cn('rounded-xl border border-border/80 bg-card p-5 text-foreground shadow-card', props.class)">
+    <UiCard :class="cn('gap-0 px-5 py-5', props.class)">
         <slot />
-    </article>
+    </UiCard>
 </template>

@@ -7,6 +7,7 @@
     "license": "MIT",
     "require": {
         "php": "^8.4",
+        "buff/apple-health": "^1.0",
         "buff/background-tasks": "^1.0",
         "buff/camera-permissions": "^1.0",
         "buff/health-connect": "^1.0",
@@ -40,6 +41,13 @@
         }
     },
     "repositories": [
+        {
+            "type": "path",
+            "url": "native-plugins/apple-health",
+            "options": {
+                "symlink": true
+            }
+        },
         {
             "type": "path",
             "url": "native-plugins/background-tasks",

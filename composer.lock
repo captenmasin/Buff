@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "383ca0b56289b332416a1c8bcd92dd46",
+    "content-hash": "c53147124ffd5ed504ae151ac5bc6f88",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -119,6 +119,39 @@
                 }
             ],
             "time": "2026-06-14T18:21:03+00:00"
+        },
+        {
+            "name": "buff/apple-health",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "native-plugins/apple-health",
+                "reference": "673a21edb31692490e975c4cf59abbea975a1718"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Buff\\AppleHealth\\AppleHealthServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Buff\\AppleHealth\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "Apple Health workout importer for Buff.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
         },
         {
             "name": "buff/background-tasks",

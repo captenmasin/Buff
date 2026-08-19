@@ -5,8 +5,8 @@ use Buff\BackgroundTasks\ScheduledTaskRegistry;
 
 it('registers the ten minute health connect command for Android', function (): void {
     $registry = app(ScheduledTaskRegistry::class);
-    $task = collect($registry->tasks())
-        ->sole('command', 'health-connect:sync');
+    $tasks = collect($registry->tasks());
+    $task = $tasks->sole('command', 'health-connect:sync');
 
     expect($task)
         ->toMatchArray([
@@ -14,10 +14,11 @@ it('registers the ten minute health connect command for Android', function (): v
             'interval_minutes' => 10,
         ])
         ->and($task['id'])->toMatch('/\A[a-f0-9]{64}\z/')
-        ->and($registry->registrations())->toBe([[
+        ->and($registry->registrations())->toHaveCount(2)
+        ->and($registry->registrations())->toContain([
             'id' => $task['id'],
             'interval_minutes' => 10,
-        ]]);
+        ]);
 });
 
 it('runs a scheduled command by its validated task ID', function (): void {
@@ -54,6 +55,18 @@ it('fails when a scheduled command cannot queue its work', function (): void {
     $this->artisan('background-task:run', ['task' => $task['id']])
         ->expectsOutputToContain('Native sync failed.')
         ->assertFailed();
+});
+
+it('registers the ten minute apple health command', function (): void {
+    $registry = app(ScheduledTaskRegistry::class);
+    $task = collect($registry->tasks())
+        ->sole('command', 'apple-health:sync');
+
+    expect($task)
+        ->toMatchArray([
+            'expression' => '*/10 * * * *',
+            'interval_minutes' => 10,
+        ]);
 });
 
 it('rejects an invalid background task ID', function (): void {

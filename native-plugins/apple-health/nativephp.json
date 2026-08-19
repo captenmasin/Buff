@@ -1,0 +1,34 @@
+{
+    "namespace": "AppleHealth",
+    "platforms": ["ios"],
+    "bridge_functions": [
+        {
+            "name": "AppleHealth.Status",
+            "ios": "AppleHealthFunctions.Status",
+            "description": "Return Apple Health availability and permission state."
+        },
+        {
+            "name": "AppleHealth.RequestPermissions",
+            "ios": "AppleHealthFunctions.RequestPermissions",
+            "description": "Launch the Apple Health permission flow."
+        },
+        {
+            "name": "AppleHealth.SyncNow",
+            "ios": "AppleHealthFunctions.SyncNow",
+            "description": "Queue an immediate Apple Health workout sync."
+        }
+    ],
+    "ios": {
+        "min_version": "18.0",
+        "init_function": "AppleHealthPlugin.startObserving",
+        "info_plist": {
+            "NSHealthShareUsageDescription": "Buff reads your workouts from Apple Health to add exercise calories to your daily log. Workout data stays on this device."
+        },
+        "entitlements": {
+            "com.apple.developer.healthkit": true,
+            "com.apple.developer.healthkit.background-delivery": true
+        },
+        "capabilities": ["healthkit"],
+        "background_modes": ["processing"]
+    }
+}

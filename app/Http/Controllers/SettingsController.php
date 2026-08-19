@@ -24,6 +24,7 @@ class SettingsController extends Controller
             ],
             'mealReminders' => $preferences->mealReminders(),
             'healthConnect' => HealthConnectController::sharedStatus(),
+            'appleHealth' => AppleHealthController::sharedStatus(),
             'timezones' => timezone_identifiers_list(DateTimeZone::ALL),
         ]);
     }

@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Buff\AppleHealth\AppleHealthServiceProvider;
 use Buff\BackgroundTasks\BackgroundTasksServiceProvider;
 use Buff\CameraPermissions\CameraPermissionsServiceProvider;
 use Buff\HealthConnect\HealthConnectServiceProvider;
@@ -26,6 +27,7 @@ class NativeServiceProvider extends ServiceProvider
     public function plugins(): array
     {
         return [
+            AppleHealthServiceProvider::class,
             CameraPermissionsServiceProvider::class,
             HealthConnectServiceProvider::class,
             NativeRefreshServiceProvider::class,

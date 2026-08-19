@@ -3,6 +3,7 @@
 use App\Models\AppPreference;
 use App\Models\DailyGoal;
 use App\Models\MealEntry;
+use App\Services\AppleHealthBridge;
 use App\Services\HealthConnectBridge;
 use App\Services\MealReminderBridge;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -10,6 +11,9 @@ use Inertia\Testing\AssertableInertia as Assert;
 it('renders unit and reminder settings without body profile data', function (): void {
     app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
         androidDetector: fn (): bool => false,
+    ));
+    app()->instance(AppleHealthBridge::class, new AppleHealthBridge(
+        iosDetector: fn (): bool => false,
     ));
 
     DailyGoal::query()->create([
@@ -38,6 +42,8 @@ it('renders unit and reminder settings without body profile data', function (): 
             ->where('mealReminders.dinner.time', '18:00')
             ->where('healthConnect.is_android', false)
             ->where('healthConnect.supported', false)
+            ->where('appleHealth.is_ios', false)
+            ->where('appleHealth.supported', false)
             ->where('timezones', timezone_identifiers_list(DateTimeZone::ALL))
         );
 });

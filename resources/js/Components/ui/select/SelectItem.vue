@@ -1,84 +1,45 @@
 <script setup lang="ts">
-import { computed, inject, onBeforeUnmount, onMounted, onUpdated, ref, watch } from 'vue';
-import { cn } from '../../../utils';
-import { SELECT_CONTEXT_KEY } from './selectContext';
+import type { SelectItemProps } from 'reka-ui'
 
-const props = withDefaults(defineProps<{
-    value: string | number;
-    disabled?: boolean;
-    class?: string;
-}>(), {
-    disabled: false,
-    class: '',
-});
+import type { HTMLAttributes } from 'vue'
+import { CheckIcon } from '@lucide/vue'
+import { reactiveOmit } from '@vueuse/core'
+import {
+  SelectItem,
+  SelectItemIndicator,
+  SelectItemText,
+  useForwardProps,
+} from 'reka-ui'
+import { cn } from '@/lib/utils'
 
-const select = inject(SELECT_CONTEXT_KEY);
+const props = defineProps<SelectItemProps & { class?: HTMLAttributes['class'] }>()
 
-if (!select) {
-    throw new Error('SelectItem must be used within Select.');
-}
+const delegatedProps = reactiveOmit(props, 'class')
 
-const itemRef = ref<HTMLElement | null>(null);
-const stringValue = computed(() => String(props.value));
-const isSelected = computed(() => String(select.model.value ?? '') === stringValue.value);
-const isHighlighted = computed(() => select.highlightedValue.value === stringValue.value);
-
-function syncRegistration(): void {
-    select.registerItem({
-        value: stringValue.value,
-        label: itemRef.value?.textContent?.trim() || stringValue.value,
-        disabled: props.disabled,
-    });
-}
-
-function handleSelect(): void {
-    if (props.disabled) {
-        return;
-    }
-
-    select.selectItem(stringValue.value);
-}
-
-onMounted(() => {
-    syncRegistration();
-});
-
-onUpdated(() => {
-    syncRegistration();
-});
-
-onBeforeUnmount(() => {
-    select.unregisterItem(stringValue.value);
-});
-
-watch(stringValue, (value, previousValue) => {
-    if (previousValue !== undefined) {
-        select.unregisterItem(previousValue);
-    }
-
-    syncRegistration();
-});
-
-watch(() => props.disabled, syncRegistration);
+const forwardedProps = useForwardProps(delegatedProps)
 </script>
 
 <template>
-    <div
-        ref="itemRef"
-        role="option"
-        :aria-selected="isSelected"
-        :aria-disabled="props.disabled"
-        :data-value="stringValue"
-        :class="cn(
-            'cursor-pointer rounded-lg px-3 py-2.5 text-base outline-none transition',
-            isSelected ? 'bg-secondary text-secondary-foreground' : 'text-foreground',
-            isHighlighted && !isSelected ? 'bg-muted' : '',
-            props.disabled ? 'cursor-not-allowed opacity-50' : 'active:bg-muted',
-            props.class,
-        )"
-        @click="handleSelect"
-        @mouseenter="select.highlightedValue.value = stringValue"
-    >
-        <slot />
-    </div>
+  <SelectItem
+    data-slot="select-item"
+    v-bind="forwardedProps"
+    :class="
+      cn(
+        'focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground gap-1.5 rounded-md py-1 pr-8 pl-1.5 text-sm [&_svg:not([class*=size-])]:size-4 *:[span]:last:flex *:[span]:last:items-center *:[span]:last:gap-2 relative flex w-full cursor-default items-center outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+        props.class,
+      )
+    "
+  >
+    <span class="pointer-events-none absolute right-2 flex size-4 items-center justify-center">
+      <SelectItemIndicator>
+        <slot name="indicator-icon">
+          <CheckIcon class="pointer-events-none" />
+        </slot>
+      </SelectItemIndicator>
+    </span>
+
+    <SelectItemText>
+      <slot />
+    </SelectItemText>
+  </SelectItem>
 </template>

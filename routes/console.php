@@ -33,3 +33,7 @@ Artisan::command('meal-reminder:check {meal} {date}', function (): int {
 Schedule::command('health-connect:sync')
     ->everyTenMinutes()
     ->description('health-connect-sync');
+
+Schedule::command('apple-health:sync')
+    ->everyTenMinutes()
+    ->description('apple-health-sync');

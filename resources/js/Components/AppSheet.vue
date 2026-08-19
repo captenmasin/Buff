@@ -1,58 +1,56 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
-import Card from './Card.vue';
-import { cn } from '../utils';
-import { useFocusTrap } from '../useFocusTrap';
+import Card from './Card.vue'
+import { Dialog, DialogContent } from './ui/dialog'
+import { Sheet, SheetContent } from './ui/sheet'
+import { cn } from '../lib/utils'
 
 const props = withDefaults(defineProps<{
-    open: boolean;
-    labelledBy: string;
-    variant?: 'modal' | 'drawer';
-    class?: string;
+    open: boolean
+    labelledBy: string
+    variant?: 'modal' | 'drawer'
+    class?: string
 }>(), {
     variant: 'modal',
     class: '',
-});
+})
 
 const emit = defineEmits<{
-    close: [];
-}>();
+    close: []
+}>()
 
-const panel = ref<HTMLElement | null>(null);
-const { onKeydown, focusFirst } = useFocusTrap(panel, () => emit('close'));
-
-watch(() => props.open, (open) => {
-    if (open) {
-        focusFirst();
+function onOpenChange(open: boolean) {
+    if (!open) {
+        emit('close')
     }
-});
+}
 </script>
 
 <template>
-    <div
-        v-if="open"
-        class="sheet-scrim"
-        :class="variant === 'drawer' ? 'sheet-scrim-drawer' : ''"
-        @click.self="emit('close')"
-        @keydown="onKeydown"
-    >
-        <div
-            ref="panel"
+    <Sheet v-if="variant === 'drawer'" :open="open" @update:open="onOpenChange">
+        <SheetContent
+            side="bottom"
+            :show-close-button="false"
             role="dialog"
             aria-modal="true"
             :aria-labelledby="labelledBy"
-            tabindex="-1"
-            :class="cn(
-                variant === 'drawer'
-                    ? 'bottom-drawer relative w-full max-w-md overflow-y-auto rounded-t-3xl border border-border/70 bg-card px-4 pt-3 shadow-card sm:max-w-lg'
-                    : 'w-full max-w-md sm:max-w-lg',
-                props.class,
-            )"
+            overlay-class="sm:left-64"
+            :class="cn('bottom-drawer max-h-[88vh] gap-0 rounded-t-3xl border-border/70 p-4 sm:left-64 sm:max-w-lg', props.class)"
         >
-            <Card v-if="variant === 'modal'" class="overflow-hidden">
+            <slot />
+        </SheetContent>
+    </Sheet>
+
+    <Dialog v-else :open="open" @update:open="onOpenChange">
+        <DialogContent
+            :show-close-button="false"
+            role="dialog"
+            aria-modal="true"
+            :aria-labelledby="labelledBy"
+            :class="cn('max-w-md gap-0 overflow-hidden p-0 sm:max-w-lg', props.class)"
+        >
+            <Card class="border-0 shadow-none ring-0">
                 <slot />
             </Card>
-            <slot v-else />
-        </div>
-    </div>
+        </DialogContent>
+    </Dialog>
 </template>

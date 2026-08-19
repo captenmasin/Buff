@@ -2,7 +2,9 @@
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
-import {Apple, Calendar, Coffee, Drumstick, Dumbbell, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
+import type {DateValue} from '@internationalized/date';
+import {parseDate} from '@internationalized/date';
+import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import {dayStatusClass, dayStatusLabel, type DayStatus} from '../dayStatus';
 import { hapticImpact } from '../haptics';
@@ -12,7 +14,10 @@ import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
+import {Calendar} from '../Components/ui/calendar';
 import Input from '../Components/ui/input/Input.vue';
+import {Popover, PopoverContent, PopoverTrigger} from '../Components/ui/popover';
+import Progress from '../Components/ui/progress/Progress.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -106,6 +111,24 @@ interface HealthConnectState {
     background_granted?: boolean | null;
 }
 
+interface AppleHealthState {
+    is_ios: boolean;
+    available: boolean;
+    supported: boolean;
+    status: string;
+    last_successful_sync_at?: string | null;
+    last_synced_at?: string | null;
+    last_status?: string | null;
+    synced_records?: number | null;
+    deleted_records?: number | null;
+    last_error?: string | null;
+    message?: string | null;
+    has_permissions?: boolean | null;
+    foreground_granted?: boolean | null;
+    background_available?: boolean | null;
+    background_granted?: boolean | null;
+}
+
 interface MacroCard {
     key: MacroKey;
     slug: string;
@@ -127,6 +150,7 @@ const props = defineProps<{
     week: WeekDay[];
     mealTypes: MealType[];
     healthConnect: HealthConnectState;
+    appleHealth: AppleHealthState;
 }>();
 
 const mealLabels: Record<MealType, string> = {
@@ -149,14 +173,27 @@ const populatedMealTypes = computed(() => props.mealTypes.filter((mealType) => B
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
+const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
 const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'});
 const healthConnectState = ref({...props.healthConnect});
+const appleHealthState = ref({...props.appleHealth});
 const healthConnectLoading = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
-const healthConnectSummaryRefreshMarker = ref(healthConnectSummaryMarker(healthConnectState.value));
-const showHealthConnect = computed(() => healthConnectState.value.is_android === true);
-const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthConnectState.value.status));
+const healthConnectSummaryRefreshMarker = ref(healthConnectSummaryMarker(props.healthConnect.is_android ? props.healthConnect : props.appleHealth));
+const healthImport = computed(() => {
+    if (appleHealthState.value.is_ios === true) {
+        return {name: 'Apple Health', prefix: '/apple-health', state: appleHealthState.value};
+    }
+
+    if (healthConnectState.value.is_android === true) {
+        return {name: 'Health Connect', prefix: '/health-connect', state: healthConnectState.value};
+    }
+
+    return null;
+});
+const showHealthConnect = computed(() => healthImport.value !== null);
+const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthImport.value?.state.status ?? ''));
 const selectedMeal = ref<SelectedMeal | null>(null);
 const mealSheetMode = ref<'details' | 'edit' | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
@@ -236,27 +273,50 @@ function confirmDelete() {
     });
 }
 
+function applyHealthImportState(data: {native?: Record<string, unknown>} & Record<string, unknown>) {
+    const nextState = {...data, ...(data.native || {})};
+
+    if (healthImport.value?.prefix === '/apple-health') {
+        appleHealthState.value = {...appleHealthState.value, ...nextState};
+        return;
+    }
+
+    healthConnectState.value = {...healthConnectState.value, ...nextState};
+}
+
 async function refreshHealthConnectStatus() {
+    const prefix = healthImport.value?.prefix;
+
+    if (!prefix) {
+        return;
+    }
+
     try {
-        const {data} = await axios.get('/health-connect/status');
-        healthConnectState.value = {...healthConnectState.value, ...data};
+        const {data} = await axios.get(`${prefix}/status`);
+        applyHealthImportState(data);
         refreshTodaySummaryWhenHealthConnectChanged();
     } catch {
-        healthConnectState.value = {...healthConnectState.value, last_error: 'Could not check Health Connect.'};
+        applyHealthImportState({last_error: `Could not check ${healthImport.value?.name ?? 'health data'}.`});
     }
 }
 
 async function connectHealthConnect() {
+    const prefix = healthImport.value?.prefix;
+
+    if (!prefix) {
+        return;
+    }
+
     healthConnectLoading.value = true;
 
     try {
-        const endpoint = healthConnectState.value.status === 'connected' ? '/health-connect/sync' : '/health-connect/connect';
+        const endpoint = healthImport.value?.state.status === 'connected' ? `${prefix}/sync` : `${prefix}/connect`;
         const {data} = await axios.post(endpoint);
-        healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+        applyHealthImportState(data);
         refreshTodaySummaryWhenHealthConnectChanged();
 
         if (shouldPollHealthConnectStatus()) {
-            scheduleHealthConnectStatusRefresh(20, healthConnectState.value.status === 'sync_queued');
+            scheduleHealthConnectStatusRefresh(20, healthImport.value?.state.status === 'sync_queued');
         }
     } finally {
         healthConnectLoading.value = false;
@@ -264,15 +324,21 @@ async function connectHealthConnect() {
 }
 
 async function syncHealthConnect() {
+    const prefix = healthImport.value?.prefix;
+
+    if (!prefix) {
+        return;
+    }
+
     healthConnectLoading.value = true;
 
     try {
-        const {data} = await axios.post('/health-connect/sync');
-        healthConnectState.value = {...healthConnectState.value, ...data, ...(data.native || {})};
+        const {data} = await axios.post(`${prefix}/sync`);
+        applyHealthImportState(data);
         refreshTodaySummaryWhenHealthConnectChanged();
 
         if (shouldPollHealthConnectStatus()) {
-            scheduleHealthConnectStatusRefresh(20, healthConnectState.value.status === 'sync_queued');
+            scheduleHealthConnectStatusRefresh(20, healthImport.value?.state.status === 'sync_queued');
         }
     } finally {
         healthConnectLoading.value = false;
@@ -313,10 +379,10 @@ function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20, waitForSumma
 }
 
 function shouldPollHealthConnectStatus() {
-    return ['permission_requested', 'sync_queued'].includes(healthConnectState.value.status);
+    return ['permission_requested', 'sync_queued'].includes(healthImport.value?.state.status ?? '');
 }
 
-function healthConnectSummaryMarker(state: HealthConnectState) {
+function healthConnectSummaryMarker(state: {last_successful_sync_at?: string | null; last_status?: string | null; synced_records?: number | null; deleted_records?: number | null}) {
     return [
         state.last_successful_sync_at ?? '',
         state.last_status ?? '',
@@ -326,7 +392,7 @@ function healthConnectSummaryMarker(state: HealthConnectState) {
 }
 
 function refreshTodaySummaryWhenHealthConnectChanged() {
-    const marker = healthConnectSummaryMarker(healthConnectState.value);
+    const marker = healthConnectSummaryMarker(healthImport.value?.state ?? {});
 
     if (marker === healthConnectSummaryRefreshMarker.value) {
         return;
@@ -334,7 +400,7 @@ function refreshTodaySummaryWhenHealthConnectChanged() {
 
     healthConnectSummaryRefreshMarker.value = marker;
     router.reload({
-        only: ['summary', 'week', 'healthConnect'],
+        only: ['summary', 'week', 'healthConnect', 'appleHealth'],
     });
 }
 
@@ -344,12 +410,20 @@ function handleVisibilityChange() {
     }
 }
 
-function selectDate(event: Event) {
-    const target = event.target instanceof HTMLInputElement ? event.target : null;
+function selectDate(value: DateValue | DateValue[] | undefined, close: () => void) {
+    const date = Array.isArray(value) ? value[0] : value;
 
-    if (target) {
-        router.visit(`/?date=${target.value}`, {preserveScroll: true});
+    if (!date) {
+        return;
     }
+
+    close();
+
+    if (date.toString() === props.summary.date) {
+        return;
+    }
+
+    router.visit(`/?date=${date.toString()}`, {preserveScroll: true});
 }
 
 function openMeal(entry: MealEntry, mealType: MealType, event: Event) {
@@ -448,7 +522,18 @@ function weekdayLabel(value: string, format: 'short' | 'long') {
 
 watch(() => props.healthConnect, (healthConnect) => {
     healthConnectState.value = {...healthConnectState.value, ...healthConnect};
-    healthConnectSummaryRefreshMarker.value = healthConnectSummaryMarker(healthConnectState.value);
+
+    if (healthImport.value?.prefix === '/health-connect') {
+        healthConnectSummaryRefreshMarker.value = healthConnectSummaryMarker(healthConnectState.value);
+    }
+}, {deep: true});
+
+watch(() => props.appleHealth, (appleHealth) => {
+    appleHealthState.value = {...appleHealthState.value, ...appleHealth};
+
+    if (healthImport.value?.prefix === '/apple-health') {
+        healthConnectSummaryRefreshMarker.value = healthConnectSummaryMarker(appleHealthState.value);
+    }
 }, {deep: true});
 
 onMounted(() => {
@@ -471,20 +556,26 @@ onBeforeUnmount(() => {
         <PageHeader>
             {{ displayDate }}
             <template #actions>
-                <Button as="label" variant="outline" size="icon" class="relative cursor-pointer overflow-hidden rounded-full" aria-label="Select date">
-                    <Calendar :size="20"/>
-                    <input
-                        :value="summary.date"
-                        type="date"
-                        class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-                        aria-label="Select date"
-                        @change="selectDate"
-                    />
-                </Button>
+                <Popover v-slot="{ close }">
+                    <PopoverTrigger as-child>
+                        <Button variant="outline" size="icon" class="rounded-full" aria-label="Select date">
+                            <CalendarIcon :size="20"/>
+                        </Button>
+                    </PopoverTrigger>
+                    <PopoverContent class="w-auto p-0" align="end">
+                        <Calendar
+                            :model-value="selectedDate"
+                            locale="en-GB"
+                            layout="month-and-year"
+                            initial-focus
+                            @update:model-value="(value) => selectDate(value, close)"
+                        />
+                    </PopoverContent>
+                </Popover>
             </template>
         </PageHeader>
 
-        <nav class="grid grid-cols-7 gap-1 rounded-2xl bg-card/70 p-1.5 shadow-card" aria-label="Week">
+        <nav class="grid grid-cols-7 gap-1 rounded-2xl bg-card p-1.5 shadow-card" aria-label="Week">
             <Link
                 v-for="day in week"
                 :key="day.date"
@@ -545,9 +636,7 @@ onBeforeUnmount(() => {
                         {{ Math.round(macro.consumed ?? 0) }}g
                         <span class="text-xs font-medium text-muted-foreground">/ {{ Math.round(macro.goal ?? 0) }}g</span>
                     </p>
-                    <div class="progress-track mt-2 h-1.5">
-                        <div class="progress-fill" :class="macro.color" :style="{ width: `${macroProgress(macro.consumed, macro.goal)}%` }"/>
-                    </div>
+                    <Progress class="mt-2 h-1.5" :model-value="macroProgress(macro.consumed, macro.goal)" :indicator-class="macro.color" />
                 </Link>
             </div>
         </Card>
@@ -595,7 +684,7 @@ onBeforeUnmount(() => {
                         size="icon"
                         class="rounded-full"
                         :disabled="healthConnectLoading"
-                        aria-label="Sync Health Connect"
+                        aria-label="Sync health workouts"
                         @click="syncHealthConnect"
                     >
                         <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
@@ -603,7 +692,7 @@ onBeforeUnmount(() => {
                     <Button
                         v-else
                         size="sm"
-                        :disabled="healthConnectLoading || !healthConnectState.available"
+                        :disabled="healthConnectLoading || !healthImport?.state.available"
                         @click="connectHealthConnect"
                     >
                         Connect
@@ -637,7 +726,7 @@ onBeforeUnmount(() => {
             </Card>
         </section>
 
-        <Button :as="Link" :href="`/weekly?date=${summary.date}`" variant="outline" class="w-full justify-between rounded-2xl">
+        <Button :as="Link" :href="`/weekly?date=${summary.date}`" variant="ghost" class="h-auto w-full justify-between rounded-2xl bg-card px-5 py-4 shadow-card">
             <span class="flex items-center gap-2">
                 <TrendingUp :size="18" />
                 Weekly roundup

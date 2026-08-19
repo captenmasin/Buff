@@ -16,19 +16,19 @@ function formatMacro(value: number) {
 <template>
     <div class="grid grid-cols-4 gap-2 rounded-xl bg-muted/80 p-3 text-center">
         <div>
-            <p class="text-xs font-semibold uppercase text-muted-foreground">Kcal</p>
+            <p class="field-label">Kcal</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ macros.calories }}</p>
         </div>
         <div>
-            <p class="text-xs font-semibold uppercase text-muted-foreground">Protein</p>
+            <p class="field-label">Protein</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(macros.protein_g) }}g</p>
         </div>
         <div>
-            <p class="text-xs font-semibold uppercase text-muted-foreground">Carbs</p>
+            <p class="field-label">Carbs</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(macros.carbs_g) }}g</p>
         </div>
         <div>
-            <p class="text-xs font-semibold uppercase text-muted-foreground">Fat</p>
+            <p class="field-label">Fat</p>
             <p class="mt-1 text-lg font-semibold text-foreground">{{ formatMacro(macros.fat_g) }}g</p>
         </div>
     </div>

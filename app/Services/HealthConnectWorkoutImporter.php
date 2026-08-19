@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\DB;
 
 class HealthConnectWorkoutImporter
 {
-    public function import(array $payload): array
+    public function import(array $payload, string $sourceType = WorkoutEntry::SOURCE_HEALTH_CONNECT): array
     {
-        return DB::transaction(function () use ($payload): array {
+        return DB::transaction(function () use ($payload, $sourceType): array {
             $syncedAt = $this->dateTime($payload['synced_at'] ?? null) ?? now();
             $windowStart = $this->dateTime($payload['window_start'] ?? null) ?? now()->subDays(30);
             $windowEnd = $this->dateTime($payload['window_end'] ?? null) ?? now();
@@ -20,6 +20,8 @@ class HealthConnectWorkoutImporter
             $ignoredIds = HealthConnectIgnoredWorkout::query()->pluck('external_id')->all();
             $importedIds = [];
             $importedCount = 0;
+            $defaultTitle = $this->defaultTitle($sourceType);
+            $syncSourceType = $this->syncSourceType($sourceType);
 
             foreach ($records as $record) {
                 $externalId = trim((string) ($record['external_id'] ?? ''));
@@ -37,11 +39,11 @@ class HealthConnectWorkoutImporter
                 }
 
                 $importedIds[] = $externalId;
-                $title = trim((string) ($record['title'] ?? '')) ?: 'Health Connect workout';
+                $title = trim((string) ($record['title'] ?? '')) ?: $defaultTitle;
 
                 WorkoutEntry::query()->updateOrCreate(
                     [
-                        'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
+                        'source_type' => $sourceType,
                         'external_id' => $externalId,
                     ],
                     [
@@ -62,7 +64,7 @@ class HealthConnectWorkoutImporter
             }
 
             $deleteQuery = WorkoutEntry::query()
-                ->where('source_type', WorkoutEntry::SOURCE_HEALTH_CONNECT)
+                ->where('source_type', $sourceType)
                 ->whereNotNull('external_id')
                 ->whereBetween('started_at', [$windowStart, $windowEnd]);
 
@@ -74,7 +76,7 @@ class HealthConnectWorkoutImporter
             $deleteQuery->get()->each->delete();
 
             HealthConnectSyncState::query()->updateOrCreate(
-                ['source_type' => HealthConnectSyncState::SOURCE_TYPE],
+                ['source_type' => $syncSourceType],
                 [
                     'last_synced_at' => $syncedAt,
                     'last_successful_sync_at' => $syncedAt,
@@ -93,10 +95,10 @@ class HealthConnectWorkoutImporter
         });
     }
 
-    public function recordFailure(string $message): void
+    public function recordFailure(string $message, string $sourceType = WorkoutEntry::SOURCE_HEALTH_CONNECT): void
     {
         HealthConnectSyncState::query()->updateOrCreate(
-            ['source_type' => HealthConnectSyncState::SOURCE_TYPE],
+            ['source_type' => $this->syncSourceType($sourceType)],
             [
                 'last_synced_at' => now(),
                 'last_status' => 'error',
@@ -112,5 +114,19 @@ class HealthConnectWorkoutImporter
         }
 
         return Carbon::parse($value);
+    }
+
+    private function defaultTitle(string $sourceType): string
+    {
+        return $sourceType === WorkoutEntry::SOURCE_APPLE_HEALTH
+            ? 'Apple Health workout'
+            : 'Health Connect workout';
+    }
+
+    private function syncSourceType(string $sourceType): string
+    {
+        return $sourceType === WorkoutEntry::SOURCE_APPLE_HEALTH
+            ? HealthConnectSyncState::APPLE_HEALTH_SOURCE_TYPE
+            : HealthConnectSyncState::SOURCE_TYPE;
     }
 }

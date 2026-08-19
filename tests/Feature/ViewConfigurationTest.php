@@ -1,5 +1,16 @@
 <?php
 
+it('disables webview zoom so the app behaves like a native shell', function (): void {
+    $layout = file_get_contents(resource_path('views/app.blade.php'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($layout)
+        ->toContain('user-scalable=no')
+        ->toContain('maximum-scale=1')
+        ->toContain('viewport-fit=cover')
+        ->and($css)->toContain('touch-action: manipulation');
+});
+
 it('uses a stable compiled view path for copied native builds', function (): void {
     $compiledViewPath = config('view.compiled');
 
@@ -22,19 +33,26 @@ it('shares page chrome across the main screens', function (): void {
     $today = file_get_contents(resource_path('js/Pages/Today.vue'));
     $settings = file_get_contents(resource_path('js/Pages/Settings.vue'));
     $shell = file_get_contents(resource_path('js/Layouts/AppShell.vue'));
+    $macros = file_get_contents(resource_path('js/Components/Add/MacroSummary.vue'));
     $css = file_get_contents(resource_path('css/app.css'));
 
     expect($today)
         ->toContain('PageHeader')
         ->toContain('CalorieRing')
         ->toContain('Start today')
+        ->toContain('rounded-2xl bg-card p-1.5 shadow-card')
+        ->toContain('PopoverTrigger')
+        ->toContain('from \'../Components/ui/calendar\'')
+        ->toContain('layout="month-and-year"')
+        ->not->toContain('type="date"')
         ->not->toContain('kicker')
+        ->not->toContain('bg-card/70')
         ->not->toContain('border-0 bg-secondary shadow-none')
         ->and($settings)->toContain('PageHeader')
         ->and($settings)->not->toContain('kicker')
         ->and($settings)->toContain('deleteAccountOpen')
         ->and($settings)->toContain('openDeleteAccountModal')
-        ->and($settings)->toContain('{{ syncDetail }}')
+        ->and($settings)->not->toContain('{{ syncDetail }}')
         ->and($settings)->not->toContain('Save units')
         ->and($settings)->not->toContain('Save reminders')
         ->and($settings)->toContain('divide-y divide-border/60')
@@ -55,26 +73,37 @@ it('shares page chrome across the main screens', function (): void {
         ->and($shell)->toContain("openAddMode('workout')")
         ->and($shell)->toContain("openAddMode('photo')")
         ->and($shell)->not->toContain('addHref')
+        ->and($macros)->toContain('field-label')
+        ->and($macros)->not->toContain('uppercase')
         ->and($css)->toContain('.page-title')
         ->and($css)->toContain('.bottom-drawer')
         ->and($css)->toContain('.page-kicker')
-        ->toContain('.field-label');
+        ->toContain('.field-label')
+        ->and($css)->not->toContain('text-transform: uppercase');
 });
 
 it('exposes focus, caption, dark domain, and motion tokens', function (): void {
     $css = file_get_contents(resource_path('css/app.css'));
-    $button = file_get_contents(resource_path('js/Components/ui/button/Button.vue'));
+    $button = file_get_contents(resource_path('js/Components/ui/button/index.ts'));
+    $card = file_get_contents(resource_path('js/Components/ui/card/Card.vue'));
     $ring = file_get_contents(resource_path('js/Components/CalorieRing.vue'));
 
     expect($css)
         ->toContain('prefers-reduced-motion')
         ->toContain('prefers-contrast')
+        ->toContain('--primary: #24382b')
+        ->toContain('--background: #f4f4f5')
+        ->toContain('--card: #ffffff')
+        ->toContain('--radius: 0.5rem')
         ->toContain('--protein: #6eb8d8')
-        ->toContain('font-size: 0.75rem')
+        ->toContain('font-size: 0.8125rem')
         ->not->toContain('font-size: 0.7rem')
+        ->not->toContain('font-size: 0.75rem')
         ->and($button)->toContain('focus-visible:ring-2')
         ->and($button)->toContain('text-xs')
         ->and($button)->not->toContain('text-[10px]')
+        ->and($card)->toContain('shadow-card')
+        ->and($card)->not->toContain('ring-1')
         ->and($ring)->toContain('role="img"');
 });
 
@@ -130,7 +159,8 @@ it('routes overlays through AppSheet', function (): void {
     expect($sheet)
         ->toContain('role="dialog"')
         ->toContain('aria-modal')
-        ->toContain('useFocusTrap')
+        ->toContain('Sheet')
+        ->toContain('Dialog')
         ->and($css)->toContain('justify-items: center')
         ->and($shell)->toContain('AppSheet')
         ->and($shell)->not->toContain('h-1 w-10')
@@ -140,17 +170,15 @@ it('routes overlays through AppSheet', function (): void {
         ->and($settings)->toContain('AppSheet');
 });
 
-it('confirms deletes in-app and surfaces sync status', function (): void {
+it('confirms deletes in-app', function (): void {
     $today = file_get_contents(resource_path('js/Pages/Today.vue'));
     $progress = file_get_contents(resource_path('js/Pages/Progress.vue'));
-    $settings = file_get_contents(resource_path('js/Pages/Settings.vue'));
 
     expect($today)
         ->toContain('ConfirmSheet')
         ->not->toContain('window.confirm')
         ->and($progress)->toContain('ConfirmSheet')
-        ->and($progress)->not->toContain('window.confirm')
-        ->and($settings)->toContain('{{ syncDetail }}');
+        ->and($progress)->not->toContain('window.confirm');
 });
 
 it('encodes day status with shape and words', function (): void {

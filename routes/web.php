@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccountController;
+use App\Http\Controllers\AppleHealthController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
@@ -72,4 +73,8 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/health-connect/status', [HealthConnectController::class, 'status']);
     Route::post('/health-connect/connect', [HealthConnectController::class, 'connect']);
     Route::post('/health-connect/sync', [HealthConnectController::class, 'sync']);
+
+    Route::get('/apple-health/status', [AppleHealthController::class, 'status']);
+    Route::post('/apple-health/connect', [AppleHealthController::class, 'connect']);
+    Route::post('/apple-health/sync', [AppleHealthController::class, 'sync']);
 });

@@ -33,6 +33,7 @@ class DashboardController extends Controller
             'week' => $weekSummary->forDate($date)['days'],
             'mealTypes' => MealEntry::MEAL_TYPES,
             'healthConnect' => HealthConnectController::sharedStatus(),
+            'appleHealth' => AppleHealthController::sharedStatus(),
         ]);
     }
 }

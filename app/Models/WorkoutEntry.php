@@ -8,6 +8,8 @@ class WorkoutEntry extends SyncedModel
 
     public const SOURCE_HEALTH_CONNECT = 'health_connect';
 
+    public const SOURCE_APPLE_HEALTH = 'apple_health';
+
     protected $fillable = [
         'date',
         'title',
@@ -39,5 +41,15 @@ class WorkoutEntry extends SyncedModel
     public function isHealthConnect(): bool
     {
         return $this->source_type === self::SOURCE_HEALTH_CONNECT;
+    }
+
+    public function isAppleHealth(): bool
+    {
+        return $this->source_type === self::SOURCE_APPLE_HEALTH;
+    }
+
+    public function isImportedHealth(): bool
+    {
+        return $this->isHealthConnect() || $this->isAppleHealth();
     }
 }

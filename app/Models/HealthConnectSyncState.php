@@ -8,6 +8,8 @@ class HealthConnectSyncState extends Model
 {
     public const SOURCE_TYPE = 'health_connect';
 
+    public const APPLE_HEALTH_SOURCE_TYPE = 'apple_health';
+
     protected $primaryKey = 'source_type';
 
     public $incrementing = false;
@@ -38,6 +40,13 @@ class HealthConnectSyncState extends Model
     {
         return self::query()->firstOrCreate([
             'source_type' => self::SOURCE_TYPE,
+        ]);
+    }
+
+    public static function appleHealth(): self
+    {
+        return self::query()->firstOrCreate([
+            'source_type' => self::APPLE_HEALTH_SOURCE_TYPE,
         ]);
     }
 }

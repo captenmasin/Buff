@@ -6,6 +6,7 @@ import Card from '../Components/Card.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
+import Progress from '../Components/ui/progress/Progress.vue';
 import { formatDisplayDate } from '../dateFormat';
 import { dayStatusClass, dayStatusLabel, type DayStatus } from '../dayStatus';
 
@@ -147,9 +148,7 @@ function applySelection() {
                 </div>
             </div>
 
-            <div class="mt-3 progress-track h-2.5">
-                <div class="progress-fill bg-success" :style="{ width: `${progress(roundup.calories, roundup.effective_target)}%` }" />
-            </div>
+            <Progress class="mt-3 h-2.5" :model-value="progress(roundup.calories, roundup.effective_target)" indicator-class="bg-success" />
 
             <div class="mt-5 grid grid-cols-3 gap-3">
                 <div v-for="macro in macroCards" :key="macro.label" class="min-w-0">
@@ -158,9 +157,7 @@ function applySelection() {
                         {{ Math.round(macro.consumed) }}g
                         <span class="text-xs font-medium text-muted-foreground">/ {{ Math.round(macro.goal ?? 0) }}g</span>
                     </p>
-                    <div class="progress-track mt-1.5 h-1.5">
-                        <div class="progress-fill" :class="macro.color" :style="{ width: `${progress(macro.consumed, macro.goal)}%` }" />
-                    </div>
+                    <Progress class="mt-1.5 h-1.5" :model-value="progress(macro.consumed, macro.goal)" :indicator-class="macro.color" />
                 </div>
             </div>
         </Card>

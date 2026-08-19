@@ -43,6 +43,19 @@ it('allows nativephp android embedded loopback requests', function (): void {
         ->assertOk();
 });
 
+it('allows nativephp ios embedded loopback requests', function (): void {
+    config(['app.allow_remote_http' => false]);
+
+    $this
+        ->withServerVariables([
+            'REMOTE_ADDR' => '0.0.0.0',
+            'NATIVEPHP_RUNNING' => 'true',
+            'NATIVEPHP_PLATFORM' => 'ios',
+        ])
+        ->get('/')
+        ->assertOk();
+});
+
 it('rejects nativephp runtime claims from remote addresses', function (): void {
     config(['app.allow_remote_http' => false]);
 

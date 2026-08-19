@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\WorkoutEntry;
 use App\Models\HealthConnectIgnoredWorkout;
+use App\Models\WorkoutEntry;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -34,7 +34,7 @@ class WorkoutController extends Controller
     {
         $date = $workoutEntry->date->toDateString();
 
-        if ($workoutEntry->isHealthConnect() && $workoutEntry->external_id) {
+        if ($workoutEntry->isImportedHealth() && $workoutEntry->external_id) {
             HealthConnectIgnoredWorkout::query()->firstOrCreate(
                 ['external_id' => $workoutEntry->external_id],
                 ['ignored_at' => now()],
