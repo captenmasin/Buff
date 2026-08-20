@@ -23,6 +23,7 @@ class BuffSyncService
         private readonly BuffApiClient $api,
         private readonly BuffCredentialStore $credentials,
         private readonly MealReminderBridge $mealReminders,
+        private readonly BodyMetricPhotoUploader $bodyMetricPhotos,
     ) {}
 
     public function resume(): BuffApiResult
@@ -133,6 +134,7 @@ class BuffSyncService
         } while ($pullOnly);
 
         $this->retryPendingConfirmations();
+        $this->bodyMetricPhotos->flushPending();
 
         return BuffApiResult::success([
             'cursor' => $state->cursor,

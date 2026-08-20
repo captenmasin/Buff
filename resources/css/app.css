@@ -10,6 +10,14 @@
 
 @custom-variant dark (&:is(.dark *));
 
+@custom-variant hover {
+    @media (hover: hover) and (pointer: fine) {
+        &:hover {
+            @slot;
+        }
+    }
+}
+
 :root {
     --background: #f4f4f5;
     --foreground: #24382b;
@@ -46,6 +54,9 @@
     --warning-soft: #fbf3dc;
     --warning-soft-foreground: #6b4a08;
     --radius: 0.5rem;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
     --card-shadow: 0 1px 2px rgb(36 56 43 / 0.04), 0 8px 24px rgb(36 56 43 / 0.05);
     --chart-1: #2f8fbd;
     --chart-2: #e07a2f;
@@ -171,6 +182,9 @@
     --color-chart-3: var(--chart-3);
     --color-chart-2: var(--chart-2);
     --color-chart-1: var(--chart-1);
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 html,
@@ -191,7 +205,25 @@ button,
 input,
 select,
 textarea {
-    font: inherit;
+    font-family: inherit;
+    font-feature-settings: inherit;
+    letter-spacing: inherit;
+}
+
+[data-slot='button'] {
+    transition:
+        color 150ms ease,
+        background-color 150ms ease,
+        border-color 150ms ease,
+        box-shadow 150ms ease,
+        opacity 150ms ease,
+        transform 100ms var(--ease-out);
+}
+
+[data-slot='button']:active:not([aria-haspopup]):not(.active\:scale-95) {
+    transform: scale(0.97);
+    transition-duration: 160ms;
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
 }
 
 .app-shell {
@@ -330,18 +362,38 @@ textarea {
         scroll-behavior: auto;
     }
 
-    .app-shell *,
+    .app-shell *:not(.animate-spin):not([data-slot='dialog-overlay']):not([data-slot='dialog-content']):not([data-slot='alert-dialog-overlay']):not([data-slot='alert-dialog-content']),
     .bottom-drawer,
-    .sheet-scrim,
-    .sheet-scrim *,
     [data-slot='sheet-overlay'],
+    [data-slot='sheet-content'] {
+        animation: none !important;
+        transition-property: color, background-color, border-color, box-shadow, opacity !important;
+    }
+
     [data-slot='sheet-content'],
+    [data-slot='button'] {
+        transform: none !important;
+        translate: none !important;
+        scale: none !important;
+    }
+
     [data-slot='dialog-overlay'],
     [data-slot='dialog-content'],
     [data-slot='alert-dialog-overlay'],
     [data-slot='alert-dialog-content'] {
-        animation: none !important;
-        transition: none !important;
+        --tw-enter-translate-x: 0 !important;
+        --tw-enter-translate-y: 0 !important;
+        --tw-enter-scale: 1 !important;
+        --tw-exit-translate-x: 0 !important;
+        --tw-exit-translate-y: 0 !important;
+        --tw-exit-scale: 1 !important;
+        transform: none !important;
+        scale: none !important;
+    }
+
+    .app-shell [role='status'] {
+        transform: none !important;
+        translate: none !important;
     }
 }
 

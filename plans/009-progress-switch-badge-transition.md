@@ -1,6 +1,6 @@
 # 009 — Replace remaining `transition-all` on Progress, Switch, and Badge
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: LOW
 - **Category**: Performance

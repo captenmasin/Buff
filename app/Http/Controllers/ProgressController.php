@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\DailyGoal;
+use App\Services\BodyMetricPhotoUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -92,8 +93,9 @@ class ProgressController extends Controller
         return back()->with('message', 'Body profile saved.');
     }
 
-    public function destroy(BodyMetric $bodyMetric): RedirectResponse
+    public function destroy(BodyMetric $bodyMetric, BodyMetricPhotoUploader $photos): RedirectResponse
     {
+        $photos->discardForMetric($bodyMetric->id);
         $bodyMetric->delete();
 
         return back()->with('message', 'Progress item removed.');

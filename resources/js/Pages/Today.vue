@@ -580,7 +580,7 @@ onBeforeUnmount(() => {
                 v-for="day in week"
                 :key="day.date"
                 :href="`/?date=${day.date}`"
-                class="relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold transition"
+                class="relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold"
                 :class="day.is_selected ? 'bg-secondary text-foreground' : 'text-muted-foreground active:bg-muted'"
                 :aria-label="`${weekdayLabel(day.date, 'long')} ${day.date}, ${dayStatusLabel(day.status)}${day.is_today ? ', today' : ''}`"
             >
@@ -740,7 +740,16 @@ onBeforeUnmount(() => {
         </Button>
 
         <AppSheet :open="Boolean(mealSheetMode && selectedMeal)" labelled-by="meal-sheet-title" @close="closeMeal">
-                <template v-if="mealSheetMode === 'details'">
+            <Transition
+                mode="out-in"
+                enter-active-class="transition duration-200 ease-out"
+                enter-from-class="opacity-0"
+                enter-to-class="opacity-100"
+                leave-active-class="transition duration-200 ease-out"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
+            >
+                <div v-if="mealSheetMode === 'details'" key="details">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                         <p class="field-label">{{ mealLabels[selectedMeal.meal_type] }}</p>
@@ -786,8 +795,8 @@ onBeforeUnmount(() => {
                     <Button type="button" variant="surface" @click="startEditingMeal"><Pencil :size="18" />Edit</Button>
                     <Button type="button" variant="destructive" @click="requestDelete('meal', selectedMeal.id, 'Delete this meal?')"><Trash2 :size="18" />Delete</Button>
                 </div>
-                </template>
-                <template v-else>
+                </div>
+                <div v-else key="edit">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 id="meal-sheet-title" class="text-xl font-semibold tracking-tight">Edit meal</h2>
                     <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close meal editor" @click="closeMeal">
@@ -825,7 +834,8 @@ onBeforeUnmount(() => {
                         Save meal
                     </Button>
                 </form>
-                </template>
+                </div>
+            </Transition>
         </AppSheet>
         <ConfirmSheet
             :open="Boolean(pendingDelete)"

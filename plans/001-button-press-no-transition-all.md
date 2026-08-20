@@ -1,6 +1,6 @@
 # 001 — Give buttons a 160ms scale press and stop `transition-all`
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: HIGH
 - **Category**: Performance + Physicality

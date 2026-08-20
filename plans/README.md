@@ -1,3 +1,41 @@
+# Plans
+
+Each file is self-contained. Execute in a fresh agent with only that markdown file.
+
+## Product plans
+
+Gaps in the calorie-tracker / progress loop (starting weight, charts, recipes, eat-back, weekly insights). Personality: honest tracker, not a bigger diary. Do not add TDEE, micros, water, or health-app weight import unless a plan says so.
+
+### Status
+
+| # | Plan | Severity | Status |
+| --- | --- | --- | --- |
+| 013 | Starting weight on day one | HIGH | TODO |
+| 014 | Date-true charts, longer history | HIGH | TODO |
+| 015 | Smoothed weight trend | HIGH | TODO |
+| 016 | Recipes / copy yesterday | HIGH | TODO |
+| 017 | Eat-back preference | MEDIUM | TODO |
+| 018 | Weekly insights | MEDIUM | TODO |
+
+### Recommended order
+
+1. **013** (onboarding; independent).
+2. **014** then **015** (015’s trend line needs 014’s date axis).
+3. **016** (logging; independent of progress).
+4. **017** then **018** (insights should use eat-back targets).
+
+### Dependencies
+
+- **015** → **014**. If 014 is skipped, copy its X-by-date chart math into 015 before drawing the trend polyline.
+- **018** → **017** recommended, not required. Without 017, insights use the current eat-all-back `effective_target`.
+- **013, 016, 017** have no product-plan dependency.
+
+### Execute
+
+Run one plan at a time, e.g. any agent with only `plans/013-starting-weight-day-one.md`.
+
+---
+
 # Animation plans
 
 Plans from the improve-animations audit of Buff (commit `9e6c09b`). Each file is self-contained. Execute in a fresh agent with no audit context.
@@ -8,18 +46,18 @@ Personality: crisp native-style tracker. Prefer deleting high-frequency motion o
 
 | # | Plan | Severity | Status |
 | --- | --- | --- | --- |
-| 001 | Button press `scale(0.97)` + drop `transition-all` (introduces easing tokens) | HIGH | TODO |
-| 002 | Remove Today week-strip `transition` | HIGH | TODO |
-| 003 | Bottom sheets travel `translateY(100%)` with `--ease-drawer` | HIGH | TODO |
-| 004 | Dialogs `duration-200 ease-out` (feel-check centering) | HIGH | TODO |
-| 005 | Fallback toast leave `ease-out` | MEDIUM | TODO |
-| 006 | `prefers-reduced-motion` keeps opacity/color | MEDIUM | TODO |
-| 007 | Goals split bar: no `width` tween | MEDIUM | TODO |
-| 008 | Gate `hover:` with `(pointer: fine)` | MEDIUM | TODO |
-| 009 | Progress / Switch / Badge: drop `transition-all` | LOW | TODO |
-| 010 | Calorie ring `stroke-dashoffset` 300ms | LOW | TODO |
-| 011 | Meal details ↔ edit opacity crossfade | LOW | TODO |
-| 012 | Onboarding step fade | LOW | TODO |
+| 001 | Button press `scale(0.97)` + drop `transition-all` (introduces easing tokens) | HIGH | DONE |
+| 002 | Remove Today week-strip `transition` | HIGH | DONE |
+| 003 | Bottom sheets travel `translateY(100%)` with `--ease-drawer` | HIGH | DONE |
+| 004 | Dialogs `duration-200 ease-out` (feel-check centering) | HIGH | DONE |
+| 005 | Fallback toast leave `ease-out` | MEDIUM | DONE |
+| 006 | `prefers-reduced-motion` keeps opacity/color | MEDIUM | DONE |
+| 007 | Goals split bar: no `width` tween | MEDIUM | DONE |
+| 008 | Gate `hover:` with `(pointer: fine)` | MEDIUM | DONE |
+| 009 | Progress / Switch / Badge: drop `transition-all` | LOW | DONE |
+| 010 | Calorie ring `stroke-dashoffset` 300ms | LOW | DONE |
+| 011 | Meal details ↔ edit opacity crossfade | LOW | DONE |
+| 012 | Onboarding step fade | LOW | DONE |
 
 Finding 9 (shared tokens as its own cleanup) was **not** selected. Tokens are still introduced in **001** because every later ease-out/drawer plan needs `cubic-bezier(0.23, 1, 0.32, 1)` and `cubic-bezier(0.32, 0.72, 0, 1)` in `@theme inline`. Finding m4 (meal row → bottom sheet instead of centered modal) was **not** selected — 011 only crossfades inner content.
 

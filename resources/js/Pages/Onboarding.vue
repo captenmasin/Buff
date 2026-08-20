@@ -119,6 +119,16 @@ syncDisplayFromStored();
             </div>
         </div>
 
+        <Transition
+            mode="out-in"
+            enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+            enter-from-class="opacity-0"
+            enter-to-class="opacity-100"
+            leave-active-class="transition duration-200 ease-out motion-reduce:transition-none"
+            leave-from-class="opacity-100"
+            leave-to-class="opacity-0"
+        >
+            <div :key="currentStep" class="space-y-5">
         <Card v-if="currentStep === 'Body & Units'">
             <div class="space-y-3">
                 <h2 class="font-semibold">Body & units</h2>
@@ -202,6 +212,8 @@ syncDisplayFromStored();
                 </label>
             </div>
         </Card>
+            </div>
+        </Transition>
 
         <div class="grid grid-cols-2 gap-2">
             <Button type="button" variant="surface" :disabled="step === 0" @click="previousStep">

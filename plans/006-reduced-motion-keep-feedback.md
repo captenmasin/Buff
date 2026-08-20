@@ -1,6 +1,6 @@
 # 006 — Keep opacity and color under `prefers-reduced-motion`
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: MEDIUM
 - **Category**: Accessibility

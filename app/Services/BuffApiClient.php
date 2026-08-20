@@ -67,6 +67,36 @@ class BuffApiClient
         }
     }
 
+    /**
+     * @param  array<int, UploadedFile>  $photos
+     */
+    public function uploadBodyMetricPhotos(string $bodyMetricId, array $photos): BuffApiResult
+    {
+        $request = $this->request(config('buff.http.meal_analysis_timeout'));
+
+        if ($request instanceof BuffApiResult) {
+            return $request;
+        }
+
+        foreach ($photos as $photo) {
+            $request = $request->attach(
+                'photos[]',
+                $photo->get(),
+                $photo->getClientOriginalName(),
+                ['Content-Type' => $photo->getMimeType() ?? 'application/octet-stream'],
+            );
+        }
+
+        try {
+            return $this->result($request->post("body-metrics/{$bodyMetricId}/photos"));
+        } catch (ConnectionException) {
+            return new BuffApiResult(
+                BuffApiStatus::ConnectionFailed,
+                message: 'Could not connect to Buff.',
+            );
+        }
+    }
+
     /** @param array<string, mixed> $data */
     private function send(string $method, string $path, array $data, bool $authenticated = true): BuffApiResult
     {

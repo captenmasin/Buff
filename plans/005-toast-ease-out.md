@@ -1,6 +1,6 @@
 # 005 — Stop using `ease-in` on the fallback toast
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: MEDIUM
 - **Category**: Easing & duration

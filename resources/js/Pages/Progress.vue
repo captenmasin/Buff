@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { Head, router, useForm } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
-import { Pencil, Plus, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
+import axios from 'axios';
+import { computed, onUnmounted, ref } from 'vue';
+import { Camera, Image as ImageIcon, LoaderCircle, Pencil, Plus, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
@@ -10,12 +11,15 @@ import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
 import { formatBodyValue, heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
+import { resizePhoto } from '../photoResize';
 
-interface BodyMetric { id: number; date: string; weight_kg: number; body_fat_percent: number | null; notes: string | null }
+interface BodyMetric { id: string; date: string; weight_kg: number; body_fat_percent: number | null; notes: string | null }
 interface BodyGoals { height_cm: number | null; target_weight_kg: number | null; target_body_fat_percent: number | null }
 interface BodyDelta { weight_kg: number; body_fat_percent: number | null }
 interface UnitPreferences { weight_unit: WeightUnit; height_unit: HeightUnit }
 interface ChartRange { min: number; max: number }
+interface SelectedPhoto { file: File; preview: string }
+interface ProgressPhoto { id: string; url: string; mime_type?: string }
 
 const props = withDefaults(defineProps<{
     today: string;
@@ -28,7 +32,17 @@ const props = withDefaults(defineProps<{
 
 const openSheet = ref<'metric' | 'profile' | null>(null);
 const pendingDelete = ref<BodyMetric | null>(null);
+const photoInput = ref<HTMLInputElement | null>(null);
+const selectedPhotos = ref<SelectedPhoto[]>([]);
+const photoUploadError = ref('');
+const photoUploading = ref(false);
+const photosMetric = ref<BodyMetric | null>(null);
+const remotePhotos = ref<ProgressPhoto[]>([]);
+const remotePhotosLoading = ref(false);
+const photoCache = ref<Record<string, ProgressPhoto[]>>({});
 let sheetTrigger: HTMLElement | null = null;
+let photoRequest = 0;
+
 const metricForm = useForm({
     date: props.today,
     weight_kg: props.latest?.date === props.today ? weightFromKg(props.latest.weight_kg, props.preferences.weight_unit) : '',
@@ -58,19 +72,91 @@ const bodyFatPoints = computed(() => chartPoints(chartMetrics.value.map((metric)
 function open(name: 'metric' | 'profile', event: Event): void {
     sheetTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     openSheet.value = name;
+    photoUploadError.value = '';
+}
+
+function clearSelectedPhotos(): void {
+    selectedPhotos.value.forEach(({preview}) => URL.revokeObjectURL(preview));
+    selectedPhotos.value = [];
 }
 
 function close(): void {
     openSheet.value = null;
     metricForm.clearErrors();
     profileForm.clearErrors();
+    photoUploadError.value = '';
+    clearSelectedPhotos();
     sheetTrigger?.focus();
     sheetTrigger = null;
 }
 
+async function selectProgressPhotos(event: Event): Promise<void> {
+    const input = event.target instanceof HTMLInputElement ? event.target : null;
+    const files = Array.from(input?.files ?? []).slice(0, 3 - selectedPhotos.value.length);
+
+    for (const file of files) {
+        const resized = await resizePhoto(file);
+        selectedPhotos.value.push({file: resized, preview: URL.createObjectURL(resized)});
+    }
+
+    if (input) {
+        input.value = '';
+    }
+}
+
+function removeSelectedPhoto(index: number): void {
+    const [photo] = selectedPhotos.value.splice(index, 1);
+
+    if (photo) {
+        URL.revokeObjectURL(photo.preview);
+    }
+}
+
+async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
+    if (selectedPhotos.value.length === 0) {
+        return true;
+    }
+
+    photoUploading.value = true;
+    photoUploadError.value = '';
+
+    const data = new FormData();
+    selectedPhotos.value.forEach(({file}) => data.append('photos[]', file));
+
+    try {
+        await axios.post(`/progress/body-metrics/${metricId}/photos`, data);
+        delete photoCache.value[metricId];
+
+        return true;
+    } catch (error) {
+        photoUploadError.value = (axios.isAxiosError(error) ? error.response?.data?.message : null)
+            || 'Could not upload progress photos. Check your connection.';
+
+        return false;
+    } finally {
+        photoUploading.value = false;
+    }
+}
+
 function saveMetric(): void {
     metricForm.transform((data) => ({ ...data, weight_kg: weightToKg(data.weight_kg, props.preferences.weight_unit) }))
-        .post('/progress/body-metrics', { preserveScroll: true, onSuccess: close });
+        .post('/progress/body-metrics', {
+            preserveScroll: true,
+            onSuccess: async () => {
+                const metric = props.history.find((entry) => entry.date === metricForm.date)
+                    ?? (props.latest?.date === metricForm.date ? props.latest : null);
+
+                if (metric && selectedPhotos.value.length > 0) {
+                    const uploaded = await uploadSelectedPhotos(metric.id);
+
+                    if (!uploaded) {
+                        return;
+                    }
+                }
+
+                close();
+            },
+        });
 }
 
 function saveProfile(): void {
@@ -107,6 +193,49 @@ function confirmDelete(): void {
         onSuccess: cancelDelete,
     });
 }
+
+async function openPhotos(metric: BodyMetric, event: Event): Promise<void> {
+    sheetTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+    photosMetric.value = metric;
+    remotePhotos.value = photoCache.value[metric.id] ?? [];
+    const request = ++photoRequest;
+
+    if (photoCache.value[metric.id]) {
+        return;
+    }
+
+    remotePhotosLoading.value = true;
+
+    try {
+        const {data} = await axios.get(`/progress/body-metrics/${metric.id}/photos`);
+
+        if (request === photoRequest) {
+            remotePhotos.value = data.photos || [];
+            photoCache.value[metric.id] = remotePhotos.value;
+        }
+    } catch {
+        if (request === photoRequest) {
+            remotePhotos.value = [];
+        }
+    } finally {
+        if (request === photoRequest) {
+            remotePhotosLoading.value = false;
+        }
+    }
+}
+
+function closePhotos(): void {
+    photoRequest++;
+    photosMetric.value = null;
+    remotePhotos.value = [];
+    remotePhotosLoading.value = false;
+    sheetTrigger?.focus();
+    sheetTrigger = null;
+}
+
+onUnmounted(() => {
+    clearSelectedPhotos();
+});
 </script>
 
 <template>
@@ -183,7 +312,22 @@ function confirmDelete(): void {
                                 <p class="text-sm text-muted-foreground">{{ formatBodyValue(weightFromKg(metric.weight_kg, preferences.weight_unit)) }} {{ preferences.weight_unit }}<span v-if="metric.body_fat_percent !== null"> · {{ metric.body_fat_percent }}%</span></p>
                             </div>
                             <p v-if="metric.notes" class="mt-1 text-sm text-muted-foreground">{{ metric.notes }}</p>
+                            <div v-if="photoCache[metric.id]?.length" class="mt-2 flex gap-1.5">
+                                <button
+                                    v-for="photo in photoCache[metric.id].slice(0, 3)"
+                                    :key="photo.id"
+                                    type="button"
+                                    class="h-12 w-12 overflow-hidden rounded-lg bg-muted"
+                                    aria-label="View progress photos"
+                                    @click="openPhotos(metric, $event)"
+                                >
+                                    <img :src="photo.url" alt="" class="h-full w-full object-cover">
+                                </button>
+                            </div>
                         </div>
+                        <Button variant="ghost" size="icon" class="rounded-full" aria-label="View progress photos" @click="openPhotos(metric, $event)">
+                            <ImageIcon :size="18" />
+                        </Button>
                         <Button variant="ghost" size="icon" class="rounded-full" aria-label="Remove progress item" @click="requestDelete(metric)"><Trash2 :size="18" /></Button>
                     </div>
                 </Card>
@@ -217,7 +361,41 @@ function confirmDelete(): void {
                         <span class="field-label">Notes</span>
                         <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
                     </label>
-                    <Button class="w-full" :disabled="metricForm.processing">Save progress</Button>
+                    <div class="space-y-2">
+                        <span class="field-label">Progress photos</span>
+                        <div v-if="selectedPhotos.length" class="grid grid-cols-3 gap-2">
+                            <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                                <img :src="photo.preview" alt="Selected progress" class="h-full w-full object-cover">
+                                <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removeSelectedPhoto(index)">
+                                    <X :size="16" />
+                                </Button>
+                            </div>
+                        </div>
+                        <input
+                            ref="photoInput"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,image/*"
+                            capture="environment"
+                            multiple
+                            class="sr-only"
+                            @change="selectProgressPhotos"
+                        >
+                        <Button
+                            v-if="selectedPhotos.length < 3"
+                            type="button"
+                            variant="surface"
+                            class="w-full"
+                            @click="photoInput?.click()"
+                        >
+                            <Camera :size="18" />
+                            {{ selectedPhotos.length ? 'Add another' : 'Take or choose photo' }}
+                        </Button>
+                        <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                    </div>
+                    <Button class="w-full" :disabled="metricForm.processing || photoUploading">
+                        <LoaderCircle v-if="metricForm.processing || photoUploading" :size="18" class="animate-spin" />
+                        {{ photoUploading ? 'Uploading photos…' : 'Save progress' }}
+                    </Button>
                 </form>
                 <form v-else class="space-y-3" @submit.prevent="saveProfile">
                     <div class="grid grid-cols-2 gap-3">
@@ -239,6 +417,28 @@ function confirmDelete(): void {
                     </label>
                     <Button class="w-full" :disabled="profileForm.processing">Save body profile</Button>
                 </form>
+        </AppSheet>
+        <AppSheet :open="Boolean(photosMetric)" labelled-by="progress-photos-title" @close="closePhotos">
+            <div class="mb-4 flex justify-between gap-3">
+                <h2 id="progress-photos-title" class="text-xl font-semibold tracking-tight">
+                    Photos · {{ photosMetric?.date }}
+                </h2>
+                <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close" @click="closePhotos"><X :size="20" /></Button>
+            </div>
+            <div v-if="remotePhotosLoading" class="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+                <LoaderCircle :size="16" class="animate-spin" />
+                Loading progress photos…
+            </div>
+            <div v-else-if="remotePhotos.length" class="grid grid-cols-2 gap-2">
+                <img
+                    v-for="photo in remotePhotos"
+                    :key="photo.id"
+                    :src="photo.url"
+                    alt="Progress photo"
+                    class="aspect-square w-full rounded-xl object-cover"
+                >
+            </div>
+            <p v-else class="text-sm text-muted-foreground">No photos for this measurement yet.</p>
         </AppSheet>
         <ConfirmSheet
             :open="Boolean(pendingDelete)"

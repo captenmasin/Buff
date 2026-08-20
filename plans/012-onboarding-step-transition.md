@@ -1,6 +1,6 @@
 # 012 — Fade onboarding steps instead of swapping cards
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: LOW
 - **Category**: Missed opportunity

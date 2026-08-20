@@ -1,6 +1,6 @@
 # 008 — Require a fine pointer before `hover:` styles apply
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: MEDIUM
 - **Category**: Accessibility

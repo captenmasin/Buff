@@ -38,7 +38,7 @@ const dashOffset = computed(() => circumference * (1 - progress.value));
                     cy="56"
                     :r="radius"
                     fill="none"
-                    class="stroke-success"
+                    class="stroke-success transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none"
                     stroke-width="8"
                     stroke-linecap="round"
                     :stroke-dasharray="circumference"

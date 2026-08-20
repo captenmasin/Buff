@@ -5,9 +5,10 @@ import { computed, nextTick, ref, watch } from 'vue';
 import Card from '../Components/Card.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
-import Input from '../Components/ui/input/Input.vue';
+import { NumberField, NumberFieldDecrement, NumberFieldIncrement, NumberFieldInput } from '../Components/ui/number-field';
 import { gramsForSplit, hasValidFivePercentSplit, macroPresets, splitFromGrams, splitWithinGramBounds, type MacroSplit } from '../goalMacros';
 import { hapticImpact } from '../haptics';
+import { cn } from '../lib/utils';
 
 const calorieStep = 50;
 const calorieMin = 1;
@@ -44,8 +45,6 @@ const activeSplit = computed<MacroSplit>(() => activePreset.value === null ? cus
 const generatedGrams = computed(() => gramsForSplit(Number(form.calories), activeSplit.value));
 const selectedSplitWithinBounds = computed(() => splitWithinGramBounds(Number(form.calories), activeSplit.value));
 const hasRepresentableSplit = computed(() => hasValidFivePercentSplit(Number(form.calories)));
-const canDecreaseCalories = computed(() => Number(form.calories) > calorieMin);
-const canIncreaseCalories = computed(() => Number(form.calories) < calorieMax);
 const percentageOptions = Array.from({ length: 21 }, (_, index) => index * 5);
 const customScrollerElements: Partial<Record<'protein' | 'carbs', HTMLElement>> = {};
 const scrollerItemHeight = 40;
@@ -65,11 +64,6 @@ function applySplit(split: MacroSplit): void {
     form.protein_g = grams.protein;
     form.carbs_g = grams.carbs;
     form.fat_g = grams.fat;
-}
-
-function nudgeCalories(delta: number): void {
-    hapticImpact();
-    form.calories = Math.min(calorieMax, Math.max(calorieMin, Number(form.calories || 0) + delta));
 }
 
 function selectPreset(index: number): void {
@@ -142,7 +136,13 @@ function save(): void {
     form.put('/goals', { preserveScroll: true });
 }
 
-watch(() => form.calories, () => applySplit(activeSplit.value));
+watch(() => form.calories, (value, previous) => {
+    if (Math.abs(Number(value) - Number(previous)) === calorieStep) {
+        hapticImpact();
+    }
+
+    applySplit(activeSplit.value);
+});
 </script>
 
 <template>
@@ -151,41 +151,34 @@ watch(() => form.calories, () => applySplit(activeSplit.value));
         <PageHeader>Goals</PageHeader>
         <form class="space-y-4" @submit.prevent="save">
             <Card>
-                <div class="flex items-center gap-3">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        class="rounded-full"
-                        :disabled="!canDecreaseCalories"
-                        aria-label="Decrease calories by 50"
-                        @click="nudgeCalories(-calorieStep)"
-                    >
-                        <Minus :size="20" />
-                    </Button>
+                <NumberField
+                    v-model="form.calories"
+                    :min="calorieMin"
+                    :max="calorieMax"
+                    :step="calorieStep"
+                    :step-snapping="false"
+                    disable-wheel-change
+                    :format-options="{ useGrouping: false, maximumFractionDigits: 0 }"
+                    class="flex items-center gap-3"
+                >
+                    <NumberFieldDecrement as-child class="relative top-auto left-auto translate-y-0 p-0">
+                        <Button type="button" variant="outline" size="icon" class="rounded-full" aria-label="Decrease calories by 50">
+                            <Minus :size="20" />
+                        </Button>
+                    </NumberFieldDecrement>
                     <label class="min-w-0 flex-1 text-center">
                         <span class="field-label">Calories</span>
-                        <Input
-                            v-model.number="form.calories"
-                            type="number"
-                            :min="calorieMin"
-                            :max="calorieMax"
-                            class="mt-1 border-0 bg-transparent px-0 text-center text-[2.35rem] font-semibold leading-none tracking-tight tabular-nums shadow-none [appearance:textfield] focus:border-transparent focus:bg-transparent focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                        <NumberFieldInput
+                            :class="cn('mt-1 h-auto border-0 bg-transparent px-0 py-1 text-center text-5xl font-bold leading-none tracking-tight tabular-nums shadow-none md:text-5xl focus:border-transparent focus:bg-transparent focus-visible:ring-2 focus-visible:ring-ring')"
                         />
                         <span class="mt-1 block text-sm text-muted-foreground">kcal per day</span>
                     </label>
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        class="rounded-full"
-                        :disabled="!canIncreaseCalories"
-                        aria-label="Increase calories by 50"
-                        @click="nudgeCalories(calorieStep)"
-                    >
-                        <Plus :size="20" />
-                    </Button>
-                </div>
+                    <NumberFieldIncrement as-child class="relative top-auto right-auto translate-y-0 p-0">
+                        <Button type="button" variant="outline" size="icon" class="rounded-full" aria-label="Increase calories by 50">
+                            <Plus :size="20" />
+                        </Button>
+                    </NumberFieldIncrement>
+                </NumberField>
                 <p v-if="form.errors.calories" class="mt-2 text-center text-sm text-destructive">{{ form.errors.calories }}</p>
 
                 <div
@@ -196,7 +189,7 @@ watch(() => form.calories, () => applySplit(activeSplit.value));
                     <div
                         v-for="macro in macros"
                         :key="macro.key"
-                        class="h-full transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                        class="h-full"
                         :class="macro.color"
                         :style="{ width: `${macro.percent}%` }"
                     />

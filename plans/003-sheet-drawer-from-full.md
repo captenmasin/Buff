@@ -1,6 +1,6 @@
 # 003 — Slide sheets from off-screen with the drawer curve
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: HIGH
 - **Category**: Easing & duration + Physicality + Interruptibility

@@ -1,6 +1,6 @@
 # 004 — Give dialogs 200ms ease-out scale, not 100ms `ease`
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: HIGH
 - **Category**: Easing & duration + Physicality

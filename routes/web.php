@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccountController;
 use App\Http\Controllers\AppleHealthController;
+use App\Http\Controllers\BodyMetricPhotoController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
@@ -53,6 +54,9 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
     Route::put('/progress/body-profile', [ProgressController::class, 'updateBodyProfile']);
     Route::delete('/progress/body-metrics/{bodyMetric}', [ProgressController::class, 'destroy']);
+    Route::post('/progress/body-metrics/{bodyMetric}/photos', [BodyMetricPhotoController::class, 'store']);
+    Route::get('/progress/body-metrics/{bodyMetric}/photos', [BodyMetricPhotoController::class, 'index']);
+    Route::delete('/progress/body-metrics/{bodyMetric}/photos/{photo}', [BodyMetricPhotoController::class, 'destroy']);
 
     Route::get('/add', [MealController::class, 'create']);
     Route::post('/barcode/lookup', [MealController::class, 'lookupBarcode']);

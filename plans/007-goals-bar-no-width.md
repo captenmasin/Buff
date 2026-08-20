@@ -1,6 +1,6 @@
 # 007 — Stop animating width on the Goals split bar
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: MEDIUM
 - **Category**: Performance

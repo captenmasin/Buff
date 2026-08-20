@@ -99,9 +99,18 @@ it('exposes focus, caption, dark domain, and motion tokens', function (): void {
         ->toContain('font-size: 0.8125rem')
         ->not->toContain('font-size: 0.7rem')
         ->not->toContain('font-size: 0.75rem')
+        ->and($css)->toContain('font-family: inherit')
+        ->and($css)->not->toContain('font: inherit')
+        ->and($css)->toContain('--ease-out: cubic-bezier(0.23, 1, 0.32, 1)')
+        ->and($css)->toContain('--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1)')
+        ->and($css)->toContain('transition-property: color, background-color, border-color, box-shadow, opacity')
+        ->and($css)->not->toContain('transition: none !important')
+        ->and($css)->toContain('(pointer: fine)')
         ->and($button)->toContain('focus-visible:ring-2')
         ->and($button)->toContain('text-xs')
         ->and($button)->not->toContain('text-[10px]')
+        ->and($button)->not->toContain('transition-all')
+        ->and($button)->not->toContain('translate-y-px')
         ->and($card)->toContain('shadow-card')
         ->and($card)->not->toContain('ring-1')
         ->and($ring)->toContain('role="img"');
@@ -136,8 +145,14 @@ it('presents goals as a calorie target and named macro split', function (): void
 
     expect($goals)
         ->toContain('PageHeader')
-        ->toContain('nudgeCalories')
+        ->toContain('NumberField')
+        ->toContain('NumberFieldDecrement')
+        ->toContain('NumberFieldIncrement')
         ->toContain('kcal per day')
+        ->toContain(':class="cn(\'mt-1 h-auto')
+        ->toContain('text-5xl font-bold')
+        ->toContain('md:text-5xl')
+        ->not->toContain('nudgeCalories')
         ->toContain('High protein')
         ->toContain('Balanced')
         ->toContain('Higher fat')
@@ -156,12 +171,21 @@ it('presents goals as a calorie target and named macro split', function (): void
         ->not->toContain('100% allocated');
 });
 
+it('does not animate the today week strip', function (): void {
+    $today = file_get_contents(resource_path('js/Pages/Today.vue'));
+
+    expect($today)
+        ->toContain('aria-label="Week"')
+        ->toContain('relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold')
+        ->not->toContain('flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold transition');
+});
+
 it('highlights meal rows across the card instead of hugging the text', function (): void {
     $today = file_get_contents(resource_path('js/Pages/Today.vue'));
 
     expect($today)
         ->toContain('-mx-5 mt-1 divide-y divide-border/60')
-        ->toContain('rounded-none px-5 py-2.5 text-left')
+        ->toContain('rounded-none border-0 px-5 py-2.5 text-left')
         ->not->toContain('h-auto min-w-0 flex-1 items-center justify-between gap-3 p-0 text-left');
 });
 

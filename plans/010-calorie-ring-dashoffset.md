@@ -1,6 +1,6 @@
 # 010 — Ease the calorie ring dashoffset
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: LOW
 - **Category**: Missed opportunity

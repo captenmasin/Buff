@@ -17,11 +17,15 @@ use Illuminate\Support\Facades\DB;
 
 class LocalAccountData
 {
-    public function __construct(private readonly MealReminderBridge $mealReminders) {}
+    public function __construct(
+        private readonly MealReminderBridge $mealReminders,
+        private readonly BodyMetricPhotoUploader $bodyMetricPhotos,
+    ) {}
 
     public function wipe(): void
     {
         $this->mealReminders->sync((new AppPreference)->mealReminders());
+        $this->bodyMetricPhotos->discardAll();
 
         DB::transaction(function (): void {
             MealEntry::query()->delete();

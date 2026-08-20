@@ -1,6 +1,6 @@
 # 002 — Remove the week-strip transition on Today
 
-- **Status**: TODO
+- **Status**: DONE
 - **Commit**: 9e6c09b
 - **Severity**: HIGH
 - **Category**: Purpose & frequency
