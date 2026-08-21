@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <title inertia>{{ config('app.name', 'Buff') }}</title>
+        <link rel="icon" type="image/png" href="/icon.png">
         @vite(['resources/css/app.css', 'resources/js/app.ts'])
         @inertiaHead
     </head>

@@ -94,6 +94,17 @@ it('creates a barcode meal from a liquid product portion', function (): void {
         ->and($entry->portion_unit)->toBe('ml');
 });
 
+it('passes a selected meal type to the add page', function (): void {
+    $this->get('/add?mode=food&meal=lunch&date=2026-05-19')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->where('mode', 'food')
+            ->where('meal', 'lunch')
+            ->where('date', '2026-05-19')
+        );
+});
+
 it('opens the add page in scan mode', function (): void {
     $this->get('/add?mode=food&scan=1')
         ->assertOk()

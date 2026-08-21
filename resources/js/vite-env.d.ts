@@ -1,6 +1,10 @@
 /// <reference types="vite/client" />
 
 declare module '#nativephp' {
+    export const Browser: {
+        auth(url: string): Promise<boolean>;
+    };
+
     export const Dialog: {
         toast(message: string, duration?: string): Promise<{ success: boolean }>;
     };

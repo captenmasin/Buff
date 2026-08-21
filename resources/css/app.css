@@ -1,3 +1,6 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "shadcn-vue/tailwind.css";
@@ -19,6 +22,13 @@
 }
 
 :root {
+    --vis-tooltip-background-color: transparent !important;
+    --vis-tooltip-border-color: transparent !important;
+    --vis-tooltip-text-color: none !important;
+    --vis-tooltip-shadow-color: none !important;
+    --vis-tooltip-backdrop-filter: none !important;
+    --vis-tooltip-padding: 0px !important;
+    --vis-tooltip-box-shadow: none !important;
     --background: #f4f4f5;
     --foreground: #24382b;
     --card: #ffffff;
@@ -260,6 +270,14 @@ textarea {
     font-weight: 600;
     letter-spacing: -0.038em;
     line-height: 1.12;
+    color: var(--foreground);
+}
+
+.card-title {
+    font-size: 1.125rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    line-height: 1.25;
     color: var(--foreground);
 }
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\BodyMetricPhotoPose;
 use App\BuffApiStatus;
 use App\Models\BodyMetric;
 use App\Services\BodyMetricPhotoUploader;
@@ -9,7 +10,10 @@ use App\Services\BuffApiClient;
 use App\Services\BuffApiResult;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BodyMetricPhotoController extends Controller
 {
@@ -18,14 +22,43 @@ class BodyMetricPhotoController extends Controller
         $validated = $request->validate([
             'photos' => ['required', 'array', 'min:1', 'max:3'],
             'photos.*' => ['required', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
+            'poses' => ['required', 'array', 'min:1', 'max:3'],
+            'poses.*' => ['required', 'distinct', Rule::enum(BodyMetricPhotoPose::class)],
         ]);
 
-        return $this->response($uploader->upload($bodyMetric, $validated['photos']));
+        if (count($validated['photos']) !== count($validated['poses'])) {
+            throw ValidationException::withMessages([
+                'poses' => ['Each photo must have a pose.'],
+            ]);
+        }
+
+        return $this->response($uploader->upload($bodyMetric, $validated['photos'], $validated['poses']));
     }
 
-    public function index(BodyMetric $bodyMetric, BuffApiClient $api): JsonResponse
+    public function index(BodyMetric $bodyMetric, BuffApiClient $api, BodyMetricPhotoUploader $uploader): JsonResponse
     {
-        return $this->response($api->get("body-metrics/{$bodyMetric->id}/photos"));
+        $result = $api->get("body-metrics/{$bodyMetric->id}/photos");
+        $cloudPhotos = $result->successful() ? ($result->data['photos'] ?? []) : [];
+
+        if (is_array($cloudPhotos) && $cloudPhotos !== []) {
+            return $this->response($result);
+        }
+
+        $pending = $uploader->pendingPhotosFor($bodyMetric);
+
+        if ($pending !== []) {
+            return response()->json([
+                'photos' => $pending,
+                'pending' => true,
+            ]);
+        }
+
+        return $this->response($result);
+    }
+
+    public function pending(BodyMetric $bodyMetric, string $pending, int $index, BodyMetricPhotoUploader $uploader): StreamedResponse
+    {
+        return $uploader->pendingPhotoResponse($bodyMetric, $pending, $index);
     }
 
     public function destroy(BodyMetric $bodyMetric, string $photo, BuffApiClient $api): JsonResponse

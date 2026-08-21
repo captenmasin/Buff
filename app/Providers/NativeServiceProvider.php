@@ -8,6 +8,7 @@ use Buff\CameraPermissions\CameraPermissionsServiceProvider;
 use Buff\HealthConnect\HealthConnectServiceProvider;
 use Buff\NativeRefresh\NativeRefreshServiceProvider;
 use Illuminate\Support\ServiceProvider;
+use Native\Mobile\Providers\BrowserServiceProvider;
 
 class NativeServiceProvider extends ServiceProvider
 {
@@ -32,6 +33,8 @@ class NativeServiceProvider extends ServiceProvider
             HealthConnectServiceProvider::class,
             NativeRefreshServiceProvider::class,
             BackgroundTasksServiceProvider::class,
+            BrowserServiceProvider::class,
+
         ];
     }
 }

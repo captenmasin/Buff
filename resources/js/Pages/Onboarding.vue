@@ -2,7 +2,9 @@
 import { Head, useForm, usePage } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 import { ArrowLeft, ArrowRight, Check } from '@lucide/vue';
+import BodyProfileEditor from '../Components/BodyProfileEditor.vue';
 import Card from '../Components/Card.vue';
+import DailyTargetsEditor from '../Components/DailyTargetsEditor.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
@@ -11,6 +13,7 @@ import SelectContent from '../Components/ui/select/SelectContent.vue';
 import SelectItem from '../Components/ui/select/SelectItem.vue';
 import SelectTrigger from '../Components/ui/select/SelectTrigger.vue';
 import SelectValue from '../Components/ui/select/SelectValue.vue';
+import { type ActivityLevel, type Sex } from '../bodyProfile';
 import { heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
 
 defineOptions({ layout: null });
@@ -22,6 +25,10 @@ const props = defineProps<{
         carbs_g: number;
         fat_g: number;
         height_cm: number | null;
+        age: number | null;
+        sex: Sex | null;
+        activity_level: ActivityLevel | null;
+        current_weight_kg: number | null;
         target_weight_kg: number | null;
         target_body_fat_percent: number | null;
         weight_unit: WeightUnit;
@@ -31,7 +38,9 @@ const props = defineProps<{
 
 const page = usePage<{ flash?: { message?: string } }>();
 const step = ref(0);
-const weightDisplay = ref('');
+const targetsValid = ref(true);
+const currentWeightDisplay = ref('');
+const targetWeightDisplay = ref('');
 const heightDisplay = ref('');
 const form = useForm({
     calories: props.defaults.calories,
@@ -39,6 +48,10 @@ const form = useForm({
     carbs_g: props.defaults.carbs_g,
     fat_g: props.defaults.fat_g,
     height_cm: props.defaults.height_cm ?? '',
+    age: props.defaults.age ?? '',
+    sex: props.defaults.sex ?? '',
+    activity_level: props.defaults.activity_level ?? '',
+    current_weight_kg: props.defaults.current_weight_kg ?? '',
     target_weight_kg: props.defaults.target_weight_kg ?? '',
     target_body_fat_percent: props.defaults.target_body_fat_percent ?? '',
     weight_unit: props.defaults.weight_unit,
@@ -47,23 +60,23 @@ const form = useForm({
 
 const steps = ['Daily Targets', 'Body & Units'];
 const currentStep = computed(() => steps[step.value]);
-const macroCalories = computed(() => Math.round((Number(form.protein_g) * 4) + (Number(form.carbs_g) * 4) + (Number(form.fat_g) * 9)));
-const macrosMatch = computed(() => macroCalories.value === Number(form.calories));
 
 function syncDisplayFromStored() {
-    weightDisplay.value = form.target_weight_kg === '' ? '' : String(weightFromKg(Number(form.target_weight_kg), form.weight_unit));
+    currentWeightDisplay.value = form.current_weight_kg === '' ? '' : String(weightFromKg(Number(form.current_weight_kg), form.weight_unit));
+    targetWeightDisplay.value = form.target_weight_kg === '' ? '' : String(weightFromKg(Number(form.target_weight_kg), form.weight_unit));
     heightDisplay.value = form.height_cm === '' ? '' : String(heightFromCm(Number(form.height_cm), form.height_unit));
 }
 
 function syncStoredFromDisplay(weightUnit: WeightUnit = form.weight_unit, heightUnit: HeightUnit = form.height_unit) {
-    form.target_weight_kg = weightToKg(weightDisplay.value, weightUnit);
+    form.current_weight_kg = weightToKg(currentWeightDisplay.value, weightUnit);
+    form.target_weight_kg = weightToKg(targetWeightDisplay.value, weightUnit);
     form.height_cm = heightToCm(heightDisplay.value, heightUnit);
 }
 
 function nextStep() {
     syncStoredFromDisplay();
 
-    if (currentStep.value === 'Daily Targets' && !macrosMatch.value) {
+    if (currentStep.value === 'Daily Targets' && !targetsValid.value) {
         return;
     }
 
@@ -108,17 +121,6 @@ syncDisplayFromStored();
 
         <p v-if="page.props.flash?.message" class="rounded-xl bg-secondary px-4 py-3 text-sm" role="status">{{ page.props.flash.message }}</p>
 
-        <div class="grid grid-cols-2 gap-2">
-            <div
-                v-for="(label, index) in steps"
-                :key="label"
-                class="rounded-xl border px-3 py-2 text-center text-sm font-semibold"
-                :class="index === step ? 'border-primary bg-secondary text-foreground' : 'border-border text-muted-foreground'"
-            >
-                {{ label }}
-            </div>
-        </div>
-
         <Transition
             mode="out-in"
             enter-active-class="transition duration-200 ease-out motion-reduce:transition-none"
@@ -131,7 +133,7 @@ syncDisplayFromStored();
             <div :key="currentStep" class="space-y-5">
         <Card v-if="currentStep === 'Body & Units'">
             <div class="space-y-3">
-                <h2 class="font-semibold">Body & units</h2>
+                <h2 class="card-title">Body & units</h2>
                 <label class="block">
                     <span class="field-label">Weight</span>
                     <Select v-model="form.weight_unit" class="mt-1">
@@ -152,59 +154,50 @@ syncDisplayFromStored();
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="cm">Centimeters</SelectItem>
-                            <SelectItem value="in">Inches</SelectItem>
+                            <SelectItem value="in">Feet and inches</SelectItem>
                         </SelectContent>
                     </Select>
                 </label>
             </div>
         </Card>
 
-        <Card v-if="currentStep === 'Daily Targets'">
+        <DailyTargetsEditor
+            v-if="currentStep === 'Daily Targets'"
+            v-model:calories="form.calories"
+            v-model:protein_g="form.protein_g"
+            v-model:carbs_g="form.carbs_g"
+            v-model:fat_g="form.fat_g"
+            :errors="form.errors"
+            @valid="targetsValid = $event"
+        />
+
+        <Card v-if="currentStep === 'Body & Units'">
             <div class="space-y-3">
-                <h2 class="font-semibold">Daily targets</h2>
-                <label class="block">
-                    <span class="field-label">Calories</span>
-                    <Input v-model.number="form.calories" type="number" min="1" class="mt-1" />
-                    <span v-if="form.errors.calories" class="mt-1 block text-sm text-destructive">{{ form.errors.calories }}</span>
-                </label>
-                <div class="grid grid-cols-3 gap-2">
-                    <label>
-                        <span class="field-label">Protein</span>
-                        <Input v-model.number="form.protein_g" type="number" min="0" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.protein_g" class="mt-1 block text-sm text-destructive">{{ form.errors.protein_g }}</span>
-                    </label>
-                    <label>
-                        <span class="field-label">Carbs</span>
-                        <Input v-model.number="form.carbs_g" type="number" min="0" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.carbs_g" class="mt-1 block text-sm text-destructive">{{ form.errors.carbs_g }}</span>
-                    </label>
-                    <label>
-                        <span class="field-label">Fat</span>
-                        <Input v-model.number="form.fat_g" type="number" min="0" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.fat_g" class="mt-1 block text-sm text-destructive">{{ form.errors.fat_g }}</span>
-                    </label>
-                </div>
-                <p class="rounded-xl p-3 text-sm" :class="macrosMatch ? 'bg-success-soft text-success-soft-foreground' : 'bg-danger-soft text-danger-soft-foreground'">
-                    {{ macroCalories }} kcal from macros
-                </p>
+                <h2 class="card-title">Body profile</h2>
+                <BodyProfileEditor
+                    v-model:age="form.age"
+                    v-model:sex="form.sex"
+                    v-model:height="heightDisplay"
+                    v-model:activity_level="form.activity_level"
+                    :height-unit="form.height_unit"
+                    :errors="form.errors"
+                />
             </div>
         </Card>
 
         <Card v-if="currentStep === 'Body & Units'">
             <div class="space-y-3">
-                <h2 class="font-semibold">Body profile</h2>
-                <div class="grid grid-cols-2 gap-3">
-                    <label>
-                        <span class="field-label">Height {{ form.height_unit }}</span>
-                        <Input v-model="heightDisplay" type="number" min="1" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.height_cm" class="mt-1 block text-sm text-destructive">{{ form.errors.height_cm }}</span>
-                    </label>
-                    <label>
-                        <span class="field-label">Target {{ form.weight_unit }}</span>
-                        <Input v-model="weightDisplay" type="number" min="1" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.target_weight_kg" class="mt-1 block text-sm text-destructive">{{ form.errors.target_weight_kg }}</span>
-                    </label>
-                </div>
+                <h2 class="card-title">Body goals</h2>
+                <label class="block">
+                    <span class="field-label">Current {{ form.weight_unit }}</span>
+                    <Input v-model="currentWeightDisplay" type="number" min="1" step="0.1" class="mt-1" />
+                    <span v-if="form.errors.current_weight_kg" class="mt-1 block text-sm text-destructive">{{ form.errors.current_weight_kg }}</span>
+                </label>
+                <label class="block">
+                    <span class="field-label">Target {{ form.weight_unit }}</span>
+                    <Input v-model="targetWeightDisplay" type="number" min="1" step="0.1" class="mt-1" />
+                    <span v-if="form.errors.target_weight_kg" class="mt-1 block text-sm text-destructive">{{ form.errors.target_weight_kg }}</span>
+                </label>
                 <label class="block">
                     <span class="field-label">Target body fat %</span>
                     <Input v-model.number="form.target_body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" />
@@ -223,12 +216,12 @@ syncDisplayFromStored();
             <Button
                 v-if="step < steps.length - 1"
                 type="submit"
-                :disabled="currentStep === 'Daily Targets' && !macrosMatch"
+                :disabled="currentStep === 'Daily Targets' && !targetsValid"
             >
                 Next
                 <ArrowRight :size="18" />
             </Button>
-            <Button v-else type="submit" :disabled="form.processing">
+            <Button v-else type="submit" :disabled="form.processing || currentWeightDisplay === ''">
                 <Check :size="18" />
                 Start
             </Button>

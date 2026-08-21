@@ -10,6 +10,8 @@ class AppPreference extends SyncedModel
 
     public const HEIGHT_UNITS = ['cm', 'in'];
 
+    public const EAT_BACK = ['all', 'half', 'none'];
+
     private const DEFAULT_MEAL_REMINDERS = [
         'breakfast' => ['enabled' => false, 'time' => '08:00'],
         'lunch' => ['enabled' => false, 'time' => '12:00'],
@@ -21,11 +23,13 @@ class AppPreference extends SyncedModel
         'weight_unit',
         'height_unit',
         'meal_reminders',
+        'eat_back',
     ];
 
     protected $attributes = [
         'weight_unit' => 'kg',
         'height_unit' => 'cm',
+        'eat_back' => 'all',
     ];
 
     protected function casts(): array
@@ -59,5 +63,10 @@ class AppPreference extends SyncedModel
         }
 
         return $reminders;
+    }
+
+    public function eatBack(): string
+    {
+        return in_array($this->eat_back, self::EAT_BACK, true) ? $this->eat_back : 'all';
     }
 }

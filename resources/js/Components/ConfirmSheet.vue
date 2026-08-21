@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import {
     AlertDialog,
-    AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
     AlertDialogDescription,
@@ -9,6 +8,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from './ui/alert-dialog'
+import Button from './ui/button/Button.vue'
 
 withDefaults(defineProps<{
     open: boolean
@@ -40,7 +40,7 @@ function onOpenChange(open: boolean) {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel variant="surface" @click="emit('cancel')">Cancel</AlertDialogCancel>
-                <AlertDialogAction variant="destructive" @click="emit('confirm')">{{ confirmLabel }}</AlertDialogAction>
+                <Button type="button" variant="destructive" @click="emit('confirm')">{{ confirmLabel }}</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

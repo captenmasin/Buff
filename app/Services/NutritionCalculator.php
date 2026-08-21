@@ -20,9 +20,9 @@ class NutritionCalculator
     /**
      * @return array{calories: int, protein_g: float, carbs_g: float, fat_g: float, macro_calories: int}
      */
-    public function effectiveDailyGoal(DailyGoal $goal, int $burnedCalories): array
+    public function effectiveDailyGoal(DailyGoal $goal, int $burnedCalories, string $eatBack = 'all'): array
     {
-        $effectiveCalories = $goal->calories + max($burnedCalories, 0);
+        $effectiveCalories = $goal->calories + $this->eatenBackCalories($burnedCalories, $eatBack);
         $macroCalories = max($goal->macro_calories, 1);
         $scale = $effectiveCalories / $macroCalories;
 
@@ -33,6 +33,17 @@ class NutritionCalculator
             'fat_g' => round((float) $goal->fat_g * $scale, 2),
             'macro_calories' => $effectiveCalories,
         ];
+    }
+
+    public function eatenBackCalories(int $burnedCalories, string $eatBack = 'all'): int
+    {
+        $burned = max($burnedCalories, 0);
+
+        return match ($eatBack) {
+            'none' => 0,
+            'half' => (int) round($burned / 2),
+            default => $burned,
+        };
     }
 
     public function macrosForPortion(FoodProduct $product, float|int|string $quantity): array

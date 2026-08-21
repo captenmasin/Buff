@@ -14,6 +14,7 @@ class PendingBodyMetricPhotoUpload extends Model
         'body_metric_id',
         'paths',
         'original_names',
+        'poses',
         'attempts',
         'last_error',
     ];
@@ -23,6 +24,7 @@ class PendingBodyMetricPhotoUpload extends Model
         return [
             'paths' => 'array',
             'original_names' => 'array',
+            'poses' => 'array',
             'attempts' => 'integer',
         ];
     }

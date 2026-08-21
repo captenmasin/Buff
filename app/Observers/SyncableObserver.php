@@ -53,6 +53,10 @@ class SyncableObserver
         $value = $model->getAttribute($field);
         $cast = $model->getCasts()[$field] ?? null;
 
+        if ($value instanceof \BackedEnum) {
+            return $value->value;
+        }
+
         if ($value instanceof Carbon && is_string($cast) && str_starts_with($cast, 'date') && ! str_starts_with($cast, 'datetime')) {
             return $value->toDateString();
         }

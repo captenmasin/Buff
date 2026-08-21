@@ -1,47 +1,90 @@
 <script setup lang="ts">
-import { Head, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onUnmounted, ref } from 'vue';
-import { Camera, Image as ImageIcon, LoaderCircle, Pencil, Plus, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { Camera, Check, Circle, Image as ImageIcon, LoaderCircle, SwitchCamera, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import PageHeader from '../Components/PageHeader.vue';
+import ProgressTrendChart from '../Components/ProgressTrendChart.vue';
 import Button from '../Components/ui/button/Button.vue';
+import type { ChartConfig } from '../Components/ui/chart';
 import Input from '../Components/ui/input/Input.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
-import { formatBodyValue, heightFromCm, heightToCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
+import { formatBodyValue, heightFromCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
+import { hapticImpact } from '../haptics';
 import { resizePhoto } from '../photoResize';
+import { buildBodyFatChartData, buildWeightChartData, chartXDomain } from '../progressChart';
+import {
+    isProgressPhotoPose,
+    progressPhotoCaptureLabels,
+    progressPhotoLabels,
+    progressPhotoPoses,
+    selectPoseOverlays,
+    sortProgressPhotos,
+    type ProgressPhotoPose,
+} from '../progressPhotos';
 
-interface BodyMetric { id: string; date: string; weight_kg: number; body_fat_percent: number | null; notes: string | null }
-interface BodyGoals { height_cm: number | null; target_weight_kg: number | null; target_body_fat_percent: number | null }
+interface BodyMetric { id: string; date: string; weight_kg: number; body_fat_percent: number | null; notes: string | null; trend_kg: number | null }
+interface BodyProfile {
+    height_cm: number | null;
+    age: number | null;
+    sex: string | null;
+    activity_level: string | null;
+}
+interface BodyGoals {
+    target_weight_kg: number | null;
+    target_body_fat_percent: number | null;
+}
+interface EnergyEstimate { bmr: number; tdee: number }
 interface BodyDelta { weight_kg: number; body_fat_percent: number | null }
+interface WeightTrend { weight_kg: number; delta_kg: number | null }
 interface UnitPreferences { weight_unit: WeightUnit; height_unit: HeightUnit }
-interface ChartRange { min: number; max: number }
-interface SelectedPhoto { file: File; preview: string }
-interface ProgressPhoto { id: string; url: string; mime_type?: string }
+interface SelectedPhoto { file: File; preview: string; pose: ProgressPhotoPose }
+interface ProgressPhoto { id: string; url: string; mime_type?: string; pose?: string | null }
 
 const props = withDefaults(defineProps<{
     today: string;
+    range: string;
+    range_start: string;
+    range_end: string;
     preferences: UnitPreferences;
     latest?: BodyMetric | null;
+    profile: BodyProfile;
     goals?: BodyGoals | null;
+    energy?: EnergyEstimate | null;
+    trend?: WeightTrend | null;
     delta?: BodyDelta | null;
     history: BodyMetric[];
-}>(), { latest: null, goals: null, delta: null });
+}>(), { latest: null, goals: null, energy: null, trend: null, delta: null });
 
-const openSheet = ref<'metric' | 'profile' | null>(null);
 const pendingDelete = ref<BodyMetric | null>(null);
 const photoInput = ref<HTMLInputElement | null>(null);
-const selectedPhotos = ref<SelectedPhoto[]>([]);
+const sheetPhotoInput = ref<HTMLInputElement | null>(null);
+const selectedPhotos = ref<Partial<Record<ProgressPhotoPose, SelectedPhoto>>>({});
 const photoUploadError = ref('');
 const photoUploading = ref(false);
 const photosMetric = ref<BodyMetric | null>(null);
 const remotePhotos = ref<ProgressPhoto[]>([]);
 const remotePhotosLoading = ref(false);
 const photoCache = ref<Record<string, ProgressPhoto[]>>({});
-let sheetTrigger: HTMLElement | null = null;
+const overlayByPose = ref<Partial<Record<ProgressPhotoPose, { photo: ProgressPhoto; date: string }>>>({});
+const overlayOpacity = ref(0.35);
+const capturingPose = ref<ProgressPhotoPose>('front');
+const libraryPose = ref<ProgressPhotoPose>('front');
+const cameraOpen = ref(false);
+const cameraStarting = ref(false);
+const cameraReady = ref(false);
+const cameraError = ref('');
+const cameraFacing = ref<'user' | 'environment'>('user');
+const cameraVideo = ref<HTMLVideoElement | null>(null);
+const photoTargetMetric = ref<BodyMetric | null>(null);
+let cameraStream: MediaStream | null = null;
 let photoRequest = 0;
+let overlayRequest = 0;
+let photoTrigger: HTMLElement | null = null;
+const photoLoads: Record<string, Promise<ProgressPhoto[]>> = {};
 
 const metricForm = useForm({
     date: props.today,
@@ -49,71 +92,340 @@ const metricForm = useForm({
     body_fat_percent: props.latest?.date === props.today ? props.latest.body_fat_percent : '',
     notes: props.latest?.date === props.today ? props.latest.notes : '',
 });
-const profileForm = useForm({
-    height_cm: heightFromCm(props.goals?.height_cm, props.preferences.height_unit) ?? '',
-    target_weight_kg: weightFromKg(props.goals?.target_weight_kg, props.preferences.weight_unit) ?? '',
-    target_body_fat_percent: props.goals?.target_body_fat_percent ?? '',
-});
 
 const hasHistory = computed(() => props.history.length > 0);
 const hasDelta = computed(() => Boolean(props.delta));
-const latestWeight = computed(() => weightFromKg(props.latest?.weight_kg, props.preferences.weight_unit));
-const displayDeltaWeight = computed(() => weightFromKg(props.delta?.weight_kg, props.preferences.weight_unit));
-const displayHeight = computed(() => heightFromCm(props.goals?.height_cm, props.preferences.height_unit));
-const displayTargetWeight = computed(() => weightFromKg(props.goals?.target_weight_kg, props.preferences.weight_unit));
-const currentBmi = computed(() => props.latest?.weight_kg && props.goals?.height_cm ? (Number(props.latest.weight_kg) / (Number(props.goals.height_cm) / 100) ** 2).toFixed(1) : null);
-const chartMetrics = computed(() => [...props.history].reverse());
-const chartWeights = computed(() => chartMetrics.value.map((metric) => weightFromKg(metric.weight_kg, props.preferences.weight_unit)));
-const weightRange = computed(() => rangeFor(chartWeights.value, displayTargetWeight.value));
-const bodyFatRange = computed(() => rangeFor(chartMetrics.value.map((metric) => metric.body_fat_percent), props.goals?.target_body_fat_percent));
-const weightPoints = computed(() => chartPoints(chartWeights.value, weightRange.value));
-const bodyFatPoints = computed(() => chartPoints(chartMetrics.value.map((metric) => metric.body_fat_percent), bodyFatRange.value));
+const hasTrendDelta = computed(() => props.trend?.delta_kg !== null && props.trend?.delta_kg !== undefined);
+const rangeOptions = [
+    { key: '30', label: '30' },
+    { key: '90', label: '90' },
+    { key: '180', label: '180' },
+    { key: 'all', label: 'All' },
+] as const;
+const latestWeight = computed(() => weightFromKg(props.trend?.weight_kg ?? props.latest?.weight_kg, props.preferences.weight_unit));
+const previousWeight = computed(() => {
+    const weight = weightFromKg(props.latest?.weight_kg, props.preferences.weight_unit);
 
-function open(name: 'metric' | 'profile', event: Event): void {
-    sheetTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
-    openSheet.value = name;
-    photoUploadError.value = '';
+    return weight === null ? undefined : String(weight);
+});
+const previousBodyFat = computed(() => {
+    if (props.latest?.body_fat_percent != null) {
+        return String(props.latest.body_fat_percent);
+    }
+
+    const prior = props.history.find((metric) => metric.body_fat_percent !== null);
+
+    return prior?.body_fat_percent == null ? undefined : String(prior.body_fat_percent);
+});
+const displayTrendDelta = computed(() => weightFromKg(props.trend?.delta_kg, props.preferences.weight_unit));
+const displayHeight = computed(() => heightFromCm(props.profile.height_cm, props.preferences.height_unit));
+const displayTargetWeight = computed(() => weightFromKg(props.goals?.target_weight_kg, props.preferences.weight_unit));
+const currentBmi = computed(() => props.latest?.weight_kg && props.profile.height_cm ? (Number(props.latest.weight_kg) / (Number(props.profile.height_cm) / 100) ** 2).toFixed(1) : null);
+const chartDomain = computed(() => chartXDomain(props.range_start, props.range_end));
+const weightChartData = computed(() => buildWeightChartData(
+    props.history.map((metric) => ({
+        date: metric.date,
+        weight: weightFromKg(metric.weight_kg, props.preferences.weight_unit) ?? 0,
+    })),
+    props.range_start,
+    props.range_end,
+    displayTargetWeight.value,
+));
+const bodyFatChartData = computed(() => buildBodyFatChartData(
+    props.history.map((metric) => ({
+        date: metric.date,
+        bodyFat: metric.body_fat_percent,
+    })),
+    props.range_start,
+    props.range_end,
+    props.goals?.target_body_fat_percent ?? null,
+));
+const hasBodyFatChart = computed(() => bodyFatChartData.value.some((row) => row.bodyFat !== undefined));
+const weightChartLines = computed(() => displayTargetWeight.value === null ? ['weight'] : ['weight', 'goal']);
+const bodyFatChartLines = computed(() => props.goals?.target_body_fat_percent == null ? ['bodyFat'] : ['bodyFat', 'goal']);
+const weightChartConfig: ChartConfig = {
+    weight: { label: 'Weight', color: 'var(--primary)' },
+    goal: { label: 'Goal', color: 'var(--food)' },
+};
+const bodyFatChartConfig: ChartConfig = {
+    bodyFat: { label: 'Body fat', color: 'var(--fat)' },
+    goal: { label: 'Goal', color: 'var(--food)' },
+};
+const selectedPhotoCount = computed(() => progressPhotoPoses.filter((pose) => Boolean(selectedPhotos.value[pose])).length);
+const activeOverlay = computed(() => overlayByPose.value[capturingPose.value] ?? null);
+const activeOverlayPhoto = computed(() => activeOverlay.value?.photo ?? null);
+const overlaySourceDate = computed(() => activeOverlay.value?.date ?? null);
+const mirrorPreview = computed(() => cameraFacing.value === 'user');
+
+function photoPoseLabel(pose: string | null | undefined): string {
+    return isProgressPhotoPose(pose) ? progressPhotoLabels[pose] : 'Progress photo';
+}
+
+function cachePhotos(metricId: string, photos: ProgressPhoto[]): ProgressPhoto[] {
+    const sorted = sortProgressPhotos(photos);
+    photoCache.value[metricId] = sorted;
+
+    return sorted;
+}
+
+function cachedPhotos(metricId: string): ProgressPhoto[] | undefined {
+    return Object.prototype.hasOwnProperty.call(photoCache.value, metricId)
+        ? photoCache.value[metricId]
+        : undefined;
+}
+
+function loadPhotosForMetric(metricId: string): Promise<ProgressPhoto[]> {
+    const cached = cachedPhotos(metricId);
+
+    if (cached !== undefined) {
+        return Promise.resolve(cached);
+    }
+
+    const inflight = photoLoads[metricId] ?? axios.get(`/progress/body-metrics/${metricId}/photos`)
+        .then(({data}) => cachePhotos(metricId, data.photos || []))
+        .catch(() => cachePhotos(metricId, []))
+        .finally(() => {
+            delete photoLoads[metricId];
+        });
+
+    photoLoads[metricId] = inflight;
+
+    return inflight;
+}
+
+async function loadHistoryPhotos(): Promise<void> {
+    await Promise.all(props.history.map((metric) => loadPhotosForMetric(metric.id)));
 }
 
 function clearSelectedPhotos(): void {
-    selectedPhotos.value.forEach(({preview}) => URL.revokeObjectURL(preview));
-    selectedPhotos.value = [];
+    progressPhotoPoses.forEach((pose) => {
+        const photo = selectedPhotos.value[pose];
+
+        if (photo) {
+            URL.revokeObjectURL(photo.preview);
+        }
+    });
+    selectedPhotos.value = {};
 }
 
-function close(): void {
-    openSheet.value = null;
-    metricForm.clearErrors();
-    profileForm.clearErrors();
-    photoUploadError.value = '';
-    clearSelectedPhotos();
-    sheetTrigger?.focus();
-    sheetTrigger = null;
+async function assignPhoto(pose: ProgressPhotoPose, file: File): Promise<void> {
+    const existing = selectedPhotos.value[pose];
+
+    if (existing) {
+        URL.revokeObjectURL(existing.preview);
+    }
+
+    const resized = await resizePhoto(file);
+    selectedPhotos.value[pose] = {file: resized, preview: URL.createObjectURL(resized), pose};
+}
+
+function nextEmptyPose(after: ProgressPhotoPose): ProgressPhotoPose | null {
+    const start = progressPhotoPoses.indexOf(after) + 1;
+
+    for (let offset = 0; offset < progressPhotoPoses.length; offset++) {
+        const pose = progressPhotoPoses[(start + offset) % progressPhotoPoses.length];
+
+        if (!selectedPhotos.value[pose]) {
+            return pose;
+        }
+    }
+
+    return null;
+}
+
+async function loadOverlayPhotos(): Promise<void> {
+    const request = ++overlayRequest;
+    await loadHistoryPhotos();
+
+    if (request !== overlayRequest) {
+        return;
+    }
+
+    overlayByPose.value = selectPoseOverlays(
+        props.history.map((metric) => ({
+            date: metric.date,
+            photos: cachedPhotos(metric.id) ?? [],
+        })),
+        photoTargetMetric.value?.date ?? metricForm.date,
+    );
 }
 
 async function selectProgressPhotos(event: Event): Promise<void> {
     const input = event.target instanceof HTMLInputElement ? event.target : null;
-    const files = Array.from(input?.files ?? []).slice(0, 3 - selectedPhotos.value.length);
+    const file = input?.files?.[0];
 
-    for (const file of files) {
-        const resized = await resizePhoto(file);
-        selectedPhotos.value.push({file: resized, preview: URL.createObjectURL(resized)});
+    if (file) {
+        await assignPhoto(libraryPose.value, file);
     }
 
     if (input) {
         input.value = '';
     }
+
+    if (file && photoTargetMetric.value) {
+        await uploadTargetedPhotos();
+    }
 }
 
-function removeSelectedPhoto(index: number): void {
-    const [photo] = selectedPhotos.value.splice(index, 1);
+function removeSelectedPhoto(pose: ProgressPhotoPose): void {
+    const photo = selectedPhotos.value[pose];
 
-    if (photo) {
-        URL.revokeObjectURL(photo.preview);
+    if (!photo) {
+        return;
+    }
+
+    URL.revokeObjectURL(photo.preview);
+    const next = { ...selectedPhotos.value };
+    delete next[pose];
+    selectedPhotos.value = next;
+}
+
+function openLibrary(pose: ProgressPhotoPose): void {
+    libraryPose.value = pose;
+    stopCamera();
+    photoInput.value?.click();
+}
+
+function cameraErrorMessage(error: unknown): string {
+    const errorName = error instanceof DOMException || error instanceof Error ? error.name : null;
+
+    if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+        return 'Camera permission was denied. Allow camera access for Buff, or choose a photo from your library.';
+    }
+
+    if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
+        return 'No usable camera was found. Choose a photo from your library instead.';
+    }
+
+    return 'Could not open the camera. Choose a photo from your library instead.';
+}
+
+async function acquireCameraStream(): Promise<MediaStream | null> {
+    if (!navigator.mediaDevices?.getUserMedia) {
+        cameraError.value = 'Camera is not available on this device. Choose a photo from your library instead.';
+        return null;
+    }
+
+    try {
+        return await navigator.mediaDevices.getUserMedia({
+            audio: false,
+            video: {
+                facingMode: { ideal: cameraFacing.value },
+            },
+        });
+    } catch (error) {
+        cameraError.value = cameraErrorMessage(error);
+        return null;
+    }
+}
+
+async function attachCameraStream(stream: MediaStream): Promise<void> {
+    cameraStream = stream;
+    await nextTick();
+
+    if (cameraVideo.value) {
+        cameraVideo.value.srcObject = stream;
+        await cameraVideo.value.play().catch(() => undefined);
+    }
+}
+
+function openFormCamera(pose: ProgressPhotoPose): void {
+    photoTargetMetric.value = null;
+    void startCamera(pose);
+}
+
+async function startCamera(pose: ProgressPhotoPose = capturingPose.value): Promise<void> {
+    capturingPose.value = pose;
+    stopCameraStream();
+    cameraError.value = '';
+    cameraStarting.value = true;
+    cameraOpen.value = true;
+    cameraReady.value = false;
+    void loadOverlayPhotos();
+
+    const stream = await acquireCameraStream();
+
+    if (!stream) {
+        cameraOpen.value = false;
+        cameraStarting.value = false;
+        return;
+    }
+
+    try {
+        await attachCameraStream(stream);
+    } finally {
+        cameraStarting.value = false;
+    }
+}
+
+function stopCameraStream(): void {
+    cameraStream?.getTracks().forEach((track) => track.stop());
+    cameraStream = null;
+
+    if (cameraVideo.value) {
+        cameraVideo.value.srcObject = null;
+    }
+}
+
+function stopCamera(): void {
+    stopCameraStream();
+    cameraOpen.value = false;
+    cameraReady.value = false;
+    cameraStarting.value = false;
+}
+
+function markCameraReady(): void {
+    cameraReady.value = true;
+}
+
+async function flipCamera(): Promise<void> {
+    cameraFacing.value = cameraFacing.value === 'user' ? 'environment' : 'user';
+    await startCamera();
+}
+
+async function captureProgressPhoto(): Promise<void> {
+    const video = cameraVideo.value;
+
+    if (!video || !cameraReady.value) {
+        return;
+    }
+
+    hapticImpact();
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, video.videoWidth);
+    canvas.height = Math.max(1, video.videoHeight);
+    const context = canvas.getContext('2d');
+
+    if (!context) {
+        return;
+    }
+
+    if (mirrorPreview.value) {
+        context.translate(canvas.width, 0);
+        context.scale(-1, 1);
+    }
+
+    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+
+    if (!blob) {
+        return;
+    }
+
+    const file = new File([blob], `${capturingPose.value}-${Date.now()}.jpg`, {type: 'image/jpeg'});
+    await assignPhoto(capturingPose.value, file);
+
+    const next = nextEmptyPose(capturingPose.value);
+
+    if (next) {
+        capturingPose.value = next;
+    } else {
+        await closeCamera();
     }
 }
 
 async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
-    if (selectedPhotos.value.length === 0) {
+    if (selectedPhotoCount.value === 0) {
         return true;
     }
 
@@ -121,11 +433,20 @@ async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
     photoUploadError.value = '';
 
     const data = new FormData();
-    selectedPhotos.value.forEach(({file}) => data.append('photos[]', file));
+
+    for (const pose of progressPhotoPoses) {
+        const photo = selectedPhotos.value[pose];
+
+        if (photo) {
+            data.append('photos[]', photo.file);
+            data.append('poses[]', pose);
+        }
+    }
 
     try {
         await axios.post(`/progress/body-metrics/${metricId}/photos`, data);
         delete photoCache.value[metricId];
+        await loadPhotosForMetric(metricId);
 
         return true;
     } catch (error) {
@@ -140,13 +461,15 @@ async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
 
 function saveMetric(): void {
     metricForm.transform((data) => ({ ...data, weight_kg: weightToKg(data.weight_kg, props.preferences.weight_unit) }))
-        .post('/progress/body-metrics', {
+        .post(`/progress/body-metrics?range=${encodeURIComponent(props.range)}`, {
             preserveScroll: true,
-            onSuccess: async () => {
-                const metric = props.history.find((entry) => entry.date === metricForm.date)
-                    ?? (props.latest?.date === metricForm.date ? props.latest : null);
+            onSuccess: async (page) => {
+                const history = (page.props.history as BodyMetric[] | undefined) ?? props.history;
+                const latest = (page.props.latest as BodyMetric | null | undefined) ?? props.latest ?? null;
+                const metric = history.find((entry) => entry.date === metricForm.date)
+                    ?? (latest?.date === metricForm.date ? latest : null);
 
-                if (metric && selectedPhotos.value.length > 0) {
+                if (metric && selectedPhotoCount.value > 0) {
                     const uploaded = await uploadSelectedPhotos(metric.id);
 
                     if (!uploaded) {
@@ -154,68 +477,57 @@ function saveMetric(): void {
                     }
                 }
 
-                close();
+                clearSelectedPhotos();
+                photoUploadError.value = '';
+                void loadOverlayPhotos();
             },
         });
 }
 
-function saveProfile(): void {
-    profileForm.transform((data) => ({
-        ...data,
-        height_cm: heightToCm(data.height_cm, props.preferences.height_unit),
-        target_weight_kg: weightToKg(data.target_weight_kg, props.preferences.weight_unit),
-    })).put('/progress/body-profile', { preserveScroll: true, onSuccess: close });
+function visitRange(range: string): void {
+    router.visit(`/progress?range=${range}`, { preserveScroll: true });
 }
 
-function rangeFor(values: Array<number | null>, target: number | null | undefined = null): ChartRange {
-    const numeric = values.map(Number).filter(Number.isFinite);
-    if (target !== null && target !== undefined) numeric.push(Number(target));
-    if (!numeric.length) return { min: 0, max: 1 };
-    const min = Math.min(...numeric); const max = Math.max(...numeric); const padding = Math.max((max - min) * 0.15, 1);
-    return { min: min - padding, max: max + padding };
-}
-
-function chartPoints(values: Array<number | null>, range: ChartRange): string {
-    return values.map((value, index) => value === null ? null : `${(index / Math.max(values.length - 1, 1)) * 100},${Math.max(0, Math.min(100, 100 - ((Number(value) - range.min) / (range.max - range.min)) * 100))}`).filter(Boolean).join(' ');
-}
-
-function targetY(target: number | null | undefined, range: ChartRange): number | null { return target === null || target === undefined ? null : 100 - ((Number(target) - range.min) / (range.max - range.min)) * 100; }
 function deltaLabel(value: number | null | undefined, suffix: string): string { return value === null || value === undefined ? 'No change' : `${value > 0 ? '+' : ''}${value}${suffix}`; }
 function requestDelete(metric: BodyMetric): void { pendingDelete.value = metric; }
 function cancelDelete(): void { pendingDelete.value = null; }
 function confirmDelete(): void {
-    if (!pendingDelete.value) {
+    const metric = pendingDelete.value;
+
+    if (!metric) {
         return;
     }
 
-    router.delete(`/progress/body-metrics/${pendingDelete.value.id}`, {
+    pendingDelete.value = null;
+
+    router.delete(`/progress/body-metrics/${metric.id}?range=${encodeURIComponent(props.range)}`, {
         preserveScroll: true,
-        onSuccess: cancelDelete,
     });
 }
 
-async function openPhotos(metric: BodyMetric, event: Event): Promise<void> {
-    sheetTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+function openPhotos(metric: BodyMetric, event: Event): void {
+    event.preventDefault();
+    event.stopPropagation();
+    hapticImpact();
+    photoTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
+
+    window.setTimeout(() => {
+        void showPhotos(metric);
+    }, 0);
+}
+
+async function showPhotos(metric: BodyMetric): Promise<void> {
     photosMetric.value = metric;
-    remotePhotos.value = photoCache.value[metric.id] ?? [];
+    const cached = cachedPhotos(metric.id);
+    remotePhotos.value = cached ?? [];
     const request = ++photoRequest;
-
-    if (photoCache.value[metric.id]) {
-        return;
-    }
-
-    remotePhotosLoading.value = true;
+    remotePhotosLoading.value = cached === undefined;
 
     try {
-        const {data} = await axios.get(`/progress/body-metrics/${metric.id}/photos`);
+        const photos = await loadPhotosForMetric(metric.id);
 
         if (request === photoRequest) {
-            remotePhotos.value = data.photos || [];
-            photoCache.value[metric.id] = remotePhotos.value;
-        }
-    } catch {
-        if (request === photoRequest) {
-            remotePhotos.value = [];
+            remotePhotos.value = photos;
         }
     } finally {
         if (request === photoRequest) {
@@ -224,16 +536,106 @@ async function openPhotos(metric: BodyMetric, event: Event): Promise<void> {
     }
 }
 
+async function addPhotosForMetric(): Promise<void> {
+    const metric = photosMetric.value;
+
+    if (!metric) {
+        return;
+    }
+
+    photoTargetMetric.value = metric;
+    hapticImpact();
+    capturingPose.value = 'front';
+    stopCameraStream();
+    cameraError.value = '';
+    cameraStarting.value = true;
+    cameraReady.value = false;
+
+    const stream = await acquireCameraStream();
+
+    if (!stream) {
+        cameraStarting.value = false;
+        return;
+    }
+
+    closePhotos();
+    cameraOpen.value = true;
+    void loadOverlayPhotos();
+
+    try {
+        await attachCameraStream(stream);
+    } finally {
+        cameraStarting.value = false;
+    }
+}
+
+function addPhotosFromLibrary(): void {
+    const metric = photosMetric.value;
+
+    if (!metric) {
+        return;
+    }
+
+    photoTargetMetric.value = metric;
+    libraryPose.value = progressPhotoPoses.find((pose) => !selectedPhotos.value[pose]) ?? 'front';
+    hapticImpact();
+    sheetPhotoInput.value?.click();
+}
+
+async function closeCamera(): Promise<void> {
+    const metric = photoTargetMetric.value;
+    stopCamera();
+    await uploadTargetedPhotos();
+
+    if (metric && photosMetric.value === null) {
+        await showPhotos(metric);
+    }
+}
+
+async function uploadTargetedPhotos(): Promise<void> {
+    const metric = photoTargetMetric.value;
+
+    if (!metric || selectedPhotoCount.value === 0) {
+        return;
+    }
+
+    const uploaded = await uploadSelectedPhotos(metric.id);
+
+    if (!uploaded) {
+        return;
+    }
+
+    photoTargetMetric.value = null;
+    clearSelectedPhotos();
+    await showPhotos(metric);
+}
+
 function closePhotos(): void {
     photoRequest++;
     photosMetric.value = null;
     remotePhotos.value = [];
     remotePhotosLoading.value = false;
-    sheetTrigger?.focus();
-    sheetTrigger = null;
+
+    if (!cameraStarting.value && !cameraOpen.value) {
+        photoTrigger?.focus();
+    }
+
+    photoTrigger = null;
 }
 
+watch(() => metricForm.date, () => {
+    void loadOverlayPhotos();
+});
+
+watch(() => props.history.map((metric) => metric.id).join(','), () => {
+    void loadHistoryPhotos().then(() => {
+        void loadOverlayPhotos();
+    });
+}, { immediate: true });
+
 onUnmounted(() => {
+    overlayRequest++;
+    stopCamera();
     clearSelectedPhotos();
 });
 </script>
@@ -242,28 +644,15 @@ onUnmounted(() => {
     <Head title="Progress" />
     <section class="space-y-5">
         <PageHeader>Progress</PageHeader>
-        <div v-if="hasHistory" class="grid grid-cols-2 gap-2">
-            <Button size="sm" @click="open('metric', $event)"><Plus :size="17" />Log measurement</Button>
-            <Button size="sm" variant="surface" @click="open('profile', $event)"><Pencil :size="17" />Edit body profile</Button>
-        </div>
 
-        <Card v-if="!hasHistory" class="space-y-4">
-            <h2 class="font-semibold tracking-tight">Start tracking your progress</h2>
-            <p class="text-sm text-muted-foreground">Your first measurement unlocks trends and history.</p>
-            <div class="grid grid-cols-2 gap-2">
-                <Button @click="open('metric', $event)"><Plus :size="18" />Log measurement</Button>
-                <Button variant="surface" @click="open('profile', $event)"><Pencil :size="18" />Edit body profile</Button>
-            </div>
-        </Card>
-
-        <template v-else>
+        <template v-if="hasHistory">
             <article class="grid grid-cols-3 gap-2">
                 <Card class="px-3">
                     <p class="field-label">Weight</p>
                     <p class="mt-2 text-2xl font-semibold tracking-tight">{{ formatBodyValue(latestWeight) }}<span class="text-sm font-medium text-muted-foreground"> {{ preferences.weight_unit }}</span></p>
-                    <p class="mt-1 flex items-center gap-1 text-sm" :class="delta?.weight_kg > 0 ? 'text-destructive' : 'text-success-foreground'">
-                        <component :is="delta?.weight_kg > 0 ? TrendingUp : TrendingDown" v-if="hasDelta" :size="15" />
-                        {{ hasDelta ? deltaLabel(displayDeltaWeight, ` ${preferences.weight_unit}`) : 'First entry' }}
+                    <p class="mt-1 flex items-center gap-1 text-sm" :class="(trend?.delta_kg ?? 0) > 0 ? 'text-destructive' : 'text-success-foreground'">
+                        <component :is="(trend?.delta_kg ?? 0) > 0 ? TrendingUp : TrendingDown" v-if="hasTrendDelta" :size="15" />
+                        {{ hasTrendDelta ? deltaLabel(displayTrendDelta, ` ${preferences.weight_unit}`) : 'First entry' }}
                     </p>
                 </Card>
                 <Card class="px-3">
@@ -274,151 +663,196 @@ onUnmounted(() => {
                 <Card class="px-3">
                     <p class="field-label">BMI</p>
                     <p class="mt-2 text-2xl font-semibold tracking-tight">{{ currentBmi ?? '--' }}</p>
-                    <p class="mt-1 text-sm text-muted-foreground">{{ displayHeight ? `${formatBodyValue(displayHeight)} ${preferences.height_unit}` : 'Set height' }}</p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        <Link v-if="!displayHeight" href="/settings" class="underline underline-offset-2">Set height</Link>
+                        <template v-else>{{ formatBodyValue(displayHeight) }} {{ preferences.height_unit }}</template>
+                    </p>
                 </Card>
             </article>
+            <p v-if="energy" class="text-sm text-muted-foreground">
+                <span class="font-semibold text-foreground">{{ energy.tdee.toLocaleString() }} kcal</span>
+                estimated daily energy · BMR {{ energy.bmr.toLocaleString() }}
+            </p>
             <Card>
-                <h2 class="font-semibold tracking-tight">Trends</h2>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="card-title">Trends</h2>
+                    <div class="flex rounded-xl bg-muted/80 p-1">
+                        <Button
+                            v-for="option in rangeOptions"
+                            :key="option.key"
+                            type="button"
+                            size="sm"
+                            class="h-8 min-w-10 rounded-lg px-2.5"
+                            :variant="range === option.key ? 'default' : 'ghost'"
+                            @click="visitRange(option.key)"
+                        >
+                            {{ option.label }}
+                        </Button>
+                    </div>
+                </div>
                 <div class="mt-4 grid gap-5">
                     <div>
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Weight</span>
                             <span v-if="displayTargetWeight" class="text-xs text-muted-foreground">Goal {{ formatBodyValue(displayTargetWeight) }} {{ preferences.weight_unit }}</span>
                         </div>
-                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-32 w-full rounded-xl bg-muted">
-                            <line v-if="targetY(displayTargetWeight, weightRange) !== null" x1="0" x2="100" :y1="targetY(displayTargetWeight, weightRange)" :y2="targetY(displayTargetWeight, weightRange)" stroke="var(--food)" stroke-width="1.5" stroke-dasharray="4 3" />
-                            <polyline :points="weightPoints" fill="none" stroke="var(--primary)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
+                        <ProgressTrendChart
+                            :key="`weight-${range}`"
+                            :data="weightChartData"
+                            :config="weightChartConfig"
+                            :x-domain="chartDomain"
+                            :lines="weightChartLines"
+                            :dashed="['goal']"
+                            :dots="['weight']"
+                            :value-suffix="` ${preferences.weight_unit}`"
+                        />
                     </div>
-                    <div>
+                    <div v-if="hasBodyFatChart">
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Body fat</span>
                             <span v-if="goals?.target_body_fat_percent" class="text-xs text-muted-foreground">Goal {{ goals.target_body_fat_percent }}%</span>
                         </div>
-                        <svg viewBox="0 0 100 100" preserveAspectRatio="none" class="h-32 w-full rounded-xl bg-muted">
-                            <line v-if="targetY(goals?.target_body_fat_percent, bodyFatRange) !== null" x1="0" x2="100" :y1="targetY(goals?.target_body_fat_percent, bodyFatRange)" :y2="targetY(goals?.target_body_fat_percent, bodyFatRange)" stroke="var(--food)" stroke-width="1.5" stroke-dasharray="4 3" />
-                            <polyline :points="bodyFatPoints" fill="none" stroke="var(--fat)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
-                        </svg>
+                        <ProgressTrendChart
+                            :key="`body-fat-${range}`"
+                            :data="bodyFatChartData"
+                            :config="bodyFatChartConfig"
+                            :x-domain="chartDomain"
+                            :lines="bodyFatChartLines"
+                            :dashed="['goal']"
+                            :dots="['bodyFat']"
+                            value-suffix="%"
+                        />
                     </div>
                 </div>
             </Card>
-            <section class="space-y-3">
-                <h2 class="text-lg font-semibold tracking-tight">Recent history</h2>
-                <Card class="divide-y divide-border/60 py-2">
-                    <div v-for="metric in history" :key="metric.id" class="flex items-start gap-3 py-3 first:pt-1 last:pb-1">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex justify-between gap-3">
-                                <p class="font-semibold">{{ metric.date }}</p>
-                                <p class="text-sm text-muted-foreground">{{ formatBodyValue(weightFromKg(metric.weight_kg, preferences.weight_unit)) }} {{ preferences.weight_unit }}<span v-if="metric.body_fat_percent !== null"> · {{ metric.body_fat_percent }}%</span></p>
-                            </div>
-                            <p v-if="metric.notes" class="mt-1 text-sm text-muted-foreground">{{ metric.notes }}</p>
-                            <div v-if="photoCache[metric.id]?.length" class="mt-2 flex gap-1.5">
-                                <button
-                                    v-for="photo in photoCache[metric.id].slice(0, 3)"
-                                    :key="photo.id"
-                                    type="button"
-                                    class="h-12 w-12 overflow-hidden rounded-lg bg-muted"
-                                    aria-label="View progress photos"
-                                    @click="openPhotos(metric, $event)"
-                                >
-                                    <img :src="photo.url" alt="" class="h-full w-full object-cover">
-                                </button>
-                            </div>
-                        </div>
-                        <Button variant="ghost" size="icon" class="rounded-full" aria-label="View progress photos" @click="openPhotos(metric, $event)">
-                            <ImageIcon :size="18" />
-                        </Button>
-                        <Button variant="ghost" size="icon" class="rounded-full" aria-label="Remove progress item" @click="requestDelete(metric)"><Trash2 :size="18" /></Button>
-                    </div>
-                </Card>
-            </section>
         </template>
 
-        <AppSheet :open="Boolean(openSheet)" labelled-by="progress-sheet-title" @close="close">
-                <div class="mb-4 flex justify-between gap-3">
-                    <h2 id="progress-sheet-title" class="text-xl font-semibold tracking-tight">{{ openSheet === 'metric' ? 'Log measurement' : 'Edit body profile' }}</h2>
-                    <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close" @click="close"><X :size="20" /></Button>
+        <Card class="space-y-4">
+            <div>
+                <h2 class="card-title">Log measurement</h2>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    {{ hasHistory ? 'Add or update a weigh-in for any day.' : 'Your first measurement unlocks trends and history.' }}
+                </p>
+            </div>
+            <form class="space-y-3" @submit.prevent="saveMetric">
+                <label class="block">
+                    <span class="field-label">Date</span>
+                    <Input v-model="metricForm.date" type="date" class="mt-1" />
+                    <span v-if="metricForm.errors.date" class="text-sm text-destructive">{{ metricForm.errors.date }}</span>
+                </label>
+                <div class="grid grid-cols-2 gap-3">
+                    <label>
+                        <span class="field-label">Weight {{ preferences.weight_unit }}</span>
+                        <Input v-model="metricForm.weight_kg" type="number" min="1" step="0.1" class="mt-1" :placeholder="previousWeight" />
+                        <span v-if="metricForm.errors.weight_kg" class="text-sm text-destructive">{{ metricForm.errors.weight_kg }}</span>
+                    </label>
+                    <label>
+                        <span class="field-label">Body fat %</span>
+                        <Input v-model="metricForm.body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" :placeholder="previousBodyFat" />
+                        <span v-if="metricForm.errors.body_fat_percent" class="text-sm text-destructive">{{ metricForm.errors.body_fat_percent }}</span>
+                    </label>
                 </div>
-                <form v-if="openSheet === 'metric'" class="space-y-3" @submit.prevent="saveMetric">
-                    <label class="block">
-                        <span class="field-label">Date</span>
-                        <Input v-model="metricForm.date" type="date" class="mt-1" />
-                        <span v-if="metricForm.errors.date" class="text-sm text-destructive">{{ metricForm.errors.date }}</span>
-                    </label>
-                    <div class="grid grid-cols-2 gap-3">
-                        <label>
-                            <span class="field-label">Weight {{ preferences.weight_unit }}</span>
-                            <Input v-model="metricForm.weight_kg" type="number" min="1" step="0.1" class="mt-1" />
-                            <span v-if="metricForm.errors.weight_kg" class="text-sm text-destructive">{{ metricForm.errors.weight_kg }}</span>
-                        </label>
-                        <label>
-                            <span class="field-label">Body fat %</span>
-                            <Input v-model="metricForm.body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" />
-                            <span v-if="metricForm.errors.body_fat_percent" class="text-sm text-destructive">{{ metricForm.errors.body_fat_percent }}</span>
-                        </label>
-                    </div>
-                    <label class="block">
-                        <span class="field-label">Notes</span>
-                        <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
-                    </label>
-                    <div class="space-y-2">
-                        <span class="field-label">Progress photos</span>
-                        <div v-if="selectedPhotos.length" class="grid grid-cols-3 gap-2">
-                            <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-xl bg-muted">
-                                <img :src="photo.preview" alt="Selected progress" class="h-full w-full object-cover">
-                                <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removeSelectedPhoto(index)">
+                <label class="block">
+                    <span class="field-label">Notes</span>
+                    <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
+                </label>
+                <div class="space-y-2">
+                    <span class="field-label">Progress photos</span>
+                    <div class="grid grid-cols-3 gap-2">
+                        <div v-for="pose in progressPhotoPoses" :key="pose" class="space-y-1.5">
+                            <span class="field-label">{{ progressPhotoLabels[pose] }}</span>
+                            <div class="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                                <button
+                                    v-if="selectedPhotos[pose]"
+                                    type="button"
+                                    class="h-full w-full"
+                                    :aria-label="`Retake ${progressPhotoLabels[pose].toLowerCase()} photo`"
+                                    @click="openFormCamera(pose)"
+                                >
+                                    <img :src="selectedPhotos[pose].preview" :alt="`${progressPhotoLabels[pose]} progress`" class="h-full w-full object-cover">
+                                </button>
+                                <button
+                                    v-else
+                                    type="button"
+                                    class="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-muted-foreground"
+                                    :aria-label="progressPhotoCaptureLabels[pose]"
+                                    @click="openFormCamera(pose)"
+                                >
+                                    <Camera :size="20" />
+                                    <span class="text-center text-xs font-medium">{{ progressPhotoCaptureLabels[pose] }}</span>
+                                </button>
+                                <Button
+                                    v-if="selectedPhotos[pose]"
+                                    type="button"
+                                    size="icon"
+                                    variant="inverse"
+                                    class="absolute right-1 top-1 h-8 w-8"
+                                    aria-label="Remove photo"
+                                    @click="removeSelectedPhoto(pose)"
+                                >
                                     <X :size="16" />
+                                </Button>
+                                <Button
+                                    v-else
+                                    type="button"
+                                    size="icon"
+                                    variant="inverse"
+                                    class="absolute right-1 top-1 h-8 w-8"
+                                    :aria-label="`Choose ${progressPhotoLabels[pose].toLowerCase()} from library`"
+                                    @click="openLibrary(pose)"
+                                >
+                                    <ImageIcon :size="16" />
                                 </Button>
                             </div>
                         </div>
-                        <input
-                            ref="photoInput"
-                            type="file"
-                            accept="image/jpeg,image/png,image/webp,image/*"
-                            capture="environment"
-                            multiple
-                            class="sr-only"
-                            @change="selectProgressPhotos"
-                        >
-                        <Button
-                            v-if="selectedPhotos.length < 3"
-                            type="button"
-                            variant="surface"
-                            class="w-full"
-                            @click="photoInput?.click()"
-                        >
-                            <Camera :size="18" />
-                            {{ selectedPhotos.length ? 'Add another' : 'Take or choose photo' }}
+                    </div>
+                    <input
+                        ref="photoInput"
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/*"
+                        class="sr-only"
+                        @change="selectProgressPhotos"
+                    >
+                    <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
+                    <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                </div>
+                <Button class="w-full" :disabled="metricForm.processing || photoUploading">
+                    <LoaderCircle v-if="metricForm.processing || photoUploading" :size="18" class="animate-spin" />
+                    {{ photoUploading ? 'Uploading photos…' : 'Save progress' }}
+                </Button>
+            </form>
+        </Card>
+
+        <section v-if="hasHistory" class="space-y-3">
+            <h2 class="text-lg font-semibold tracking-tight">Recent history</h2>
+            <Card class="divide-y divide-border/60 py-2">
+                <div v-for="metric in history" :key="metric.id" class="py-3 first:pt-1 last:pb-1">
+                    <div class="flex items-center gap-2">
+                        <p class="min-w-0 flex-1 font-semibold">{{ metric.date }}</p>
+                        <p class="shrink-0 text-sm text-muted-foreground">{{ formatBodyValue(weightFromKg(metric.weight_kg, preferences.weight_unit)) }} {{ preferences.weight_unit }}<span v-if="metric.body_fat_percent !== null"> · {{ metric.body_fat_percent }}%</span></p>
+                        <Button type="button" variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="View progress photos" @pointerdown.stop @click.stop="openPhotos(metric, $event)">
+                            <ImageIcon :size="18" />
                         </Button>
-                        <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                        <Button variant="ghost" size="icon-sm" class="rounded-full text-muted-foreground" aria-label="Remove progress item" @click="requestDelete(metric)"><Trash2 :size="18" /></Button>
                     </div>
-                    <Button class="w-full" :disabled="metricForm.processing || photoUploading">
-                        <LoaderCircle v-if="metricForm.processing || photoUploading" :size="18" class="animate-spin" />
-                        {{ photoUploading ? 'Uploading photos…' : 'Save progress' }}
-                    </Button>
-                </form>
-                <form v-else class="space-y-3" @submit.prevent="saveProfile">
-                    <div class="grid grid-cols-2 gap-3">
-                        <label>
-                            <span class="field-label">Height {{ preferences.height_unit }}</span>
-                            <Input v-model="profileForm.height_cm" type="number" min="1" step="0.1" class="mt-1" />
-                            <span v-if="profileForm.errors.height_cm" class="text-sm text-destructive">{{ profileForm.errors.height_cm }}</span>
-                        </label>
-                        <label>
-                            <span class="field-label">Target {{ preferences.weight_unit }}</span>
-                            <Input v-model="profileForm.target_weight_kg" type="number" min="1" step="0.1" class="mt-1" />
-                            <span v-if="profileForm.errors.target_weight_kg" class="text-sm text-destructive">{{ profileForm.errors.target_weight_kg }}</span>
-                        </label>
+                    <p v-if="metric.notes" class="mt-1 text-sm text-muted-foreground">{{ metric.notes }}</p>
+                    <div v-if="photoCache[metric.id]?.length" class="mt-2 flex gap-1.5">
+                        <button
+                            v-for="photo in photoCache[metric.id].slice(0, 3)"
+                            :key="photo.id"
+                            type="button"
+                            class="h-12 w-12 overflow-hidden rounded-lg bg-muted"
+                            :aria-label="`View ${photoPoseLabel(photo.pose).toLowerCase()} photo`"
+                            @click.stop="openPhotos(metric, $event)"
+                        >
+                            <img :src="photo.url" :alt="photoPoseLabel(photo.pose)" class="h-full w-full object-cover">
+                        </button>
                     </div>
-                    <label class="block">
-                        <span class="field-label">Target body fat %</span>
-                        <Input v-model="profileForm.target_body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" />
-                        <span v-if="profileForm.errors.target_body_fat_percent" class="text-sm text-destructive">{{ profileForm.errors.target_body_fat_percent }}</span>
-                    </label>
-                    <Button class="w-full" :disabled="profileForm.processing">Save body profile</Button>
-                </form>
-        </AppSheet>
-        <AppSheet :open="Boolean(photosMetric)" labelled-by="progress-photos-title" @close="closePhotos">
+                </div>
+            </Card>
+        </section>
+
+        <AppSheet :open="photosMetric !== null" variant="drawer" labelled-by="progress-photos-title" @close="closePhotos">
             <div class="mb-4 flex justify-between gap-3">
                 <h2 id="progress-photos-title" class="text-xl font-semibold tracking-tight">
                     Photos · {{ photosMetric?.date }}
@@ -429,16 +863,35 @@ onUnmounted(() => {
                 <LoaderCircle :size="16" class="animate-spin" />
                 Loading progress photos…
             </div>
-            <div v-else-if="remotePhotos.length" class="grid grid-cols-2 gap-2">
-                <img
-                    v-for="photo in remotePhotos"
-                    :key="photo.id"
-                    :src="photo.url"
-                    alt="Progress photo"
-                    class="aspect-square w-full rounded-xl object-cover"
+            <div v-else-if="remotePhotos.length" class="grid grid-cols-3 gap-2">
+                <figure v-for="photo in remotePhotos" :key="photo.id" class="space-y-1">
+                    <img
+                        :src="photo.url"
+                        :alt="photoPoseLabel(photo.pose)"
+                        class="aspect-square w-full rounded-xl object-cover"
+                    >
+                    <figcaption class="text-center text-xs text-muted-foreground">{{ photoPoseLabel(photo.pose) }}</figcaption>
+                </figure>
+            </div>
+            <div v-if="!remotePhotosLoading && remotePhotos.length < 3" class="space-y-3" :class="remotePhotos.length ? 'mt-4' : ''">
+                <p v-if="remotePhotos.length === 0" class="text-sm text-muted-foreground">No photos for this measurement yet.</p>
+                <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
+                <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                <Button type="button" class="w-full" :disabled="photoUploading" @click.stop="addPhotosForMetric">
+                    <LoaderCircle v-if="photoUploading" :size="18" class="animate-spin" />
+                    {{ photoUploading ? 'Uploading photos…' : 'Add photos' }}
+                </Button>
+                <Button type="button" variant="surface" class="w-full" :disabled="photoUploading" @click.stop="addPhotosFromLibrary">
+                    Choose from library
+                </Button>
+                <input
+                    ref="sheetPhotoInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/*"
+                    class="sr-only"
+                    @change="selectProgressPhotos"
                 >
             </div>
-            <p v-else class="text-sm text-muted-foreground">No photos for this measurement yet.</p>
         </AppSheet>
         <ConfirmSheet
             :open="Boolean(pendingDelete)"
@@ -447,5 +900,102 @@ onUnmounted(() => {
             @cancel="cancelDelete"
             @confirm="confirmDelete"
         />
+
+        <Teleport to="body">
+        <div v-if="cameraOpen" class="fixed inset-0 z-[80] flex flex-col bg-foreground text-primary-foreground">
+            <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
+                <div class="min-w-0">
+                    <p class="text-sm text-primary-foreground/70">{{ progressPhotoLabels[capturingPose] }} photo</p>
+                    <h2 class="truncate text-xl font-semibold">
+                        {{ cameraStarting ? 'Opening camera…' : activeOverlayPhoto ? (overlaySourceDate ? `Match ${progressPhotoLabels[capturingPose].toLowerCase()} · ${overlaySourceDate}` : `Match your last ${progressPhotoLabels[capturingPose].toLowerCase()}`) : `Line up your ${progressPhotoLabels[capturingPose].toLowerCase()}` }}
+                    </h2>
+                </div>
+                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-primary-foreground/10 text-primary-foreground active:bg-primary-foreground/15" aria-label="Close camera" @click="closeCamera">
+                    <X :size="22" />
+                </Button>
+            </div>
+
+            <div class="relative min-h-0 flex-1 bg-foreground">
+                <div v-if="cameraStarting || !cameraReady" class="absolute inset-0 z-20 grid place-items-center bg-foreground">
+                    <LoaderCircle :size="34" class="animate-spin text-primary-foreground/70" />
+                </div>
+
+                <video
+                    ref="cameraVideo"
+                    class="relative z-0 h-full w-full bg-foreground object-cover transition-opacity duration-150"
+                    :class="[
+                        cameraReady ? 'opacity-100' : 'opacity-0',
+                        mirrorPreview ? '-scale-x-100' : '',
+                    ]"
+                    autoplay
+                    muted
+                    playsinline
+                    disablepictureinpicture
+                    controlslist="nodownload noplaybackrate noremoteplayback"
+                    @loadeddata="markCameraReady"
+                    @playing="markCameraReady"
+                />
+
+                <img
+                    v-if="activeOverlayPhoto && overlayOpacity > 0"
+                    :src="activeOverlayPhoto.url"
+                    alt=""
+                    class="pointer-events-none absolute inset-0 z-10 h-full w-full object-cover"
+                    :style="{ opacity: overlayOpacity }"
+                >
+
+                <div class="absolute bottom-3 left-0 right-0 z-10 flex justify-center gap-2 px-4">
+                    <button
+                        v-for="pose in progressPhotoPoses"
+                        :key="pose"
+                        type="button"
+                        class="inline-flex min-w-16 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
+                        :class="pose === capturingPose
+                            ? 'border-primary-foreground bg-primary-foreground text-foreground'
+                            : selectedPhotos[pose]
+                                ? 'border-transparent bg-primary-foreground/15 text-primary-foreground'
+                                : 'border-dashed border-primary-foreground/45 bg-transparent text-primary-foreground/70'"
+                        :aria-label="selectedPhotos[pose] ? `${progressPhotoLabels[pose]} photo captured` : `${progressPhotoLabels[pose]} photo, empty`"
+                        :aria-pressed="pose === capturingPose"
+                        @click="capturingPose = pose"
+                    >
+                        <Check v-if="selectedPhotos[pose]" :size="14" />
+                        <Circle v-else :size="14" />
+                        {{ progressPhotoLabels[pose] }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="grid gap-3 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3">
+                <label class="block">
+                    <span class="mb-1 flex justify-between text-xs text-primary-foreground/70">
+                        <span>{{ activeOverlayPhoto ? 'Ghost overlay' : `No previous ${progressPhotoLabels[capturingPose].toLowerCase()} photo to ghost yet` }}</span>
+                        <span v-if="activeOverlayPhoto">{{ Math.round(overlayOpacity * 100) }}%</span>
+                    </span>
+                    <input
+                        v-model.number="overlayOpacity"
+                        type="range"
+                        min="0"
+                        max="0.7"
+                        step="0.05"
+                        class="w-full accent-primary-foreground disabled:opacity-40"
+                        aria-label="Overlay opacity"
+                        :disabled="!activeOverlayPhoto"
+                    >
+                </label>
+                <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
+                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-primary-foreground/10 text-primary-foreground" aria-label="Flip camera" @click="flipCamera">
+                        <SwitchCamera :size="22" />
+                    </Button>
+                    <Button type="button" variant="inverse" class="h-14 w-full rounded-full text-base" :disabled="!cameraReady" @click="captureProgressPhoto">
+                        Capture {{ progressPhotoLabels[capturingPose].toLowerCase() }}
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-primary-foreground/10 text-primary-foreground" :aria-label="`Choose ${progressPhotoLabels[capturingPose].toLowerCase()} from library`" @click="openLibrary(capturingPose)">
+                        <ImageIcon :size="22" />
+                    </Button>
+                </div>
+            </div>
+        </div>
+        </Teleport>
     </section>
 </template>

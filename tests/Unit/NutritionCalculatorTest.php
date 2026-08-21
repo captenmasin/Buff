@@ -53,3 +53,26 @@ it('scales daily macro goals from burned calories', function (): void {
         'macro_calories' => 2300,
     ]);
 });
+
+it('applies eat-back presets to burned calories', function (): void {
+    $calculator = new NutritionCalculator;
+    $goal = new DailyGoal([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    expect($calculator->eatenBackCalories(300, 'all'))->toBe(300)
+        ->and($calculator->eatenBackCalories(300, 'half'))->toBe(150)
+        ->and($calculator->eatenBackCalories(300, 'none'))->toBe(0)
+        ->and($calculator->eatenBackCalories(301, 'half'))->toBe(151)
+        ->and($calculator->effectiveDailyGoal($goal, 300, 'half'))->toBe([
+            'calories' => 2150,
+            'protein_g' => 182.75,
+            'carbs_g' => 209.63,
+            'fat_g' => 64.5,
+            'macro_calories' => 2150,
+        ]);
+});

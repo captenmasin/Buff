@@ -5,6 +5,7 @@ import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import {Link2, Moon, Smartphone, Sun, X} from '@lucide/vue';
 import {applyAppearance, saveAppearance, storedAppearance, type Appearance} from '../appearance';
 import AppSheet from '../Components/AppSheet.vue';
+import BodyProfileEditor from '../Components/BodyProfileEditor.vue';
 import Card from '../Components/Card.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
@@ -15,9 +16,11 @@ import SelectItem from '../Components/ui/select/SelectItem.vue';
 import SelectTrigger from '../Components/ui/select/SelectTrigger.vue';
 import SelectValue from '../Components/ui/select/SelectValue.vue';
 import Switch from '../Components/ui/switch/Switch.vue';
-import {type HeightUnit, type WeightUnit} from '../bodyUnits';
+import {type ActivityLevel, type Sex} from '../bodyProfile';
+import {heightFromCm, heightToCm, type HeightUnit, type WeightUnit} from '../bodyUnits';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
+type EatBack = 'all' | 'half' | 'none';
 
 type MealReminders = Record<MealType, {
     enabled: boolean;
@@ -28,6 +31,13 @@ const props = defineProps<{
     preferences: {
         weight_unit: WeightUnit;
         height_unit: HeightUnit;
+        eat_back: EatBack;
+    };
+    bodyProfile: {
+        height_cm: number | null;
+        age: number | null;
+        sex: Sex | null;
+        activity_level: ActivityLevel | null;
     };
     mealReminders: MealReminders;
     healthConnect: HealthConnectState;
@@ -87,6 +97,17 @@ const unitForm = useForm({
     height_unit: props.preferences.height_unit,
 });
 
+const eatBackForm = useForm({
+    eat_back: props.preferences.eat_back,
+});
+
+const profileForm = useForm({
+    height_cm: heightFromCm(props.bodyProfile.height_cm, props.preferences.height_unit) ?? '',
+    age: props.bodyProfile.age ?? '',
+    sex: props.bodyProfile.sex ?? '',
+    activity_level: props.bodyProfile.activity_level ?? '',
+});
+
 const mealReminderForm = useForm<MealReminders>({
     breakfast: {...props.mealReminders.breakfast},
     lunch: {...props.mealReminders.lunch},
@@ -100,6 +121,13 @@ const accountForm = useForm({
 });
 const logoutForm = useForm({});
 const deleteAccountForm = useForm({password: ''});
+const passwordResetUrl = computed(() => {
+    const email = page.props.buff.account?.email;
+
+    return email
+        ? `/account/forgot-password?${new URLSearchParams({email}).toString()}`
+        : '/account/forgot-password';
+});
 
 const appearance = ref<Appearance>(storedAppearance());
 const healthConnectState = ref({...props.healthConnect});
@@ -112,6 +140,11 @@ const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof 
     {value: 'system', label: 'System', icon: Smartphone},
     {value: 'light', label: 'Light', icon: Sun},
     {value: 'dark', label: 'Dark', icon: Moon},
+];
+const eatBackOptions: Array<{ value: EatBack; label: string; description: string }> = [
+    {value: 'all', label: 'Eat all back', description: 'Add every workout calorie to today’s food target and macros.'},
+    {value: 'half', label: 'Eat half back', description: 'Add half. Useful when a watch or band tends to overestimate burn.'},
+    {value: 'none', label: "Don't eat back", description: 'Keep the food target as set. Workouts still log; they just don’t unlock extra food.'},
 ];
 const mealReminderOptions: Array<{ id: MealType; label: string }> = [
     {id: 'breakfast', label: 'Breakfast'},
@@ -180,6 +213,22 @@ function saveUnits() {
     }
 
     unitForm.put('/settings/units', {preserveScroll: true});
+}
+
+function saveEatBack(eatBack: EatBack) {
+    if (eatBackForm.processing) {
+        return;
+    }
+
+    eatBackForm.eat_back = eatBack;
+    eatBackForm.put('/settings/eat-back', {preserveScroll: true});
+}
+
+function saveBodyProfile() {
+    profileForm.transform((data) => ({
+        ...data,
+        height_cm: heightToCm(data.height_cm, unitForm.height_unit),
+    })).put('/settings/body-profile', {preserveScroll: true});
 }
 
 function saveMealReminders() {
@@ -321,7 +370,11 @@ watch(() => deleteAccountForm.errors.password, (error) => {
 
 watch(
     () => [unitForm.weight_unit, unitForm.height_unit] as const,
-    () => {
+    ([, nextHeightUnit], [, previousHeightUnit]) => {
+        if (previousHeightUnit && nextHeightUnit !== previousHeightUnit && profileForm.height_cm !== '') {
+            profileForm.height_cm = heightFromCm(heightToCm(profileForm.height_cm, previousHeightUnit), nextHeightUnit) ?? '';
+        }
+
         saveUnits();
     },
 );
@@ -351,7 +404,7 @@ onBeforeUnmount(() => {
         <PageHeader>Settings</PageHeader>
 
         <Card>
-            <h2 class="font-semibold">Appearance</h2>
+            <h2 class="card-title">Appearance</h2>
             <div class="mt-3 rounded-xl bg-muted/80 p-1">
                 <div class="grid grid-cols-3 gap-1" role="group" aria-label="Appearance">
                     <Button
@@ -374,7 +427,7 @@ onBeforeUnmount(() => {
         <Card>
             <template v-if="page.props.buff.account">
                 <form class="space-y-3" @submit.prevent="saveAccount">
-                    <h2 class="font-semibold">Your account</h2>
+                    <h2 class="card-title">Your account</h2>
                     <label class="block">
                         <span class="field-label">Name</span>
                         <Input v-model="accountForm.name" autocomplete="name" required class="mt-1" />
@@ -406,7 +459,7 @@ onBeforeUnmount(() => {
             </template>
 
             <div v-else class="space-y-3">
-                <h2 class="font-semibold">Account sync paused</h2>
+                <h2 class="card-title">Account sync paused</h2>
                 <p class="text-sm text-muted-foreground">Your offline data remains on this device. Sign in before the next sync.</p>
                 <Button :as="Link" href="/account/login" class="w-full">Sign in</Button>
                 <form v-if="page.props.buff.has_local_account" @submit.prevent="logoutForm.post('/account/logout')">
@@ -421,7 +474,7 @@ onBeforeUnmount(() => {
                     <Link2 :size="18"/>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h2 class="font-semibold">{{ healthImport?.name }}</h2>
+                    <h2 class="card-title">{{ healthImport?.name }}</h2>
                     <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectLabel }}</p>
                     <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
                 </div>
@@ -439,7 +492,7 @@ onBeforeUnmount(() => {
         <Card>
             <div class="space-y-3">
                 <div>
-                    <h2 class="font-semibold">Meal reminders</h2>
+                    <h2 class="card-title">Meal reminders</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
                 </div>
 
@@ -479,7 +532,27 @@ onBeforeUnmount(() => {
 
         <Card>
             <div class="space-y-3">
-                <h2 class="font-semibold">Units</h2>
+                <div>
+                    <h2 class="card-title">Body profile</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">Used for BMI and calorie estimates. Weight and body-fat goals live under Goals.</p>
+                </div>
+                <form class="space-y-3" @submit.prevent="saveBodyProfile">
+                    <BodyProfileEditor
+                        v-model:age="profileForm.age"
+                        v-model:sex="profileForm.sex"
+                        v-model:height="profileForm.height_cm"
+                        v-model:activity_level="profileForm.activity_level"
+                        :height-unit="unitForm.height_unit"
+                        :errors="profileForm.errors"
+                    />
+                    <Button class="w-full" :disabled="profileForm.processing">Save profile</Button>
+                </form>
+            </div>
+        </Card>
+
+        <Card>
+            <div class="space-y-3">
+                <h2 class="card-title">Units</h2>
 
                 <div class="grid grid-cols-2 gap-3">
                     <label>
@@ -504,12 +577,45 @@ onBeforeUnmount(() => {
                             </SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="cm">Centimeters</SelectItem>
-                                <SelectItem value="in">Inches</SelectItem>
+                                <SelectItem value="in">Feet and inches</SelectItem>
                             </SelectContent>
                         </Select>
                         <span v-if="unitForm.errors.height_unit" class="mt-1 block text-sm text-destructive">{{ unitForm.errors.height_unit }}</span>
                     </label>
                 </div>
+            </div>
+        </Card>
+
+        <Card>
+            <div class="space-y-3">
+                <div>
+                    <h2 class="card-title">Exercise calories</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        How much of a workout to add to today’s food target. Wearables often overestimate burn, and eating every unlocked calorie can stall a cut. The ring still shows everything you burned — this only changes remaining calories and macros.
+                    </p>
+                </div>
+                <div class="grid gap-2">
+                    <Button
+                        v-for="option in eatBackOptions"
+                        :key="option.value"
+                        type="button"
+                        class="h-auto justify-start rounded-2xl px-4 py-3 text-left"
+                        :variant="eatBackForm.eat_back === option.value ? 'default' : 'surface'"
+                        :disabled="eatBackForm.processing"
+                        @click="saveEatBack(option.value)"
+                    >
+                        <span>
+                            <span class="block font-semibold">{{ option.label }}</span>
+                            <span
+                                class="mt-0.5 block text-sm font-medium"
+                                :class="eatBackForm.eat_back === option.value ? 'text-primary-foreground/70' : 'text-muted-foreground'"
+                            >
+                                {{ option.description }}
+                            </span>
+                        </span>
+                    </Button>
+                </div>
+                <p v-if="eatBackForm.errors.eat_back" class="text-sm text-destructive">{{ eatBackForm.errors.eat_back }}</p>
             </div>
         </Card>
 
@@ -534,6 +640,10 @@ onBeforeUnmount(() => {
             </div>
 
             <form class="mt-4 space-y-3" @submit.prevent="submitDeleteAccount">
+                <p class="text-sm text-muted-foreground">
+                    Signed in with Google or Apple, or don't know your password?
+                    <Link :href="passwordResetUrl" class="text-primary">Set or reset it by email first.</Link>
+                </p>
                 <label for="delete-account-password" class="block field-label">Password</label>
                 <Input
                     id="delete-account-password"

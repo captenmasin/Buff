@@ -2,16 +2,20 @@
 
 use App\Models\AppPreference;
 use App\Models\BodyMetric;
+use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use Illuminate\Support\Facades\Date;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('creates and updates a body metric for a date', function (): void {
-    $this->post('/progress/body-metrics', [
-        'date' => '2026-05-19',
-        'weight_kg' => 82.4,
-        'body_fat_percent' => 18.5,
-        'notes' => 'Morning weigh-in',
-    ])->assertRedirect();
+    $this->from('/progress')
+        ->post('/progress/body-metrics', [
+            'date' => '2026-05-19',
+            'weight_kg' => 82.4,
+            'body_fat_percent' => 18.5,
+            'notes' => 'Morning weigh-in',
+        ])
+        ->assertRedirect('/progress?range=90');
 
     $this->assertDatabaseHas('body_metrics', [
         'date' => '2026-05-19 00:00:00',
@@ -19,11 +23,13 @@ it('creates and updates a body metric for a date', function (): void {
         'body_fat_percent' => 18.5,
     ]);
 
-    $this->post('/progress/body-metrics', [
-        'date' => '2026-05-19',
-        'weight_kg' => 82.0,
-        'body_fat_percent' => 18.2,
-    ])->assertRedirect();
+    $this->from('/progress')
+        ->post('/progress/body-metrics', [
+            'date' => '2026-05-19',
+            'weight_kg' => 82.0,
+            'body_fat_percent' => 18.2,
+        ])
+        ->assertRedirect('/progress?range=90');
 
     $this->assertDatabaseCount('body_metrics', 1);
     $this->assertDatabaseHas('body_metrics', [
@@ -33,7 +39,54 @@ it('creates and updates a body metric for a date', function (): void {
     ]);
 });
 
+it('reloads recent history after saving a measurement', function (): void {
+    Date::setTestNow('2026-08-20');
+
+    $this->from('/progress?range=30')
+        ->post('/progress/body-metrics?range=30', [
+            'date' => '2026-08-20',
+            'weight_kg' => 81.2,
+            'body_fat_percent' => 18.1,
+            'notes' => 'After lift',
+        ])
+        ->assertRedirect('/progress?range=30');
+
+    $this->get('/progress?range=30')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Progress')
+            ->where('range', '30')
+            ->has('history', 1)
+            ->where('history.0.date', '2026-08-20')
+            ->where('history.0.weight_kg', 81.2)
+            ->where('history.0.body_fat_percent', 18.1)
+            ->where('history.0.notes', 'After lift')
+            ->where('latest.weight_kg', 81.2)
+        );
+
+    $this->from('/progress?range=30')
+        ->post('/progress/body-metrics?range=30', [
+            'date' => '2026-08-18',
+            'weight_kg' => 81.6,
+        ])
+        ->assertRedirect('/progress?range=30');
+
+    $this->get('/progress?range=30')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->has('history', 2)
+            ->where('history.0.date', '2026-08-20')
+            ->where('history.1.date', '2026-08-18')
+            ->where('history.1.weight_kg', 81.6)
+            ->where('latest.weight_kg', 81.2)
+        );
+
+    Date::setTestNow();
+});
+
 it('renders latest metric delta and history', function (): void {
+    Date::setTestNow('2026-05-19');
+
     BodyMetric::query()->create([
         'date' => '2026-05-18',
         'weight_kg' => 83.0,
@@ -53,14 +106,68 @@ it('renders latest metric delta and history', function (): void {
             ->where('latest.weight_kg', 82.4)
             ->where('delta.weight_kg', -0.6)
             ->where('delta.body_fat_percent', -0.5)
+            ->where('range', '90')
+            ->where('trend.weight_kg', 82.85)
+            ->where('trend.delta_kg', -0.15)
+            ->missing('trend.to_goal_kg')
             ->has('history', 2)
         );
+
+    Date::setTestNow();
 });
 
-it('passes body goals to progress', function (): void {
+it('filters progress history by calendar range', function (): void {
+    Date::setTestNow('2026-08-20');
+
+    BodyMetric::query()->create(['date' => '2026-08-20', 'weight_kg' => 80]);
+    BodyMetric::query()->create(['date' => '2026-08-17', 'weight_kg' => 80.4]);
+    BodyMetric::query()->create(['date' => '2026-07-11', 'weight_kg' => 81]);
+    BodyMetric::query()->create(['date' => '2026-05-12', 'weight_kg' => 82]);
+
+    $this->get('/progress')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('range', '90')
+            ->has('history', 3)
+            ->where('latest.weight_kg', 80)
+        );
+
+    $this->get('/progress?range=30')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('range', '30')
+            ->has('history', 2)
+            ->where('latest.weight_kg', 80)
+        );
+
+    $this->get('/progress?range=all')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('range', 'all')
+            ->has('history', 4)
+        );
+
+    $this->get('/progress?range=7')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('range', '90')
+            ->has('history', 3)
+        );
+
+    Date::setTestNow();
+});
+
+it('passes body profile and goals to progress', function (): void {
     AppPreference::current()->update([
         'weight_unit' => 'lb',
         'height_unit' => 'in',
+    ]);
+
+    BodyProfile::current()->update([
+        'height_cm' => 178,
+        'age' => 32,
+        'sex' => 'male',
+        'activity_level' => 'moderate',
     ]);
 
     DailyGoal::query()->create([
@@ -69,7 +176,6 @@ it('passes body goals to progress', function (): void {
         'carbs_g' => 195,
         'fat_g' => 60,
         'macro_calories' => 2000,
-        'height_cm' => 178,
         'target_weight_kg' => 80,
         'target_body_fat_percent' => 15,
     ]);
@@ -77,9 +183,13 @@ it('passes body goals to progress', function (): void {
     $this->get('/progress')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('goals.height_cm', 178)
+            ->where('profile.height_cm', 178)
+            ->where('profile.age', 32)
+            ->where('profile.sex', 'male')
+            ->where('profile.activity_level', 'moderate')
             ->where('goals.target_weight_kg', 80)
             ->where('goals.target_body_fat_percent', 15)
+            ->where('energy', null)
             ->where('preferences.weight_unit', 'lb')
             ->where('preferences.height_unit', 'in')
         );
@@ -92,73 +202,35 @@ it('deletes a body metric', function (): void {
     ]);
 
     $this->delete("/progress/body-metrics/{$metric->id}")
-        ->assertRedirect();
+        ->assertRedirect('/progress?range=90');
 
     $this->assertDatabaseMissing('body_metrics', ['id' => $metric->id]);
 });
 
-it('updates the body profile from progress', function (): void {
-    $this->put('/progress/body-profile', [
+it('estimates energy when the body profile and a weigh-in are complete', function (): void {
+    BodyMetric::query()->create([
+        'date' => '2026-05-19',
+        'weight_kg' => 80,
+    ]);
+
+    BodyProfile::current()->update([
         'height_cm' => 178,
-        'target_weight_kg' => 82,
-        'target_body_fat_percent' => 15,
-    ])->assertRedirect();
-
-    $this->assertDatabaseHas('daily_goals', [
-        'height_cm' => 178,
-        'target_weight_kg' => 82,
-        'target_body_fat_percent' => 15,
-    ]);
-});
-
-it('updates only the latest goal body profile and preserves nutrition targets', function (): void {
-    $older = DailyGoal::query()->create([
-        'calories' => 1800, 'protein_g' => 120, 'carbs_g' => 180, 'fat_g' => 62, 'macro_calories' => 1800,
-    ]);
-    $latest = DailyGoal::query()->create([
-        'calories' => 2200, 'protein_g' => 180, 'carbs_g' => 220, 'fat_g' => 68.89, 'macro_calories' => 2200,
-    ]);
-    $older->forceFill(['updated_at' => now()->subDay()])->save();
-
-    $this->put('/progress/body-profile', [
-        'height_cm' => 178, 'target_weight_kg' => 82, 'target_body_fat_percent' => 15,
-    ])->assertRedirect();
-
-    expect($older->fresh()->height_cm)->toBeNull()
-        ->and($latest->fresh()->height_cm)->toBe('178.00')
-        ->and($latest->fresh()->calories)->toBe(2200)
-        ->and((float) $latest->fresh()->protein_g)->toBe(180.0);
-});
-
-it('allows clearing every body profile value', function (): void {
-    DailyGoal::query()->create([
-        'calories' => 2000, 'protein_g' => 170, 'carbs_g' => 195, 'fat_g' => 60, 'macro_calories' => 2000,
-        'height_cm' => 178, 'target_weight_kg' => 80, 'target_body_fat_percent' => 15,
+        'age' => 30,
+        'sex' => 'male',
+        'activity_level' => 'moderate',
     ]);
 
-    $this->put('/progress/body-profile', [
-        'height_cm' => '', 'target_weight_kg' => '', 'target_body_fat_percent' => '',
-    ])->assertRedirect();
-
-    $this->assertDatabaseHas('daily_goals', [
-        'height_cm' => null, 'target_weight_kg' => null, 'target_body_fat_percent' => null,
-    ]);
-});
-
-it('requires and bounds each body profile field', function (): void {
-    foreach (['height_cm', 'target_weight_kg', 'target_body_fat_percent'] as $field) {
-        $payload = ['height_cm' => 178, 'target_weight_kg' => 82, 'target_body_fat_percent' => 15];
-        unset($payload[$field]);
-        $this->put('/progress/body-profile', $payload)->assertSessionHasErrors($field);
-    }
-
-    $this->put('/progress/body-profile', [
-        'height_cm' => 49, 'target_weight_kg' => 0, 'target_body_fat_percent' => 81,
-    ])->assertSessionHasErrors(['height_cm', 'target_weight_kg', 'target_body_fat_percent']);
+    $this->get('/progress')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('energy.bmr', 1768)
+            ->where('energy.tdee', 2740)
+        );
 });
 
 it('removes the old body profile endpoints', function (): void {
     $this->put('/settings/body-targets')->assertNotFound();
     $this->put('/settings/height')->assertNotFound();
     $this->put('/progress/height')->assertNotFound();
+    $this->put('/progress/body-profile')->assertNotFound();
 });

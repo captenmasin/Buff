@@ -2,8 +2,9 @@
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { Camera, Dumbbell, Home, Pencil, Plus, Scale, ScanBarcode, Search, Settings, Target, X } from '@lucide/vue';
+import { Home, Plus, Scale, Settings, Target, X } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
+import AddChooser from '../Components/Add/AddChooser.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Button from '../Components/ui/button/Button.vue';
 
@@ -29,7 +30,6 @@ const navItems = [
 ];
 
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
-const isAddActive = computed(() => path.value === '/add' || addDrawerOpen.value);
 
 function isActive(match: string) {
     return path.value === match;
@@ -90,11 +90,11 @@ function handleNativeAndroidBack() {
     return false;
 }
 
-function openAddMode(mode: string, extra: Record<string, string> = {}) {
+function openAddMode(mode: string, extra?: Record<string, string>) {
     hapticImpact();
     closeDrawerImmediately();
 
-    const params = new URLSearchParams({ mode, ...extra });
+    const params = new URLSearchParams({ mode, ...(extra ?? {}) });
     const selectedDate = page.props.summary?.date;
 
     if (selectedDate) {
@@ -203,9 +203,11 @@ onUnmounted(() => {
 <template>
     <div class="app-shell flex bg-background sm:pl-64">
         <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
-            <div class="mb-8 px-2">
+            <Link href="/" class="mb-8 flex items-center gap-2 px-2">
+                <img :src="'/icon.png'" alt="" class="size-12 rounded-2xl dark:hidden" />
+                <img :src="'/icon-dark.png'" alt="" class="hidden size-12 rounded-2xl dark:block" />
                 <p class="page-title text-[1.65rem]">Buff</p>
-            </div>
+            </Link>
 
             <nav class="grid gap-1" aria-label="Primary">
                 <Button
@@ -221,7 +223,7 @@ onUnmounted(() => {
                 </Button>
 
                 <Button
-                    :variant="isAddActive ? 'default' : 'surface'"
+                    variant="default"
                     class="mt-4 h-11 justify-start px-3 text-sm"
                     aria-label="Add"
                     @click="openAddDrawer()"
@@ -268,50 +270,7 @@ onUnmounted(() => {
                 </Button>
             </div>
 
-            <div class="grid gap-3">
-                <div class="grid grid-cols-3 gap-2">
-                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('food')">
-                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
-                            <Search :size="22" />
-                        </span>
-                        <span class="text-sm font-semibold">Search</span>
-                    </Button>
-
-                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('food', { scan: '1' })">
-                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
-                            <ScanBarcode :size="22" />
-                        </span>
-                        <span class="text-sm font-semibold">Scan</span>
-                    </Button>
-
-                    <Button variant="outline" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3" @click="openAddMode('custom')">
-                        <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
-                            <Pencil :size="22" />
-                        </span>
-                        <span class="text-sm font-semibold">Custom</span>
-                    </Button>
-                </div>
-
-                <Button variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left" @click="openAddMode('workout')">
-                    <span class="grid h-11 w-11 place-items-center rounded-xl bg-workout text-primary-foreground">
-                        <Dumbbell :size="22" />
-                    </span>
-                    <span>
-                        <span class="block font-semibold">Workout</span>
-                        <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
-                    </span>
-                </Button>
-
-                <Button variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left" @click="openAddMode('photo')">
-                    <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
-                        <Camera :size="22" />
-                    </span>
-                    <span>
-                        <span class="block font-semibold">Photo meal</span>
-                        <span class="block text-sm font-medium text-muted-foreground">Estimate editable macros</span>
-                    </span>
-                </Button>
-            </div>
+            <AddChooser @select="openAddMode" />
         </AppSheet>
 
         <nav class="bottom-nav fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-border/70 bg-card/80 shadow-card backdrop-blur-xl sm:hidden">

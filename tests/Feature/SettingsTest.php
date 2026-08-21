@@ -1,14 +1,16 @@
 <?php
 
 use App\Models\AppPreference;
+use App\Models\BodyProfile;
 use App\Models\DailyGoal;
 use App\Models\MealEntry;
+use App\Models\SyncOutbox;
 use App\Services\AppleHealthBridge;
 use App\Services\HealthConnectBridge;
 use App\Services\MealReminderBridge;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('renders unit and reminder settings without body profile data', function (): void {
+it('renders unit reminder and body profile settings', function (): void {
     app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
         androidDetector: fn (): bool => false,
     ));
@@ -16,13 +18,19 @@ it('renders unit and reminder settings without body profile data', function (): 
         iosDetector: fn (): bool => false,
     ));
 
+    BodyProfile::current()->update([
+        'height_cm' => 178,
+        'age' => 32,
+        'sex' => 'male',
+        'activity_level' => 'moderate',
+    ]);
+
     DailyGoal::query()->create([
         'calories' => 2000,
         'protein_g' => 170,
         'carbs_g' => 195,
         'fat_g' => 60,
         'macro_calories' => 2000,
-        'height_cm' => 178,
         'target_weight_kg' => 80,
         'target_body_fat_percent' => 15,
     ]);
@@ -34,6 +42,11 @@ it('renders unit and reminder settings without body profile data', function (): 
             ->missing('settings')
             ->where('preferences.weight_unit', 'kg')
             ->where('preferences.height_unit', 'cm')
+            ->where('preferences.eat_back', 'all')
+            ->where('bodyProfile.height_cm', 178)
+            ->where('bodyProfile.age', 32)
+            ->where('bodyProfile.sex', 'male')
+            ->where('bodyProfile.activity_level', 'moderate')
             ->where('mealReminders.breakfast.enabled', false)
             ->where('mealReminders.breakfast.time', '08:00')
             ->where('mealReminders.lunch.enabled', false)
@@ -60,6 +73,109 @@ it('updates unit preferences from settings', function (): void {
         'weight_unit' => 'lb',
         'height_unit' => 'in',
     ]);
+});
+
+it('updates eat-back preference from settings', function (): void {
+    AppPreference::current();
+
+    $this->put('/settings/eat-back', [
+        'eat_back' => 'half',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('app_preferences', [
+        'eat_back' => 'half',
+    ]);
+});
+
+it('rejects invalid eat-back values', function (): void {
+    $this->put('/settings/eat-back', [
+        'eat_back' => 'quarter',
+    ])->assertSessionHasErrors('eat_back');
+});
+
+it('updates body profile from settings and syncs it separately from goals', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2200,
+        'protein_g' => 180,
+        'carbs_g' => 220,
+        'fat_g' => 68.89,
+        'macro_calories' => 2200,
+        'target_weight_kg' => 80,
+        'target_body_fat_percent' => 15,
+    ]);
+
+    $this->put('/settings/body-profile', [
+        'height_cm' => 178,
+        'age' => 32,
+        'sex' => 'female',
+        'activity_level' => 'light',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('body_profiles', [
+        'id' => BodyProfile::ID,
+        'height_cm' => 178,
+        'age' => 32,
+        'sex' => 'female',
+        'activity_level' => 'light',
+    ]);
+
+    $this->assertDatabaseHas('daily_goals', [
+        'calories' => 2200,
+        'target_weight_kg' => 80,
+        'target_body_fat_percent' => 15,
+    ]);
+
+    $outbox = SyncOutbox::query()->where('record_id', BodyProfile::ID)->firstOrFail();
+
+    expect($outbox->record_type)->toBe('body_profiles')
+        ->and($outbox->payload['age'])->toBe(32)
+        ->and($outbox->payload['sex'])->toBe('female')
+        ->and($outbox->payload['activity_level'])->toBe('light');
+});
+
+it('allows clearing body profile without clearing body targets', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000, 'protein_g' => 170, 'carbs_g' => 195, 'fat_g' => 60, 'macro_calories' => 2000,
+        'target_weight_kg' => 80, 'target_body_fat_percent' => 15,
+    ]);
+
+    BodyProfile::current()->update([
+        'height_cm' => 178,
+        'age' => 32,
+        'sex' => 'male',
+        'activity_level' => 'moderate',
+    ]);
+
+    $this->put('/settings/body-profile', [
+        'height_cm' => '',
+        'age' => '',
+        'sex' => '',
+        'activity_level' => '',
+    ])->assertRedirect();
+
+    $this->assertDatabaseHas('body_profiles', [
+        'id' => BodyProfile::ID,
+        'height_cm' => null,
+        'age' => null,
+        'sex' => null,
+        'activity_level' => null,
+    ]);
+
+    $this->assertDatabaseHas('daily_goals', [
+        'target_weight_kg' => 80,
+        'target_body_fat_percent' => 15,
+    ]);
+});
+
+it('requires and bounds body profile fields', function (): void {
+    $this->put('/settings/body-profile', [])->assertSessionHasErrors(['height_cm', 'age', 'sex', 'activity_level']);
+
+    $this->put('/settings/body-profile', [
+        'height_cm' => 49,
+        'age' => 12,
+        'sex' => 'unknown',
+        'activity_level' => 'extreme',
+    ])->assertSessionHasErrors(['height_cm', 'age', 'sex', 'activity_level']);
 });
 
 it('updates and schedules meal reminders', function (): void {

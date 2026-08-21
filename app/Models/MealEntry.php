@@ -12,11 +12,14 @@ class MealEntry extends SyncedModel
 
     public const SOURCE_BARCODE = 'barcode';
 
+    public const SOURCE_RECIPE = 'recipe';
+
     protected $fillable = [
         'date',
         'meal_type',
         'source_type',
         'food_product_id',
+        'recipe_id',
         'name',
         'portion_quantity',
         'portion_unit',
@@ -41,5 +44,10 @@ class MealEntry extends SyncedModel
     public function foodProduct(): BelongsTo
     {
         return $this->belongsTo(FoodProduct::class);
+    }
+
+    public function recipe(): BelongsTo
+    {
+        return $this->belongsTo(Recipe::class);
     }
 }

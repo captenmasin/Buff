@@ -53,6 +53,7 @@ class WeeklySummaryController extends Controller
             ],
             'week' => $summary['days'],
             'roundup' => $summary['roundup'],
+            'insights' => $summary['insights'],
         ]);
     }
 }

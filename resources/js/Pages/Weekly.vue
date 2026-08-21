@@ -3,12 +3,13 @@ import { Head, Link, router } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import { ref } from 'vue';
 import Card from '../Components/Card.vue';
+import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Progress from '../Components/ui/progress/Progress.vue';
 import { formatDisplayDate } from '../dateFormat';
-import { dayStatusClass, dayStatusLabel, type DayStatus } from '../dayStatus';
+import { dayStatusLabel, type DayStatus } from '../dayStatus';
 
 interface WeekDay {
     date: string;
@@ -38,6 +39,11 @@ interface WeekRoundup {
     fat_goal_g: number | null;
 }
 
+interface WeekInsight {
+    id: string;
+    text: string;
+}
+
 const props = defineProps<{
     mode: 'week' | 'range';
     selectedDate: string;
@@ -48,6 +54,7 @@ const props = defineProps<{
     };
     week: WeekDay[];
     roundup: WeekRoundup;
+    insights: WeekInsight[];
 }>();
 
 const selectedMode = ref<'week' | 'range'>(props.mode);
@@ -162,10 +169,19 @@ function applySelection() {
             </div>
         </Card>
 
+        <Card v-if="insights.length">
+            <h2 class="card-title">Insights</h2>
+            <div class="mt-1 divide-y divide-border/60">
+                <p v-for="insight in insights" :key="insight.id" class="py-3 text-sm first:pt-3 last:pb-1">
+                    {{ insight.text }}
+                </p>
+            </div>
+        </Card>
+
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
-            <Card class="divide-y divide-border/60 py-1">
-                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
+            <Card class="divide-y divide-border/60 py-1.5">
+                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 py-3">
                     <span class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-muted font-semibold">
                         {{ day.label }}
                     </span>
@@ -178,7 +194,7 @@ function applySelection() {
                         </p>
                     </div>
                     <div class="flex shrink-0 flex-col items-end gap-1">
-                        <span class="h-3 w-3 rounded-full" :class="dayStatusClass(day.status)" aria-hidden="true" />
+                        <DayStatusIndicator :status="day.status" :size="18" />
                         <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>
                     </div>
                 </div>

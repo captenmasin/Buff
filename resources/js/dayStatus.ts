@@ -9,11 +9,15 @@ export function dayStatusLabel(status: DayStatus): string {
     }[status];
 }
 
+export function dayStatusHasTick(status: DayStatus): boolean {
+    return status !== 'neutral';
+}
+
 export function dayStatusClass(status: DayStatus): string {
     return {
-        target: 'bg-success',
-        under: 'border-2 border-warning bg-transparent',
-        over: 'bg-fat',
+        target: 'bg-success text-white',
+        under: 'bg-warning text-white',
+        over: 'bg-fat text-white',
         neutral: 'border border-muted-foreground/50 bg-transparent',
     }[status];
 }

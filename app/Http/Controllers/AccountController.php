@@ -12,6 +12,7 @@ use App\Services\LocalAccountData;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -42,9 +43,11 @@ class AccountController extends Controller
         return $this->page('register');
     }
 
-    public function forgotPasswordPage(): Response
+    public function forgotPasswordPage(Request $request): Response
     {
-        return $this->page('forgot');
+        $email = $request->string('email')->trim()->toString();
+
+        return $this->page('forgot', $email === '' ? [] : ['email' => $email]);
     }
 
     public function resetPasswordPage(Request $request): Response
@@ -70,7 +73,7 @@ class AccountController extends Controller
         return $this->page('verify', ['email' => $account['email'] ?? null]);
     }
 
-    public function register(Request $request): RedirectResponse
+    public function register(Request $request, LocalAccountData $localData): RedirectResponse
     {
         if ($redirect = $this->registrationRedirect()) {
             return $redirect;
@@ -89,12 +92,12 @@ class AccountController extends Controller
             'device_name' => $this->deviceName(),
         ], false);
 
-        $this->finishAuthentication($result);
+        $this->finishAuthentication($result, $localData);
 
-        return redirect('/onboarding')->with('message', 'Account created. Check your email when you can to verify it.');
+        return redirect('/onboarding');
     }
 
-    public function login(Request $request): RedirectResponse
+    public function login(Request $request, LocalAccountData $localData): RedirectResponse
     {
         $validated = $request->validate([
             'email' => ['required', 'email', 'max:255'],
@@ -107,7 +110,33 @@ class AccountController extends Controller
             'device_name' => $this->deviceName(),
         ], false);
 
-        $this->finishAuthentication($result);
+        $this->finishAuthentication($result, $localData);
+
+        return $this->accountRedirect();
+    }
+
+    public function socialCallback(Request $request, LocalAccountData $localData): RedirectResponse
+    {
+        if ($error = $request->string('error')->toString()) {
+            return redirect()->route('account.login')->with('message', $error);
+        }
+
+        $code = $request->string('code')->toString();
+
+        if ($code === '') {
+            return redirect()->route('account.login')->with('message', 'Social sign-in could not be completed.');
+        }
+
+        $result = $this->api->post('auth/social/redeem', [
+            'code' => $code,
+            'device_name' => $this->deviceName(),
+        ], false);
+
+        try {
+            $this->finishAuthentication($result, $localData);
+        } catch (ValidationException) {
+            return redirect()->route('account.login')->with('message', 'Social sign-in could not be completed.');
+        }
 
         return $this->accountRedirect();
     }
@@ -133,6 +162,13 @@ class AccountController extends Controller
             'password_confirmation' => $request->string('password_confirmation')->toString(),
         ], false);
         $this->ensureSuccessful($result, 'email');
+
+        $storedEmail = $this->credentials->account()['email'] ?? null;
+
+        if (is_string($storedEmail)
+            && Str::lower(trim($storedEmail)) === Str::lower(trim($validated['email']))) {
+            $this->credentials->clearToken();
+        }
 
         return redirect()->route('account.login')->with('message', 'Password reset. Sign in again.');
     }
@@ -196,6 +232,14 @@ class AccountController extends Controller
         return redirect()->route('account.login')->with('message', 'Signed out and removed local health data.');
     }
 
+    public function destroyLocalData(LocalAccountData $localData): RedirectResponse
+    {
+        $this->credentials->clear();
+        $localData->wipe();
+
+        return redirect()->route('account.register')->with('message', 'Device data cleared.');
+    }
+
     public function destroy(Request $request, LocalAccountData $localData): RedirectResponse
     {
         $validated = $request->validate(['password' => ['required', 'string']]);
@@ -207,7 +251,7 @@ class AccountController extends Controller
         return redirect()->route('account.register')->with('message', 'Your Buff account was deleted.');
     }
 
-    private function finishAuthentication(BuffApiResult $result): void
+    private function finishAuthentication(BuffApiResult $result, LocalAccountData $localData): void
     {
         $this->ensureSuccessful($result, 'email');
         $token = $result->data['token'] ?? null;
@@ -222,13 +266,7 @@ class AccountController extends Controller
         $existingState = SyncState::query()->first();
 
         if ($existingState?->account_id !== null && $existingState->account_id !== $account['id']) {
-            $this->credentials->store($token, $account);
-            $this->api->post('auth/logout');
-            $this->credentials->clear();
-
-            throw ValidationException::withMessages([
-                'email' => 'This device contains offline data for another account. Sign in to that account and log out before switching.',
-            ]);
+            $localData->wipe();
         }
 
         $this->credentials->store($token, $account);
@@ -265,7 +303,7 @@ class AccountController extends Controller
         }
 
         if ($this->credentials->account() !== null || SyncState::query()->exists()) {
-            return redirect()->route('account.login')->with('message', 'This device already contains local account data. Sign in to continue.');
+            return redirect()->route('account.login')->with('message', 'This device already has data. Sign in to keep using it.');
         }
 
         return null;
@@ -274,7 +312,11 @@ class AccountController extends Controller
     /** @param array<string, mixed> $props */
     private function page(string $screen, array $props = []): Response
     {
-        return Inertia::render('Account', ['screen' => $screen, ...$props]);
+        return Inertia::render('Account', [
+            'screen' => $screen,
+            'socialLoginUrl' => rtrim((string) config('buff.api_url'), '/').'/auth',
+            ...$props,
+        ]);
     }
 
     private function deviceName(): string

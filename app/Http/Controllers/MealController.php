@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\FoodProduct;
 use App\Models\MealEntry;
 use App\Models\PendingMealAnalysisConfirmation;
+use App\Models\Recipe;
 use App\Services\BuffSyncService;
 use App\Services\NutritionCalculator;
 use App\Services\OpenFoodFactsService;
@@ -31,7 +32,7 @@ class MealController extends Controller
         };
 
         $meal = $request->string('meal')->toString();
-        $availableModes = ['food', 'custom', 'workout', 'photo'];
+        $availableModes = ['food', 'custom', 'workout', 'photo', 'recipe'];
 
         return Inertia::render('Add', [
             'date' => $request->filled('date')
@@ -44,6 +45,11 @@ class MealController extends Controller
             'previousFoodEntries' => $this->previousFoodEntries(),
             'previousCustomMeals' => $this->previousCustomMeals(),
             'previousBreakfastMeals' => $this->previousBreakfastMeals(),
+            'recipes' => Recipe::query()
+                ->latest()
+                ->get()
+                ->map(fn (Recipe $recipe): array => $recipe->toPayload())
+                ->all(),
         ]);
     }
 
@@ -175,6 +181,37 @@ class MealController extends Controller
         ]);
 
         return redirect('/?date='.$validated['date'])->with('message', 'Meal added.');
+    }
+
+    public function storeFromRecipe(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+            'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
+            'recipe_id' => ['required', 'uuid', 'exists:recipes,id'],
+            'servings' => ['nullable', 'numeric', 'min:0.1', 'max:100'],
+        ]);
+
+        $recipe = Recipe::query()->findOrFail($validated['recipe_id']);
+        $loggedServings = (float) ($validated['servings'] ?? $recipe->servings);
+        $factor = $loggedServings / max((float) $recipe->servings, 0.1);
+        $totals = $recipe->totals();
+
+        MealEntry::query()->create([
+            'date' => $validated['date'],
+            'meal_type' => $validated['meal_type'],
+            'source_type' => MealEntry::SOURCE_RECIPE,
+            'recipe_id' => $recipe->id,
+            'name' => $recipe->name,
+            'portion_quantity' => $loggedServings,
+            'portion_unit' => null,
+            'calories' => (int) round($totals['calories'] * $factor),
+            'protein_g' => round($totals['protein_g'] * $factor, 2),
+            'carbs_g' => round($totals['carbs_g'] * $factor, 2),
+            'fat_g' => round($totals['fat_g'] * $factor, 2),
+        ]);
+
+        return redirect('/?date='.$validated['date'])->with('message', 'Recipe logged.');
     }
 
     public function update(Request $request, MealEntry $mealEntry, NutritionCalculator $calculator): RedirectResponse

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppPreference;
+use App\Models\BodyProfile;
 use App\Services\MealReminderBridge;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
@@ -21,7 +22,9 @@ class SettingsController extends Controller
             'preferences' => [
                 'weight_unit' => $preferences->weight_unit,
                 'height_unit' => $preferences->height_unit,
+                'eat_back' => $preferences->eatBack(),
             ],
+            'bodyProfile' => BodyProfile::current()->toPayload(),
             'mealReminders' => $preferences->mealReminders(),
             'healthConnect' => HealthConnectController::sharedStatus(),
             'appleHealth' => AppleHealthController::sharedStatus(),
@@ -39,6 +42,24 @@ class SettingsController extends Controller
         AppPreference::current()->update($validated);
 
         return back();
+    }
+
+    public function updateEatBack(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'eat_back' => ['required', Rule::in(AppPreference::EAT_BACK)],
+        ]);
+
+        AppPreference::current()->update($validated);
+
+        return back();
+    }
+
+    public function updateBodyProfile(Request $request): RedirectResponse
+    {
+        BodyProfile::current()->update($request->validate(BodyProfile::rules(present: true)));
+
+        return back()->with('message', 'Body profile saved.');
     }
 
     public function updateMealReminders(Request $request, MealReminderBridge $bridge): RedirectResponse

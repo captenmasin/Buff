@@ -2,14 +2,17 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, Search, Utensils, History, X } from '@lucide/vue';
+import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import { resizePhoto } from '../photoResize';
+import AddChooser from '../Components/Add/AddChooser.vue';
 import MacroSummary from '../Components/Add/MacroSummary.vue';
+import MealTypePicker from '../Components/Add/MealTypePicker.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from "../Components/Card.vue";
 import PageHeader from '../Components/PageHeader.vue';
+import RecipeMode from '../Components/RecipeMode.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import Select from '../Components/ui/select/Select.vue';
@@ -80,6 +83,28 @@ interface SelectedPhoto {
     preview: string;
 }
 
+interface RecipeItem {
+    name: string;
+    food_product_id: string | null;
+    portion_quantity: number;
+    portion_unit: 'g' | 'ml';
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+}
+
+interface RecipeSummary {
+    id: string;
+    name: string;
+    servings: number;
+    calories: number;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+    items: RecipeItem[];
+}
+
 interface NativeBridge {
     Scanner: {
         scan(): {
@@ -106,20 +131,15 @@ const props = withDefaults(defineProps<{
     previousFoodEntries?: PreviousMeal[];
     previousCustomMeals?: PreviousMeal[];
     previousBreakfastMeals?: PreviousMeal[];
+    recipes?: RecipeSummary[];
 }>(), {
     meal: null,
     autoScan: false,
     previousFoodEntries: () => [],
     previousCustomMeals: () => [],
     previousBreakfastMeals: () => [],
+    recipes: () => [],
 });
-
-const mealLabels: Record<MealType, string> = {
-    breakfast: 'Breakfast',
-    lunch: 'Lunch',
-    dinner: 'Dinner',
-    snacks: 'Snacks',
-};
 
 const customMealMacroFields: ReadonlyArray<readonly [MacroField, string]> = [
     ['protein_g', 'Protein'],
@@ -138,7 +158,15 @@ function addModeUrl(mode: string, extra: Record<string, string> = {}) {
         ...extra,
     });
 
+    if (props.meal && !params.has('meal')) {
+        params.set('meal', props.meal);
+    }
+
     return `/add?${params.toString()}`;
+}
+
+function openAddMode(mode: string, extra?: Record<string, string>) {
+    router.visit(addModeUrl(mode, extra ?? {}));
 }
 
 function smartMealType(): MealType {
@@ -173,6 +201,7 @@ const selectedPreviousMeal = ref<PreviousMeal | null>(null);
 const previousMealPortionQuantity = ref<number | null>(null);
 const previousMealPortionUnit = ref('g');
 let foodSearchRequestId = 0;
+let foodSearchTimer = 0;
 const photoInput = ref<HTMLInputElement | null>(null);
 const selectedPhotos = ref<SelectedPhoto[]>([]);
 const photoNote = ref('');
@@ -392,6 +421,13 @@ async function lookup(scannedBarcode: string | null = null) {
     } finally {
         lookupLoading.value = false;
     }
+}
+
+function queueFoodSearch() {
+    window.clearTimeout(foodSearchTimer);
+    foodSearchTimer = window.setTimeout(() => {
+        searchFoodProducts();
+    }, 250);
 }
 
 async function searchFoodProducts() {
@@ -675,9 +711,9 @@ function applyAnalysisDraft(analysis: {id: string; draft: MealAnalysisDraft}) {
     customMealForm.name = draft.name;
     customMealForm.portion_quantity = Number(draft.portion_quantity);
     customMealForm.portion_unit = draft.portion_unit;
-    customMealForm.protein_g = Number(draft.protein_g);
-    customMealForm.carbs_g = Number(draft.carbs_g);
-    customMealForm.fat_g = Number(draft.fat_g);
+    customMealForm.protein_g = String(draft.protein_g);
+    customMealForm.carbs_g = String(draft.carbs_g);
+    customMealForm.fat_g = String(draft.fat_g);
     customMealForm.analysis_id = analysis.id;
     customMealForm.clearErrors();
 }
@@ -789,9 +825,9 @@ function selectPreviousCustomMeal(meal: PreviousMeal) {
     customMealForm.name = meal.name;
     customMealForm.portion_quantity = meal.portion_quantity ?? 100;
     customMealForm.portion_unit = meal.portion_unit || 'g';
-    customMealForm.protein_g = meal.protein_g;
-    customMealForm.carbs_g = meal.carbs_g;
-    customMealForm.fat_g = meal.fat_g;
+    customMealForm.protein_g = String(meal.protein_g);
+    customMealForm.carbs_g = String(meal.carbs_g);
+    customMealForm.fat_g = String(meal.fat_g);
     customMealForm.clearErrors();
 }
 
@@ -814,6 +850,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+    window.clearTimeout(foodSearchTimer);
     stopWebScan();
     selectedPhotos.value.forEach(({preview}) => URL.revokeObjectURL(preview));
 
@@ -828,8 +865,8 @@ onUnmounted(() => {
 
     <section class="space-y-5">
         <PageHeader :kicker="displayDate">
-            {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Workout' : 'Add' }}
-            <span v-if="meal"> — {{ meal }}</span>
+            {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Add workout' : mode === 'recipe' ? 'Recipes' : 'Add' }}
+            <span v-if="meal"> — {{ meal.charAt(0).toUpperCase() + meal.slice(1) }}</span>
         </PageHeader>
 
         <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-primary-foreground">
@@ -889,47 +926,20 @@ onUnmounted(() => {
             </div>
         </div>
 
-        <article v-if="mode === 'choose'" class="grid gap-3">
-            <Button :as="Link" :href="addModeUrl('food')" variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left">
-                <span class="grid h-11 w-11 place-items-center rounded-xl bg-primary text-primary-foreground">
-                    <Utensils :size="22" />
-                </span>
-                <span>
-                    <span class="block font-semibold">Food</span>
-                    <span class="block text-sm font-medium text-muted-foreground">Search, scan, or custom</span>
-                </span>
-            </Button>
+        <AddChooser v-if="mode === 'choose'" @select="openAddMode" />
 
-            <Button :as="Link" :href="addModeUrl('workout')" variant="outline" class="h-auto justify-start rounded-2xl p-4 text-left">
-                <span class="grid h-11 w-11 place-items-center rounded-xl bg-workout text-primary-foreground">
-                    <Dumbbell :size="22" />
-                </span>
-                <span>
-                    <span class="block font-semibold">Workout</span>
-                    <span class="block text-sm font-medium text-muted-foreground">Log calories burned</span>
-                </span>
-            </Button>
-
-            <Button
-                :as="Link"
-                :href="addModeUrl('photo')"
-                variant="outline"
-                class="h-auto justify-start rounded-2xl p-4 text-left"
-            >
-                <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
-                    <Camera :size="22" />
-                </span>
-                <span>
-                    <span class="block font-semibold">Photo meal</span>
-                    <span class="block text-sm font-medium text-muted-foreground">Estimate editable macros</span>
-                </span>
-            </Button>
-        </article>
+        <RecipeMode
+            v-if="mode === 'recipe'"
+            :date="date"
+            :meal-types="mealTypes"
+            :recipes="recipes"
+            :meal="meal"
+        />
 
         <Card v-if="mode === 'photo' && !analysisContext">
             <div class="flex items-center gap-2">
                 <Camera :size="21" class="text-food" />
-                <h2 class="font-semibold">Analyze meal photos</h2>
+                <h2 class="card-title">Analyze meal photos</h2>
             </div>
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
@@ -987,47 +997,39 @@ onUnmounted(() => {
 
         <Card v-if="mode === 'food'">
             <div class="flex items-center gap-2">
-                <Search :size="21" class="text-fat" />
-                <h2 class="font-semibold">Food</h2>
-            </div>
-
-            <div class="mt-4 grid grid-cols-3 gap-2">
-                <Button variant="default" class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3">
-                    <Search :size="22" />
-                    <span class="text-sm font-semibold">Search</span>
-                </Button>
-                <Button
-                    variant="outline"
-                    class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3"
-                    :disabled="scannerStarting"
-                    @click="startScan"
-                >
-                    <Camera :size="22" />
-                    <span class="text-sm font-semibold">{{ scannerStarting ? 'Opening...' : 'Scan' }}</span>
-                </Button>
-                <Button
-                    :as="Link"
-                    :href="`/add?date=${date}&mode=custom`"
-                    variant="outline"
-                    class="h-auto w-full flex-col gap-2 rounded-2xl px-2 py-3"
-                >
-                    <Pencil :size="22" />
-                    <span class="text-sm font-semibold">Custom</span>
-                </Button>
+                <Search :size="21" class="text-food" />
+                <h2 class="card-title">Search food</h2>
             </div>
 
             <form class="mt-4 flex gap-2" @submit.prevent="searchFoodProducts">
                 <Input
                     v-model="foodSearch"
                     type="search"
-                    placeholder="Search..."
+                    placeholder="Search foods..."
                     class="min-w-0 flex-1"
+                    @input="queueFoodSearch"
                 />
-                <Button class="aspect-square h-[50px] shrink-0 px-0 py-0" :disabled="foodSearchLoading" aria-label="Search foods">
-                    <LoaderCircle v-if="foodSearchLoading" :size="21" class="animate-spin" />
-                    <Search v-else :size="21" />
+                <Button
+                    type="button"
+                    variant="outline"
+                    class="aspect-square h-[50px] shrink-0 px-0 py-0"
+                    :disabled="scannerStarting"
+                    aria-label="Scan barcode"
+                    @click="startScan"
+                >
+                    <ScanBarcode :size="21" />
                 </Button>
             </form>
+
+            <Button
+                :as="Link"
+                :href="addModeUrl('custom')"
+                variant="ghost"
+                class="mt-2 h-auto w-full justify-start px-1 py-2 text-left text-sm font-medium text-muted-foreground"
+            >
+                <Pencil :size="16" />
+                Add custom food
+            </Button>
 
             <p v-if="nativeMessage" class="mt-3 rounded-xl bg-muted p-3 text-sm text-foreground/80">{{ nativeMessage }}</p>
             <p v-if="lookupError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground">{{ lookupError }}</p>
@@ -1085,9 +1087,9 @@ onUnmounted(() => {
                 </div>
             </div>
 
-            <p v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+            <div v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
                 No products found.
-            </p>
+            </div>
         </Card>
 
         <AppSheet
@@ -1152,21 +1154,7 @@ onUnmounted(() => {
                     </Select>
                 </div>
 
-                <div class="rounded-xl border border-border bg-muted p-3">
-                    <p class="text-base font-semibold">When did you have it?</p>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        <Button
-                            v-for="mealType in mealTypes"
-                            :key="mealType"
-                            type="button"
-                            class="min-h-11 px-3 text-base"
-                            :variant="selectedMealType === mealType ? 'default' : 'inverse'"
-                            @click="setMealType(mealType)"
-                        >
-                            {{ mealLabels[mealType] }}
-                        </Button>
-                    </div>
-                </div>
+                <MealTypePicker v-model="selectedMealType" :meal-types="mealTypes" @update:model-value="setMealType" />
 
                 <MacroSummary :macros="activeFoodMacros" />
 
@@ -1185,7 +1173,7 @@ onUnmounted(() => {
         <Card v-if="mode === 'custom' || analysisContext">
             <div class="flex items-center gap-2">
                 <Utensils :size="21" class="text-food" />
-                <h2 class="font-semibold">{{ analysisContext ? 'Review meal estimate' : 'Custom food' }}</h2>
+                <h2 class="card-title">{{ analysisContext ? 'Review meal estimate' : 'Custom food' }}</h2>
             </div>
 
             <div v-if="analysisContext" class="mt-4 rounded-xl bg-muted p-3 text-sm">
@@ -1209,12 +1197,14 @@ onUnmounted(() => {
                         :key="meal.id"
                         type="button"
                         variant="surface"
-                        class="h-auto justify-start p-3 text-left"
+                        class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                         @click="selectPreviousCustomMeal(meal)"
                     >
-                        <span class="block font-semibold">{{ meal.name }}</span>
-                        <span class="block text-sm text-muted-foreground">
-                            {{ meal.calories }} kcal<span v-if="meal.portion_quantity"> · {{ meal.portion_quantity }}{{ meal.portion_unit }}</span> · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
+                        <span class="min-w-0 flex-1 overflow-hidden">
+                            <span class="block truncate font-semibold">{{ meal.name }}</span>
+                            <span class="mt-0.5 block text-sm font-medium whitespace-normal text-muted-foreground">
+                                {{ meal.calories }} kcal<span v-if="meal.portion_quantity"> · {{ meal.portion_quantity }}{{ meal.portion_unit }}</span> · P {{ meal.protein_g }}g · C {{ meal.carbs_g }}g · F {{ meal.fat_g }}g
+                            </span>
                         </span>
                     </Button>
                 </div>
@@ -1273,21 +1263,7 @@ onUnmounted(() => {
                     </label>
                 </div>
 
-                <div class="rounded-xl border border-border bg-muted p-3">
-                    <p class="text-sm font-semibold">When did you have it?</p>
-                    <div class="mt-3 grid grid-cols-2 gap-2">
-                        <Button
-                            v-for="mealType in mealTypes"
-                            :key="mealType"
-                            type="button"
-                            class="min-h-11 px-3 text-sm"
-                            :variant="selectedMealType === mealType ? 'default' : 'inverse'"
-                            @click="setMealType(mealType)"
-                        >
-                            {{ mealLabels[mealType] }}
-                        </Button>
-                    </div>
-                </div>
+                <MealTypePicker v-model="selectedMealType" :meal-types="mealTypes" @update:model-value="setMealType" />
 
                 <div :class="analysisContext ? 'grid grid-cols-2 gap-2' : ''">
                     <Button v-if="analysisContext" type="button" variant="surface" :disabled="customMealForm.processing" @click="cancelAnalysis">
@@ -1333,7 +1309,7 @@ onUnmounted(() => {
         <Card v-if="mode === 'workout'">
             <div class="flex items-center gap-2">
                 <Dumbbell :size="21" class="text-workout" />
-                <h2 class="font-semibold">Workout</h2>
+                <h2 class="card-title">Workout</h2>
             </div>
 
             <form class="mt-4 space-y-4" @submit.prevent="addWorkout">

@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\AppPreference;
+use App\Models\BodyMetric;
+use App\Models\BodyProfile;
 use App\Models\DailyGoal;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
@@ -20,13 +22,21 @@ class OnboardingController extends Controller
             return redirect('/');
         }
 
+        $profile = BodyProfile::query()->find(BodyProfile::ID);
+
         return Inertia::render('Onboarding', [
             'defaults' => [
                 'calories' => 2000,
                 'protein_g' => 170,
                 'carbs_g' => 195,
                 'fat_g' => 60,
-                'height_cm' => null,
+                ...($profile?->toPayload() ?? [
+                    'height_cm' => null,
+                    'age' => null,
+                    'sex' => null,
+                    'activity_level' => null,
+                ]),
+                'current_weight_kg' => null,
                 'target_weight_kg' => null,
                 'target_body_fat_percent' => null,
                 'weight_unit' => 'kg',
@@ -42,7 +52,8 @@ class OnboardingController extends Controller
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'height_cm' => ['nullable', 'numeric', 'min:50', 'max:260'],
+            ...BodyProfile::rules(),
+            'current_weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
             'target_weight_kg' => ['nullable', 'numeric', 'min:1', 'max:1000'],
             'target_body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
             'weight_unit' => ['required', Rule::in(AppPreference::WEIGHT_UNITS)],
@@ -67,15 +78,30 @@ class OnboardingController extends Controller
             'carbs_g' => $validated['carbs_g'],
             'fat_g' => $validated['fat_g'],
             'macro_calories' => $macroCalories,
-            'height_cm' => $validated['height_cm'] ?? null,
             'target_weight_kg' => $validated['target_weight_kg'] ?? null,
             'target_body_fat_percent' => $validated['target_body_fat_percent'] ?? null,
+        ]);
+
+        BodyProfile::current()->update([
+            'height_cm' => $validated['height_cm'] ?? null,
+            'age' => $validated['age'] ?? null,
+            'sex' => $validated['sex'] ?? null,
+            'activity_level' => $validated['activity_level'] ?? null,
         ]);
 
         AppPreference::current()->update([
             'weight_unit' => $validated['weight_unit'],
             'height_unit' => $validated['height_unit'],
         ]);
+
+        BodyMetric::query()->updateOrCreate(
+            ['date' => today()->startOfDay()],
+            [
+                'weight_kg' => $validated['current_weight_kg'],
+                'body_fat_percent' => null,
+                'notes' => null,
+            ]
+        );
 
         return redirect('/')->with('message', 'Buff is ready.');
     }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\AppPreference;
 use App\Models\DailyGoal;
 use App\Models\MealEntry;
 use App\Models\WorkoutEntry;
@@ -50,7 +51,7 @@ class MacroController extends Controller
             ->whereDate('date', $date->toDateString())
             ->sum('calories_burned');
 
-        $effectiveGoal = $goal ? $calculator->effectiveDailyGoal($goal, $burned) : null;
+        $effectiveGoal = $goal ? $calculator->effectiveDailyGoal($goal, $burned, AppPreference::current()->eatBack()) : null;
 
         $entries = MealEntry::query()
             ->with('foodProduct')

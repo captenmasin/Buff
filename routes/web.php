@@ -11,6 +11,7 @@ use App\Http\Controllers\MealAnalysisController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProgressController;
+use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\WeeklySummaryController;
@@ -20,6 +21,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/account/login', [AccountController::class, 'loginPage'])->name('account.login');
 Route::post('/account/login', [AccountController::class, 'login']);
+Route::delete('/account/local-data', [AccountController::class, 'destroyLocalData']);
+Route::get('/account/social/callback', [AccountController::class, 'socialCallback']);
 Route::get('/account/register', [AccountController::class, 'registerPage'])->name('account.register');
 Route::post('/account/register', [AccountController::class, 'register']);
 Route::get('/account/forgot-password', [AccountController::class, 'forgotPasswordPage']);
@@ -44,6 +47,8 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
 
     Route::get('/settings', [SettingsController::class, 'edit']);
     Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
+    Route::put('/settings/eat-back', [SettingsController::class, 'updateEatBack']);
+    Route::put('/settings/body-profile', [SettingsController::class, 'updateBodyProfile']);
     Route::put('/settings/meal-reminders', [SettingsController::class, 'updateMealReminders']);
     Route::patch('/account', [AccountController::class, 'update']);
     Route::delete('/account', [AccountController::class, 'destroy']);
@@ -52,10 +57,11 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
 
     Route::get('/progress', [ProgressController::class, 'index']);
     Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
-    Route::put('/progress/body-profile', [ProgressController::class, 'updateBodyProfile']);
     Route::delete('/progress/body-metrics/{bodyMetric}', [ProgressController::class, 'destroy']);
     Route::post('/progress/body-metrics/{bodyMetric}/photos', [BodyMetricPhotoController::class, 'store']);
     Route::get('/progress/body-metrics/{bodyMetric}/photos', [BodyMetricPhotoController::class, 'index']);
+    Route::get('/progress/body-metrics/{bodyMetric}/photos/pending/{pending}/{index}', [BodyMetricPhotoController::class, 'pending'])
+        ->whereNumber('index');
     Route::delete('/progress/body-metrics/{bodyMetric}/photos/{photo}', [BodyMetricPhotoController::class, 'destroy']);
 
     Route::get('/add', [MealController::class, 'create']);
@@ -63,6 +69,10 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/food-products/search', [MealController::class, 'searchFoodProducts']);
     Route::post('/meals/custom', [MealController::class, 'storeCustom']);
     Route::post('/meals/barcode', [MealController::class, 'storeBarcode']);
+    Route::post('/meals/recipe', [MealController::class, 'storeFromRecipe']);
+    Route::post('/recipes', [RecipeController::class, 'store']);
+    Route::put('/recipes/{recipe}', [RecipeController::class, 'update']);
+    Route::delete('/recipes/{recipe}', [RecipeController::class, 'destroy']);
     Route::post('/meals/{mealEntry}/repeat', [MealController::class, 'repeat']);
     Route::put('/meals/{mealEntry}', [MealController::class, 'update']);
     Route::delete('/meals/{mealEntry}', [MealController::class, 'destroy']);

@@ -69,8 +69,9 @@ class BuffApiClient
 
     /**
      * @param  array<int, UploadedFile>  $photos
+     * @param  array<int, string>  $poses
      */
-    public function uploadBodyMetricPhotos(string $bodyMetricId, array $photos): BuffApiResult
+    public function uploadBodyMetricPhotos(string $bodyMetricId, array $photos, array $poses): BuffApiResult
     {
         $request = $this->request(config('buff.http.meal_analysis_timeout'));
 
@@ -88,7 +89,9 @@ class BuffApiClient
         }
 
         try {
-            return $this->result($request->post("body-metrics/{$bodyMetricId}/photos"));
+            return $this->result($request->post("body-metrics/{$bodyMetricId}/photos", [
+                'poses' => array_values($poses),
+            ]));
         } catch (ConnectionException) {
             return new BuffApiResult(
                 BuffApiStatus::ConnectionFailed,

@@ -2,14 +2,15 @@
 
 namespace App\Services;
 
+use App\BodyMetricPhotoPose;
 use App\Models\BodyMetric;
 use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\SyncOutbox;
 use App\Models\SyncState;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BodyMetricPhotoUploader
 {
@@ -17,11 +18,12 @@ class BodyMetricPhotoUploader
 
     /**
      * @param  array<int, UploadedFile>  $photos
+     * @param  array<int, string>  $poses
      */
-    public function upload(BodyMetric $bodyMetric, array $photos): BuffApiResult
+    public function upload(BodyMetric $bodyMetric, array $photos, array $poses): BuffApiResult
     {
         if ($this->metricPendingSync($bodyMetric->id)) {
-            $this->stage($bodyMetric, $photos);
+            $this->stage($bodyMetric, $photos, $poses);
 
             return BuffApiResult::success([
                 'pending' => true,
@@ -29,21 +31,17 @@ class BodyMetricPhotoUploader
             ]);
         }
 
-        return $this->api->uploadBodyMetricPhotos($bodyMetric->id, $photos);
+        return $this->api->uploadBodyMetricPhotos($bodyMetric->id, $photos, $poses);
     }
 
     public function flushPending(): void
     {
-        PendingBodyMetricPhotoUpload::query()
-            ->where('created_at', '<', Date::now()->subDay())
-            ->each(fn (PendingBodyMetricPhotoUpload $pending) => $this->discard($pending));
-
         PendingBodyMetricPhotoUpload::query()->oldest()->each(function (PendingBodyMetricPhotoUpload $pending): void {
             if (SyncState::query()->doesntExist() || $this->metricPendingSync($pending->body_metric_id)) {
                 return;
             }
 
-            $photos = $this->filesFromPending($pending);
+            [$photos, $poses] = $this->filesFromPending($pending);
 
             if ($photos === []) {
                 $this->discard($pending);
@@ -51,7 +49,7 @@ class BodyMetricPhotoUploader
                 return;
             }
 
-            $result = $this->api->uploadBodyMetricPhotos($pending->body_metric_id, $photos);
+            $result = $this->api->uploadBodyMetricPhotos($pending->body_metric_id, $photos, $poses);
             $pending->increment('attempts');
 
             if ($result->successful()) {
@@ -62,6 +60,54 @@ class BodyMetricPhotoUploader
                 ]);
             }
         });
+    }
+
+    /**
+     * @return array<int, array{id: string, url: string, mime_type: string, pose: string|null, pending: bool}>
+     */
+    public function pendingPhotosFor(BodyMetric $bodyMetric): array
+    {
+        $photos = [];
+
+        PendingBodyMetricPhotoUpload::query()
+            ->where('body_metric_id', $bodyMetric->id)
+            ->oldest()
+            ->each(function (PendingBodyMetricPhotoUpload $pending) use (&$photos, $bodyMetric): void {
+                foreach ($pending->paths as $index => $path) {
+                    if (! is_string($path) || ! Storage::disk('local')->exists($path)) {
+                        continue;
+                    }
+
+                    $absolute = Storage::disk('local')->path($path);
+                    $pose = is_array($pending->poses) ? ($pending->poses[$index] ?? null) : null;
+
+                    $photos[] = [
+                        'id' => $pending->id.':'.$index,
+                        'url' => url("/progress/body-metrics/{$bodyMetric->id}/photos/pending/{$pending->id}/{$index}"),
+                        'mime_type' => mime_content_type($absolute) ?: 'image/jpeg',
+                        'pose' => is_string($pose) ? $pose : null,
+                        'pending' => true,
+                    ];
+                }
+            });
+
+        usort($photos, fn (array $left, array $right): int => BodyMetricPhotoPose::sortKey($left['pose']) <=> BodyMetricPhotoPose::sortKey($right['pose']));
+
+        return array_slice($photos, 0, 3);
+    }
+
+    public function pendingPhotoResponse(BodyMetric $bodyMetric, string $pendingId, int $index): StreamedResponse
+    {
+        $pending = PendingBodyMetricPhotoUpload::query()
+            ->where('body_metric_id', $bodyMetric->id)
+            ->whereKey($pendingId)
+            ->firstOrFail();
+
+        $path = $pending->paths[$index] ?? null;
+
+        abort_unless(is_string($path) && Storage::disk('local')->exists($path), 404);
+
+        return Storage::disk('local')->response($path);
     }
 
     public function discardForMetric(string $bodyMetricId): void
@@ -81,8 +127,9 @@ class BodyMetricPhotoUploader
 
     /**
      * @param  array<int, UploadedFile>  $photos
+     * @param  array<int, string>  $poses
      */
-    private function stage(BodyMetric $bodyMetric, array $photos): void
+    private function stage(BodyMetric $bodyMetric, array $photos, array $poses): void
     {
         $directory = 'progress-photos/'.$bodyMetric->id.'/'.Str::uuid()->toString();
         $paths = [];
@@ -100,6 +147,7 @@ class BodyMetricPhotoUploader
             'body_metric_id' => $bodyMetric->id,
             'paths' => $paths,
             'original_names' => $names,
+            'poses' => array_values($poses),
         ]);
     }
 
@@ -121,11 +169,12 @@ class BodyMetricPhotoUploader
     }
 
     /**
-     * @return array<int, UploadedFile>
+     * @return array{0: array<int, UploadedFile>, 1: array<int, string>}
      */
     private function filesFromPending(PendingBodyMetricPhotoUpload $pending): array
     {
         $photos = [];
+        $poses = [];
 
         foreach ($pending->paths as $index => $path) {
             if (! is_string($path) || ! Storage::disk('local')->exists($path)) {
@@ -134,10 +183,13 @@ class BodyMetricPhotoUploader
 
             $absolute = Storage::disk('local')->path($path);
             $name = $pending->original_names[$index] ?? basename($path);
+            $fallback = BodyMetricPhotoPose::cases()[$index] ?? BodyMetricPhotoPose::Front;
+            $pose = is_array($pending->poses) ? ($pending->poses[$index] ?? null) : null;
             $photos[] = new UploadedFile($absolute, $name, mime_content_type($absolute) ?: null, null, true);
+            $poses[] = is_string($pose) ? $pose : $fallback->value;
         }
 
-        return $photos;
+        return [$photos, $poses];
     }
 
     private function metricPendingSync(string $bodyMetricId): bool

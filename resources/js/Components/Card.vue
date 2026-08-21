@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Card as UiCard } from './ui/card'
 import { cn } from '../lib/utils'
 
 const props = defineProps({
@@ -11,7 +10,10 @@ const props = defineProps({
 </script>
 
 <template>
-    <UiCard :class="cn('gap-0 px-5 py-5', props.class)">
+    <div
+        data-slot="card"
+        :class="cn('group/card flex flex-col gap-0 overflow-hidden rounded-2xl bg-card px-5 py-5 text-sm text-card-foreground shadow-card has-data-[slot=card-footer]:pb-0 has-[>img:first-child]:pt-0 *:[img:first-child]:rounded-t-2xl *:[img:last-child]:rounded-b-2xl', props.class)"
+    >
         <slot />
-    </UiCard>
+    </div>
 </template>

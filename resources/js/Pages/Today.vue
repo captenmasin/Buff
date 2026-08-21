@@ -6,9 +6,10 @@ import type {DateValue} from '@internationalized/date';
 import {parseDate} from '@internationalized/date';
 import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
-import {dayStatusClass, dayStatusLabel, type DayStatus} from '../dayStatus';
+import {dayStatusLabel, type DayStatus} from '../dayStatus';
 import { hapticImpact } from '../haptics';
 import CalorieRing from '../Components/CalorieRing.vue';
+import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import AppSheet from '../Components/AppSheet.vue';
@@ -169,7 +170,6 @@ const mealIcons = {
 
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
-const populatedMealTypes = computed(() => props.mealTypes.filter((mealType) => Boolean(props.summary.entries[mealType]?.length)));
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
@@ -248,20 +248,20 @@ function cancelDelete() {
 }
 
 function confirmDelete() {
-    if (!pendingDelete.value) {
+    const pending = pendingDelete.value;
+
+    if (!pending) {
         return;
     }
 
-    const {kind, id} = pendingDelete.value;
+    const {kind, id} = pending;
+    pendingDelete.value = null;
     hapticImpact();
 
     if (kind === 'meal') {
         router.delete(`/meals/${id}`, {
             preserveScroll: true,
-            onSuccess: () => {
-                closeMeal();
-                cancelDelete();
-            },
+            onSuccess: closeMeal,
         });
 
         return;
@@ -269,7 +269,6 @@ function confirmDelete() {
 
     router.delete(`/workouts/${id}`, {
         preserveScroll: true,
-        onSuccess: cancelDelete,
     });
 }
 
@@ -580,19 +579,14 @@ onBeforeUnmount(() => {
                 v-for="day in week"
                 :key="day.date"
                 :href="`/?date=${day.date}`"
-                class="relative flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold"
+                class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold"
                 :class="day.is_selected ? 'bg-secondary text-foreground' : 'text-muted-foreground active:bg-muted'"
                 :aria-label="`${weekdayLabel(day.date, 'long')} ${day.date}, ${dayStatusLabel(day.status)}${day.is_today ? ', today' : ''}`"
             >
-                <span
-                    v-if="day.is_today"
-                    class="absolute top-1.5 h-1.5 w-1.5 rounded-full bg-primary"
-                    aria-hidden="true"
-                />
                 <span class="sm:hidden">{{ day.label }}</span>
                 <span class="hidden sm:inline lg:hidden">{{ weekdayLabel(day.date, 'short') }}</span>
                 <span class="hidden lg:inline">{{ weekdayLabel(day.date, 'long') }}</span>
-                <span class="h-1.5 w-1.5 rounded-full" :class="dayStatusClass(day.status)" aria-hidden="true"/>
+                <DayStatusIndicator :status="day.status" :size="16" />
             </Link>
         </nav>
 
@@ -607,7 +601,7 @@ onBeforeUnmount(() => {
                     <Plus :size="20" />
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h2 class="font-semibold">Start today</h2>
+                    <h2 class="card-title">Start today</h2>
                     <p class="mt-1 text-sm text-muted-foreground">Log a meal or workout to begin tracking this day.</p>
                 </div>
             </div>
@@ -641,40 +635,54 @@ onBeforeUnmount(() => {
             </div>
         </Card>
 
-        <section v-if="hasMeals" class="space-y-3">
+        <section class="space-y-3">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">Meals</h2>
                 <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" size="sm"><Plus class="w-4" />Add food</Button>
             </div>
 
-            <Card class="py-2">
-                <div v-for="mealType in populatedMealTypes" :key="mealType" class="py-3 first:pt-1 last:pb-1">
-                <div class="flex items-center gap-2 text-muted-foreground">
-                    <component :is="mealIcons[mealType]" class="w-4"></component>
-                    <h3 class="font-semibold text-foreground">{{ mealLabels[mealType] }}</h3>
-                </div>
+            <Card class="py-0">
+                <div class="-mx-5 divide-y divide-border/60">
+                    <div v-for="mealType in mealTypes" :key="mealType" class="px-5 py-3">
+                        <div class="flex items-center justify-between gap-2 text-muted-foreground">
+                            <div class="flex items-center gap-2">
+                                <component :is="mealIcons[mealType]" class="w-4"></component>
+                                <h3 class="font-semibold text-foreground">{{ mealLabels[mealType] }}</h3>
+                            </div>
+                            <Button
+                                v-if="!summary.entries[mealType]?.length"
+                                :as="Link"
+                                :href="`/add?mode=food&date=${summary.date}&meal=${mealType}`"
+                                variant="ghost"
+                                size="sm"
+                                :aria-label="`Add ${mealLabels[mealType].toLowerCase()}`"
+                            >
+                                <Plus class="w-4" />Add meal
+                            </Button>
+                        </div>
 
-                <div class="-mx-5 mt-1 divide-y divide-border/60">
-                    <div v-for="entry in summary.entries[mealType]" :key="entry.id">
-                        <Button
-                            variant="ghost"
-                            class="h-auto w-full min-w-0 items-center justify-between gap-3 rounded-none border-0 px-5 py-2.5 text-left active:translate-y-0"
-                            :aria-label="`View ${entry.name}`"
-                            @click="openMeal(entry, mealType, $event)"
-                        >
-                            <span class="min-w-0">
-                                <span class="block truncate font-medium text-foreground">{{ entry.name }}</span>
-                                <span class="block text-xs text-muted-foreground">
-                                    {{ entry.portion_quantity }}{{ entry.portion_unit }}
-                                </span>
-                            </span>
-                            <span class="shrink-0 text-right">
-                                <span class="block text-sm font-semibold tabular-nums text-foreground">{{ entry.calories }}</span>
-                                <span class="text-[10px] font-medium text-muted-foreground">kcal</span>
-                            </span>
-                        </Button>
+                        <div v-if="summary.entries[mealType]?.length" class="-mx-5 mt-1 divide-y divide-border/60">
+                            <div v-for="entry in summary.entries[mealType]" :key="entry.id">
+                                <Button
+                                    variant="ghost"
+                                    class="h-auto w-full min-w-0 items-center justify-between gap-3 rounded-none border-0 px-5 py-2.5 text-left active:translate-y-0"
+                                    :aria-label="`View ${entry.name}`"
+                                    @click="openMeal(entry, mealType, $event)"
+                                >
+                                    <span class="min-w-0">
+                                        <span class="block truncate font-medium text-foreground">{{ entry.name }}</span>
+                                        <span class="block text-xs text-muted-foreground">
+                                            {{ entry.portion_quantity }}{{ entry.portion_unit }}
+                                        </span>
+                                    </span>
+                                    <span class="shrink-0 text-right">
+                                        <span class="block text-sm font-semibold tabular-nums text-foreground">{{ entry.calories }}</span>
+                                        <span class="text-[10px] font-medium text-muted-foreground">kcal</span>
+                                    </span>
+                                </Button>
+                            </div>
+                        </div>
                     </div>
-                </div>
                 </div>
             </Card>
         </section>

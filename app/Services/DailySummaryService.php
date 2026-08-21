@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\AppPreference;
 use App\Models\DailyGoal;
 use App\Models\MealEntry;
 use App\Models\WorkoutEntry;
@@ -33,7 +34,9 @@ class DailySummaryService
 
         $calorieGoal = $goal?->calories ?? 0;
         $burned = (int) $workouts->sum('calories_burned');
-        $effectiveGoal = $goal ? $this->calculator->effectiveDailyGoal($goal, $burned) : null;
+        $eatBack = AppPreference::current()->eatBack();
+        $effectiveGoal = $goal ? $this->calculator->effectiveDailyGoal($goal, $burned, $eatBack) : null;
+        $eatenBack = $this->calculator->eatenBackCalories($burned, $eatBack);
 
         return [
             'date' => $date->toDateString(),
@@ -43,7 +46,7 @@ class DailySummaryService
             ],
             'totals' => [
                 ...$totals,
-                'calories_remaining' => $calorieGoal + $burned - $totals['calories'],
+                'calories_remaining' => $calorieGoal + $eatenBack - $totals['calories'],
                 'protein_remaining' => $effectiveGoal ? round($effectiveGoal['protein_g'] - $totals['protein_g'], 2) : 0,
                 'carbs_remaining' => $effectiveGoal ? round($effectiveGoal['carbs_g'] - $totals['carbs_g'], 2) : 0,
                 'fat_remaining' => $effectiveGoal ? round($effectiveGoal['fat_g'] - $totals['fat_g'], 2) : 0,
