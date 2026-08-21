@@ -37,6 +37,7 @@ it('keeps account and onboarding outside the app shell', function (): void {
         ->toContain("clearDataForm.delete('/account/local-data')")
         ->toContain("signInWith('google')")
         ->toContain("signInWith('apple')")
+        ->toContain('v-if="appleLoginAvailable"')
         ->toContain(':src="\'/icon.png\'"')
         ->toContain(':src="\'/icon-dark.png\'"')
         ->and($replacement)->toContain("hasLocalAccount ? 'confirm'")

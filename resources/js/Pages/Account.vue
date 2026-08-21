@@ -15,6 +15,7 @@ const props = withDefaults(defineProps<{
     screen: 'login' | 'register' | 'forgot' | 'reset' | 'verify';
     email?: string | null;
     token?: string;
+    appleLoginAvailable: boolean;
     socialLoginUrl: string;
 }>(), {
     email: '',
@@ -200,7 +201,7 @@ async function signInWith(provider: SocialProvider) {
                         <Button class="w-full" :disabled="loginForm.processing">Sign in</Button>
                         <div class="space-y-2 border-t pt-4">
                             <Button type="button" variant="surface" class="w-full" @click="signInWith('google')">Continue with Google</Button>
-                            <Button type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
+                            <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
                         </div>
                         <div class="flex justify-between text-sm">
                             <Link href="/account/forgot-password" class="text-primary">Forgot password?</Link>
@@ -229,7 +230,7 @@ async function signInWith(provider: SocialProvider) {
                     <Button class="w-full" :disabled="registerForm.processing">Create account</Button>
                     <div class="space-y-2 border-t pt-4">
                         <Button type="button" variant="surface" class="w-full" @click="signInWith('google')">Continue with Google</Button>
-                        <Button type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
+                        <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
                     </div>
                     <p class="text-center text-sm"><Link href="/account/login" class="text-primary">Back to sign in</Link></p>
                 </form>

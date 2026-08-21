@@ -10,6 +10,7 @@ use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Testing\AssertableInertia as Assert;
+use Native\Mobile\Facades\System;
 
 beforeEach(function (): void {
     $this->withMiddleware(EnsureBuffAccount::class);
@@ -107,6 +108,19 @@ it('prefills the password reset request email', function (): void {
             ->where('screen', 'forgot')
             ->where('email', 'mason@example.com'));
 });
+
+it('only offers apple login on ios', function (bool $isIos): void {
+    System::shouldReceive('isIos')->once()->andReturn($isIos);
+
+    $this->get('/account/login')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Account')
+            ->where('appleLoginAvailable', $isIos));
+})->with([
+    'iPhone' => true,
+    'other platforms' => false,
+]);
 
 it('clears only a matching account token after password reset', function (): void {
     $account = [

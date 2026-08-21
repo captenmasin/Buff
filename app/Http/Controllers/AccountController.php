@@ -16,6 +16,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Native\Mobile\Facades\System;
 
 class AccountController extends Controller
 {
@@ -314,6 +315,7 @@ class AccountController extends Controller
     {
         return Inertia::render('Account', [
             'screen' => $screen,
+            'appleLoginAvailable' => System::isIos(),
             'socialLoginUrl' => rtrim((string) config('buff.api_url'), '/').'/auth',
             ...$props,
         ]);
