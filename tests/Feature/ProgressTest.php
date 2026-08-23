@@ -4,6 +4,7 @@ use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use App\Models\SyncOutbox;
 use Illuminate\Support\Facades\Date;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -13,6 +14,8 @@ it('creates and updates a body metric for a date', function (): void {
             'date' => '2026-05-19',
             'weight_kg' => 82.4,
             'body_fat_percent' => 18.5,
+            'chest_cm' => 102.4,
+            'waist_cm' => 84.2,
             'notes' => 'Morning weigh-in',
         ])
         ->assertRedirect('/progress?range=90');
@@ -21,6 +24,8 @@ it('creates and updates a body metric for a date', function (): void {
         'date' => '2026-05-19 00:00:00',
         'weight_kg' => 82.4,
         'body_fat_percent' => 18.5,
+        'chest_cm' => 102.4,
+        'waist_cm' => 84.2,
     ]);
 
     $this->from('/progress')
@@ -36,8 +41,29 @@ it('creates and updates a body metric for a date', function (): void {
         'date' => '2026-05-19 00:00:00',
         'weight_kg' => 82.0,
         'body_fat_percent' => 18.2,
+        'chest_cm' => 102.4,
+        'waist_cm' => 84.2,
     ]);
+
+    $outbox = SyncOutbox::query()->where('record_type', 'body_metrics')->sole();
+
+    expect($outbox->payload['chest_cm'])->toBe('102.40')
+        ->and($outbox->payload['waist_cm'])->toBe('84.20');
 });
+
+it('validates body measurements', function (string $field, mixed $value): void {
+    $this->post('/progress/body-metrics', [
+        'date' => '2026-05-19',
+        'weight_kg' => 82.4,
+        $field => $value,
+    ])->assertSessionHasErrors($field);
+})->with([
+    'chest below range' => ['chest_cm', 0],
+    'waist above range' => ['waist_cm', 501],
+    'hips nonnumeric' => ['hips_cm', 'wide'],
+    'upper arm below range' => ['upper_arm_cm', 0],
+    'thigh above range' => ['thigh_cm', 501],
+]);
 
 it('reloads recent history after saving a measurement', function (): void {
     Date::setTestNow('2026-08-20');
@@ -91,12 +117,15 @@ it('renders latest metric delta and history', function (): void {
         'date' => '2026-05-18',
         'weight_kg' => 83.0,
         'body_fat_percent' => 19.0,
+        'chest_cm' => 103.0,
+        'waist_cm' => 85.0,
     ]);
 
     BodyMetric::query()->create([
         'date' => '2026-05-19',
         'weight_kg' => 82.4,
         'body_fat_percent' => 18.5,
+        'chest_cm' => 104.2,
     ]);
 
     $this->get('/progress')
@@ -106,6 +135,11 @@ it('renders latest metric delta and history', function (): void {
             ->where('latest.weight_kg', 82.4)
             ->where('delta.weight_kg', -0.6)
             ->where('delta.body_fat_percent', -0.5)
+            ->where('measurements.chest_cm.value_cm', 104.2)
+            ->where('measurements.chest_cm.delta_cm', 1.2)
+            ->where('measurements.waist_cm.value_cm', 85)
+            ->where('measurements.waist_cm.delta_cm', null)
+            ->where('measurements.hips_cm', null)
             ->where('range', '90')
             ->where('trend.weight_kg', 82.85)
             ->where('trend.delta_kg', -0.15)
@@ -161,6 +195,7 @@ it('passes body profile and goals to progress', function (): void {
     AppPreference::current()->update([
         'weight_unit' => 'lb',
         'height_unit' => 'in',
+        'measurement_unit' => 'in',
     ]);
 
     BodyProfile::current()->update([
@@ -192,6 +227,7 @@ it('passes body profile and goals to progress', function (): void {
             ->where('energy', null)
             ->where('preferences.weight_unit', 'lb')
             ->where('preferences.height_unit', 'in')
+            ->where('preferences.measurement_unit', 'in')
         );
 });
 

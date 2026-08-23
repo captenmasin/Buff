@@ -42,7 +42,7 @@ return [
         ],
         BodyMetric::class => [
             'type' => 'body_metrics',
-            'fields' => ['date', 'weight_kg', 'body_fat_percent', 'notes'],
+            'fields' => ['date', 'weight_kg', 'body_fat_percent', 'chest_cm', 'waist_cm', 'hips_cm', 'upper_arm_cm', 'thigh_cm', 'notes'],
         ],
         WorkoutEntry::class => [
             'type' => 'workout_entries',
@@ -54,7 +54,7 @@ return [
         ],
         AppPreference::class => [
             'type' => 'app_preferences',
-            'fields' => ['weight_unit', 'height_unit', 'meal_reminders', 'eat_back'],
+            'fields' => ['weight_unit', 'height_unit', 'measurement_unit', 'meal_reminders', 'eat_back'],
         ],
     ],
 ];

@@ -25,6 +25,7 @@ class HandleInertiaRequests extends Middleware
             'buff' => [
                 'account' => $credentials->account(),
                 'needs_sign_in' => $credentials->token() === null,
+                'can_resume' => $credentials->refreshToken() !== null,
                 'has_local_account' => $syncState !== null,
                 'sync' => $syncState ? [
                     'last_succeeded_at' => $syncState->last_succeeded_at?->toISOString(),

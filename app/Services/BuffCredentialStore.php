@@ -15,6 +15,8 @@ class BuffCredentialStore
 
     private ?string $token = null;
 
+    private ?string $refreshToken = null;
+
     /** @var array<string, mixed>|null */
     private ?array $account = null;
 
@@ -26,9 +28,10 @@ class BuffCredentialStore
     }
 
     /** @param array<string, mixed> $account */
-    public function store(string $token, array $account): void
+    public function store(string $token, array $account, ?string $refreshToken = null): void
     {
         $this->token = $token;
+        $this->refreshToken = $refreshToken;
         $this->account = $this->normalizeAccount($account);
         $this->lastRotationAttemptedAt = now();
         $this->persist();
@@ -37,6 +40,11 @@ class BuffCredentialStore
     public function token(): ?string
     {
         return $this->token;
+    }
+
+    public function refreshToken(): ?string
+    {
+        return $this->refreshToken;
     }
 
     /** @return array<string, mixed>|null */
@@ -77,9 +85,16 @@ class BuffCredentialStore
         $this->persist();
     }
 
+    public function clearRefreshToken(): void
+    {
+        $this->refreshToken = null;
+        $this->persist();
+    }
+
     public function clear(): void
     {
         $this->token = null;
+        $this->refreshToken = null;
         $this->lastRotationAttemptedAt = null;
         $this->account = null;
 
@@ -111,6 +126,7 @@ class BuffCredentialStore
 
         $payload = json_encode([
             'token' => $this->token,
+            'refresh_token' => $this->refreshToken,
             'account' => $this->account,
             'last_rotation_attempted_at' => $this->lastRotationAttemptedAt?->getTimestamp(),
         ], JSON_THROW_ON_ERROR);
@@ -144,12 +160,15 @@ class BuffCredentialStore
         }
 
         $token = $payload['token'] ?? null;
+        $refreshToken = $payload['refresh_token'] ?? null;
         $account = $payload['account'] ?? null;
         $rotationTimestamp = $payload['last_rotation_attempted_at'] ?? null;
 
         if (($token !== null && (! is_string($token) || $token === ''))
+            || ($refreshToken !== null && (! is_string($refreshToken) || $refreshToken === ''))
             || ($account !== null && (! is_array($account) || ! is_string($account['id'] ?? null)))
             || ($token !== null && $account === null)
+            || ($refreshToken !== null && $account === null)
             || ($rotationTimestamp !== null && ! is_int($rotationTimestamp))) {
             $disk->delete(self::CREDENTIAL_PATH);
 
@@ -157,6 +176,7 @@ class BuffCredentialStore
         }
 
         $this->token = $token;
+        $this->refreshToken = $refreshToken;
         $this->account = $account;
         $this->lastRotationAttemptedAt = is_int($rotationTimestamp)
             ? Carbon::createFromTimestamp($rotationTimestamp)

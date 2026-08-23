@@ -116,6 +116,27 @@ class AccountController extends Controller
         return $this->accountRedirect();
     }
 
+    public function resume(LocalAccountData $localData): RedirectResponse
+    {
+        $refreshToken = $this->credentials->refreshToken();
+
+        if ($refreshToken === null) {
+            return redirect()->route('account.login');
+        }
+
+        $result = $this->api->postWithToken('auth/resume', $refreshToken, [
+            'device_name' => $this->deviceName(),
+        ]);
+
+        if ($result->status === BuffApiStatus::Unauthenticated) {
+            $this->credentials->clearRefreshToken();
+        }
+
+        $this->finishAuthentication($result, $localData);
+
+        return $this->accountRedirect();
+    }
+
     public function socialCallback(Request $request, LocalAccountData $localData): RedirectResponse
     {
         if ($error = $request->string('error')->toString()) {
@@ -169,6 +190,7 @@ class AccountController extends Controller
         if (is_string($storedEmail)
             && Str::lower(trim($storedEmail)) === Str::lower(trim($validated['email']))) {
             $this->credentials->clearToken();
+            $this->credentials->clearRefreshToken();
         }
 
         return redirect()->route('account.login')->with('message', 'Password reset. Sign in again.');
@@ -221,6 +243,21 @@ class AccountController extends Controller
         return back()->with('message', $message);
     }
 
+    public function updatePassword(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'current_password' => ['required', 'string'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+        $result = $this->api->put('account/password', [
+            ...$validated,
+            'password_confirmation' => $request->string('password_confirmation')->toString(),
+        ]);
+        $this->ensureSuccessful($result, 'current_password');
+
+        return back()->with('message', $result->message ?? 'Password updated.');
+    }
+
     public function logout(LocalAccountData $localData): RedirectResponse
     {
         if ($this->credentials->token() !== null) {
@@ -256,10 +293,13 @@ class AccountController extends Controller
     {
         $this->ensureSuccessful($result, 'email');
         $token = $result->data['token'] ?? null;
+        $refreshToken = $result->data['refresh_token'] ?? null;
         $account = $result->data['user'] ?? null;
         $accountId = is_array($account) ? ($account['id'] ?? null) : null;
 
-        if (! is_string($token) || $token === '' || ! is_array($account) || ! is_int($accountId) || $accountId < 1) {
+        if (! is_string($token) || $token === ''
+            || ($refreshToken !== null && (! is_string($refreshToken) || $refreshToken === ''))
+            || ! is_array($account) || ! is_int($accountId) || $accountId < 1) {
             throw ValidationException::withMessages(['email' => 'Buff returned an invalid sign-in response.']);
         }
 
@@ -270,7 +310,7 @@ class AccountController extends Controller
             $localData->wipe();
         }
 
-        $this->credentials->store($token, $account);
+        $this->credentials->store($token, $account, is_string($refreshToken) ? $refreshToken : null);
         SyncState::current($account['id']);
 
         $this->sync->queueExistingRecords();

@@ -6,6 +6,7 @@ import { Home, Plus, Scale, Settings, Target, X } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import AddChooser from '../Components/Add/AddChooser.vue';
 import AppSheet from '../Components/AppSheet.vue';
+import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
 
 const page = usePage<{
@@ -31,8 +32,14 @@ const navItems = [
 
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
 
+const isSettingsSubpage = computed(() => path.value.startsWith('/settings/'));
+
 function isActive(match: string) {
-    return path.value === match;
+    if (match === '/') {
+        return path.value === '/';
+    }
+
+    return path.value === match || path.value.startsWith(`${match}/`);
 }
 
 function openAddDrawer(pushHistory = true) {
@@ -201,12 +208,13 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="app-shell flex bg-background sm:pl-64">
+    <div class="app-shell flex bg-background sm:pl-64" :class="{'settings-subpage': isSettingsSubpage}">
+        <OfflineBanner />
+
         <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
-            <Link href="/" class="mb-8 flex items-center gap-2 px-2">
-                <img :src="'/icon.png'" alt="" class="size-12 rounded-2xl dark:hidden" />
-                <img :src="'/icon-dark.png'" alt="" class="hidden size-12 rounded-2xl dark:block" />
-                <p class="page-title text-[1.65rem]">Buff</p>
+            <Link href="/" class="mb-8 px-2" aria-label="Buff home">
+                <img :src="'/logo.png'" alt="Buff" class="h-auto w-32 dark:hidden" />
+                <img :src="'/logo-dark.png'" alt="Buff" class="hidden h-auto w-32 dark:block" />
             </Link>
 
             <nav class="grid gap-1" aria-label="Primary">
@@ -248,7 +256,7 @@ onUnmounted(() => {
         >
             <div
                 v-if="fallbackToast"
-                class="fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-card"
+                class="fallback-toast fixed inset-x-4 top-[calc(env(safe-area-inset-top,0px)+1rem)] z-50 mx-auto max-w-sm rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground shadow-card"
                 role="status"
                 aria-live="polite"
             >
@@ -273,14 +281,15 @@ onUnmounted(() => {
             <AddChooser @select="openAddMode" />
         </AppSheet>
 
-        <nav class="bottom-nav fixed inset-x-3 bottom-3 z-20 rounded-2xl border border-border/70 bg-card/80 shadow-card backdrop-blur-xl sm:hidden">
-            <div class="mx-auto grid max-w-md grid-cols-5 items-end gap-1 px-2 pt-1.5">
+        <nav v-if="!isSettingsSubpage" class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border/70 bg-card/50 shadow-card backdrop-blur-lg sm:hidden">
+            <div class="mx-auto grid grid-cols-5 items-end gap-1 px-2 pt-1.5">
                 <Button
                     :as="Link"
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
-                    class="flex rounded-xl"
+                    :class="isActive(navItems[0].match) ? 'bg-primary/5' : ''"
+                    class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[0].label }}</span>
@@ -291,7 +300,8 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
-                    class="flex rounded-xl"
+                    :class="isActive(navItems[1].match) ? 'bg-primary/5' : ''"
+                    class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[1].label }}</span>
@@ -312,7 +322,8 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
-                    class="flex rounded-xl"
+                    :class="isActive(navItems[2].match) ? 'bg-primary/5' : ''"
+                    class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[2].label }}</span>
@@ -323,7 +334,8 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
-                    class="flex rounded-xl"
+                    :class="isActive(navItems[3].match) ? 'bg-primary/5' : ''"
+                    class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[3].label }}</span>

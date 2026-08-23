@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, Check } from '@lucide/vue';
 import BodyProfileEditor from '../Components/BodyProfileEditor.vue';
 import Card from '../Components/Card.vue';
 import DailyTargetsEditor from '../Components/DailyTargetsEditor.vue';
+import OfflineBanner from '../Components/OfflineBanner.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
@@ -114,6 +115,8 @@ syncDisplayFromStored();
 
 <template>
     <Head title="Set up Buff" />
+
+    <OfflineBanner />
 
     <main class="min-h-dvh bg-background px-4 pb-[calc(env(safe-area-inset-bottom,0px)+2.5rem)] pt-[calc(env(safe-area-inset-top,0px)+2.5rem)] text-foreground">
     <form class="mx-auto max-w-md space-y-5" @submit.prevent="currentStep === 'Body & Units' ? finish() : nextStep()">

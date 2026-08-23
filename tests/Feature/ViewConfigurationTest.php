@@ -32,6 +32,10 @@ it('keeps account and onboarding outside the app shell', function (): void {
     expect($account)->toContain('defineOptions({ layout: null })')
         ->toContain('accountReplacementDecision')
         ->toContain('pendingSocialProvider')
+        ->toContain('Continue as {{ localAccountName }}')
+        ->toContain('Use a different account')
+        ->toContain("resumeForm.post('/account/resume')")
+        ->not->toContain('This device still has data from a previous account')
         ->toContain('Clear device data')
         ->toMatch('/<\/form>\s+<\/Card>\s+<Button\s+v-if="hasDeviceData"/')
         ->toContain("clearDataForm.delete('/account/local-data')")
@@ -44,16 +48,41 @@ it('keeps account and onboarding outside the app shell', function (): void {
         ->and($onboarding)->toContain('defineOptions({ layout: null })')
         ->toContain('Feet and inches')
         ->toContain('safe-area-inset-top')
-        ->toContain('safe-area-inset-bottom');
+        ->toContain('safe-area-inset-bottom')
+        ->and($account)->toContain('OfflineBanner')
+        ->and($onboarding)->toContain('OfflineBanner');
+});
+
+it('shows a mobile banner when the device is offline', function (): void {
+    $banner = file_get_contents(resource_path('js/Components/OfflineBanner.vue'));
+    $network = file_get_contents(resource_path('js/networkStatus.ts'));
+    $shell = file_get_contents(resource_path('js/Layouts/AppShell.vue'));
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($network)
+        ->toContain('onLine')
+        ->toContain("'offline'")
+        ->toContain("'online'")
+        ->and($banner)->toContain('No internet connection')
+        ->toContain('sm:hidden')
+        ->toContain('WifiOff')
+        ->toContain('subscribeToNetworkStatus')
+        ->and($shell)->toContain('OfflineBanner')
+        ->toContain('fallback-toast')
+        ->and($css)->toContain('html[data-offline] .fallback-toast');
 });
 
 it('shares page chrome across the main screens', function (): void {
     $today = file_get_contents(resource_path('js/Pages/Today.vue'));
     $settings = file_get_contents(resource_path('js/Pages/Settings.vue'));
+    $settingsAccount = file_get_contents(resource_path('js/Pages/Settings/Account.vue'));
+    $settingsUnits = file_get_contents(resource_path('js/Pages/Settings/Units.vue'));
+    $settingsGroup = file_get_contents(resource_path('js/Components/SettingsGroup.vue'));
     $bodyProfileEditor = file_get_contents(resource_path('js/Components/BodyProfileEditor.vue'));
     $shell = file_get_contents(resource_path('js/Layouts/AppShell.vue'));
     $macros = file_get_contents(resource_path('js/Components/Add/MacroSummary.vue'));
     $css = file_get_contents(resource_path('css/app.css'));
+    $app = file_get_contents(resource_path('js/app.ts'));
 
     expect($today)
         ->toContain('PageHeader')
@@ -75,13 +104,22 @@ it('shares page chrome across the main screens', function (): void {
         ->and($settings)->not->toContain('kicker')
         ->and($settings)->toContain('deleteAccountOpen')
         ->and($settings)->toContain('openDeleteAccountModal')
+        ->and($settings)->toContain('SettingsGroup')
+        ->and($settings)->toContain('href="/settings/account"')
+        ->and($settings)->toContain('href="/settings/password"')
+        ->and($settings)->toContain('href="/settings/appearance"')
         ->and($settings)->not->toContain('{{ syncDetail }}')
         ->and($settings)->not->toContain('Save units')
         ->and($settings)->not->toContain('Save reminders')
-        ->and($settings)->toContain('divide-y divide-border/60')
-        ->and($settings)->toContain('Select v-model="accountForm.timezone"')
-        ->and($settings)->not->toContain('Input v-model="accountForm.timezone"')
-        ->and($settings)->toContain('Feet and inches')
+        ->and($settingsGroup)->toContain('divide-y divide-border/60')
+        ->and($settingsGroup)->toContain('title?: string')
+        ->and($settingsGroup)->toContain('v-if="title"')
+        ->and($settingsAccount)->toContain('Select v-model="accountForm.timezone"')
+        ->and($settingsAccount)->toContain("const accountAvatarName = computed(() => page.props.buff.account?.name || page.props.buff.account?.email || 'Account')")
+        ->and($settingsAccount)->toContain('<h2 class="card-title">My Account</h2>')
+        ->and($settingsAccount)->toContain(':class="accountAvatarColor"')
+        ->and($settingsAccount)->not->toContain('Input v-model="accountForm.timezone"')
+        ->and($settingsUnits)->toContain('Feet and inches')
         ->and($bodyProfileEditor)->toContain('v-model.number="heightFeet"')
         ->toContain('v-model.number="heightInches"')
         ->not->toContain('Height {{ heightUnit }}')
@@ -89,32 +127,44 @@ it('shares page chrome across the main screens', function (): void {
         ->and($settings)->not->toContain('Import / export')
         ->and($settings)->not->toContain('/settings/export')
         ->and($settings)->not->toContain('/settings/import')
-        ->and($settings)->toContain('Sign out and remove local data')
+        ->and($settings)->toContain('Log out')
+        ->and($settings)->toContain('Delete account')
+        ->and(strpos($settings, 'title="Preferences"'))->toBeLessThan(strpos($settings, '>Log out</SettingsRow>'))
+        ->and(strpos($settings, 'href="/settings/password">Change password'))->toBeLessThan(strpos($settings, '>Log out</SettingsRow>'))
         ->and($settings)->toContain('passwordResetUrl')
         ->and($settings)->toContain('Set or reset it by email first.')
         ->and($settings)->toContain('delete-account-password')
         ->and($shell)->toContain('bottom-nav')
+        ->and($shell)->toContain('isSettingsSubpage')
         ->and($shell)->toContain('openAddDrawer')
         ->and($shell)->toContain('bottom-drawer')
         ->and($shell)->toContain('AddChooser')
         ->and($shell)->toContain('openAddMode')
         ->and($shell)->toMatch('/<Button\s+variant="default"\s+class="mt-4 h-11 justify-start px-3 text-sm"/')
         ->and($shell)->not->toContain('isAddActive')
-        ->and($shell)->toContain('<Link href="/" class="mb-8 flex items-center gap-2 px-2">')
-        ->and($shell)->toContain(':src="\'/icon.png\'"')
-        ->and($shell)->toContain(':src="\'/icon-dark.png\'"')
-        ->and($shell)->toContain('size-12 rounded-2xl dark:hidden')
-        ->and($shell)->toContain('hidden size-12 rounded-2xl dark:block')
+        ->and($shell)->toContain('<Link href="/" class="mb-8 px-2" aria-label="Buff home">')
+        ->and($shell)->toContain(':src="\'/logo.png\'"')
+        ->and($shell)->toContain(':src="\'/logo-dark.png\'"')
+        ->and($shell)->toContain('h-auto w-32 dark:hidden')
+        ->and($shell)->toContain('hidden h-auto w-32 dark:block')
         ->and($shell)->not->toContain('addHref')
         ->and($macros)->toContain('field-label')
         ->and($macros)->not->toContain('uppercase')
         ->and($css)->toContain('.page-title')
         ->and($css)->toContain('.card-title')
+        ->and($css)->toContain('padding-top: calc(env(safe-area-inset-top, 0px) + 2.75rem)')
+        ->and($css)->toContain('padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 1.75rem)')
+        ->and($css)->toContain('padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem)')
+        ->and($css)->toContain('padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 0.5rem)')
         ->and($today)->toContain('card-title')
-        ->and($settings)->toContain('card-title')
+        ->and($settingsAccount)->toContain('card-title')
         ->and($css)->toContain('.bottom-drawer')
         ->and($css)->toContain('.page-kicker')
         ->toContain('.field-label')
+        ->and($css)->toContain('data-settings-nav')
+        ->and($css)->toContain('settings-slide-in-right')
+        ->and($app)->toContain('settingsVisitOptions')
+        ->and($app)->toContain('visitOptions')
         ->and($css)->not->toContain('text-transform: uppercase');
 });
 
@@ -200,6 +250,24 @@ it('groups add options the same way in the drawer and on the add page', function
         ->and($add)->not->toContain('Search, scan, or custom')
         ->and($recipes)->toContain('MealTypePicker')
         ->and($recipes)->not->toContain('field-label">Meal');
+});
+
+it('keeps previous food thumbnails from showing broken remote images', function (): void {
+    $thumbnail = file_get_contents(resource_path('js/Components/FoodThumbnail.vue'));
+    $add = file_get_contents(resource_path('js/Pages/Add.vue'));
+    $today = file_get_contents(resource_path('js/Pages/Today.vue'));
+    $macros = file_get_contents(resource_path('js/Pages/MacroBreakdown.vue'));
+
+    expect($thumbnail)
+        ->toContain('@error="failed = true"')
+        ->toContain('@load="loaded = true"')
+        ->toContain("loaded ? '' : 'opacity-0'")
+        ->toContain('Utensils')
+        ->and($add)->toContain('FoodThumbnail')
+        ->toContain(':src="entry.image_url"')
+        ->not->toContain('<img v-if="entry.image_url"')
+        ->and($today)->toContain('FoodThumbnail')
+        ->and($macros)->toContain('FoodThumbnail');
 });
 
 it('presents goals as a calorie target and named macro split', function (): void {

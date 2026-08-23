@@ -53,6 +53,7 @@ private const val MEAL_WORK_NAME_PREFIX = "buff-meal-reminder-"
 private const val MEAL_NOTIFICATION_CHANNEL_ID = "meal-reminders"
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 private const val NOTIFICATION_PERMISSION_REQUESTED_KEY = "notification-permission-requested"
+private const val MEAL_REMINDER_MAX_RETRIES = 3
 private val TASK_ID_PATTERN = Regex("^[a-f0-9]{64}$")
 private val MEAL_IDS = setOf("breakfast", "lunch", "dinner")
 private val MEAL_TIME_PATTERN = Regex("^([01]\\d|2[0-3]):[0-5]\\d$")
@@ -344,6 +345,10 @@ class MealReminderWorker(
                 }
             } catch (error: Exception) {
                 Log.e("BuffMealReminders", "Could not check the $mealId reminder", error)
+
+                if (runAttemptCount < MEAL_REMINDER_MAX_RETRIES) {
+                    return@withContext Result.retry()
+                }
             }
         }
 

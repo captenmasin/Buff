@@ -125,6 +125,43 @@ it('opens the add launcher with its chooser and preserves dates', function (): v
         );
 });
 
+it('passes unique recent previous food entries to add page', function (): void {
+    $product = FoodProduct::query()->create([
+        'barcode' => '1234567890123',
+        'name' => 'Yoghurt',
+        'brand' => 'Dairy Co',
+        'image_url' => 'https://images.example/yoghurt.jpg',
+        'nutrition_unit' => 'g',
+        'calories_per_100' => 120,
+        'protein_per_100' => 8,
+        'carbs_per_100' => 12,
+        'fat_per_100' => 4,
+    ]);
+
+    MealEntry::query()->create([
+        'date' => '2026-05-18',
+        'meal_type' => 'breakfast',
+        'source_type' => MealEntry::SOURCE_BARCODE,
+        'food_product_id' => $product->id,
+        'name' => 'Yoghurt',
+        'portion_quantity' => 150,
+        'portion_unit' => 'g',
+        'calories' => 180,
+        'protein_g' => 12,
+        'carbs_g' => 18,
+        'fat_g' => 6,
+    ]);
+
+    $this->get('/add?mode=food')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->has('previousFoodEntries', 1)
+            ->where('previousFoodEntries.0.name', 'Yoghurt')
+            ->where('previousFoodEntries.0.image_url', 'https://images.example/yoghurt.jpg')
+        );
+});
+
 it('passes unique recent previous custom meals to add page', function (): void {
     $olderDuplicate = MealEntry::query()->create([
         'date' => '2026-05-17',

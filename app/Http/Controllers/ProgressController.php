@@ -18,6 +18,8 @@ use Inertia\Response;
 
 class ProgressController extends Controller
 {
+    private const MEASUREMENT_FIELDS = ['chest_cm', 'waist_cm', 'hips_cm', 'upper_arm_cm', 'thigh_cm'];
+
     public function index(Request $request, EnergyEstimator $estimator, WeightTrendService $trends): Response
     {
         $range = $request->string('range')->toString();
@@ -57,7 +59,9 @@ class ProgressController extends Controller
             'preferences' => [
                 'weight_unit' => $preferences->weight_unit,
                 'height_unit' => $preferences->height_unit,
+                'measurement_unit' => $preferences->measurement_unit,
             ],
+            'measurements' => $this->measurementSummary($allMetrics),
             'latest' => $latest ? $this->metricPayload($latest, $this->trendKg($trendByDate, $latest)) : null,
             'profile' => $profile->toPayload(),
             'goals' => $goal ? [
@@ -93,16 +97,26 @@ class ProgressController extends Controller
             'date' => ['required', 'date'],
             'weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
             'body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
+            'chest_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'waist_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'hips_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'upper_arm_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
+            'thigh_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        $measurements = collect(self::MEASUREMENT_FIELDS)
+            ->filter(fn (string $field): bool => array_key_exists($field, $validated))
+            ->mapWithKeys(fn (string $field): array => [$field => $validated[$field]])
+            ->all();
+
         BodyMetric::query()->updateOrCreate(
             ['date' => Carbon::parse($validated['date'])->startOfDay()],
-            [
+            array_merge([
                 'weight_kg' => $validated['weight_kg'],
                 'body_fat_percent' => $validated['body_fat_percent'] ?? null,
                 'notes' => $validated['notes'] ?? null,
-            ]
+            ], $measurements)
         );
 
         return $this->redirectToProgress($request)->with('message', 'Progress updated.');
@@ -155,7 +169,7 @@ class ProgressController extends Controller
     }
 
     /**
-     * @return array{id: string, date: string, weight_kg: float, body_fat_percent: float|null, notes: string|null, trend_kg: float|null}
+     * @return array{id: string, date: string, weight_kg: float, body_fat_percent: float|null, chest_cm: float|null, waist_cm: float|null, hips_cm: float|null, upper_arm_cm: float|null, thigh_cm: float|null, notes: string|null, trend_kg: float|null}
      */
     private function metricPayload(BodyMetric $metric, ?float $trendKg = null): array
     {
@@ -164,8 +178,39 @@ class ProgressController extends Controller
             'date' => $metric->date->toDateString(),
             'weight_kg' => (float) $metric->weight_kg,
             'body_fat_percent' => $metric->body_fat_percent !== null ? (float) $metric->body_fat_percent : null,
+            'chest_cm' => $metric->chest_cm !== null ? (float) $metric->chest_cm : null,
+            'waist_cm' => $metric->waist_cm !== null ? (float) $metric->waist_cm : null,
+            'hips_cm' => $metric->hips_cm !== null ? (float) $metric->hips_cm : null,
+            'upper_arm_cm' => $metric->upper_arm_cm !== null ? (float) $metric->upper_arm_cm : null,
+            'thigh_cm' => $metric->thigh_cm !== null ? (float) $metric->thigh_cm : null,
             'notes' => $metric->notes,
             'trend_kg' => $trendKg,
         ];
+    }
+
+    /**
+     * @param  Collection<int, BodyMetric>  $metrics
+     * @return array<string, array{value_cm: float, delta_cm: float|null}|null>
+     */
+    private function measurementSummary(Collection $metrics): array
+    {
+        return collect(self::MEASUREMENT_FIELDS)->mapWithKeys(function (string $field) use ($metrics): array {
+            $values = $metrics
+                ->filter(fn (BodyMetric $metric): bool => $metric->{$field} !== null)
+                ->pluck($field)
+                ->values();
+
+            if ($values->isEmpty()) {
+                return [$field => null];
+            }
+
+            $latest = (float) $values->last();
+            $previous = $values->count() > 1 ? (float) $values[$values->count() - 2] : null;
+
+            return [$field => [
+                'value_cm' => $latest,
+                'delta_cm' => $previous === null ? null : round($latest - $previous, 2),
+            ]];
+        })->all();
     }
 }

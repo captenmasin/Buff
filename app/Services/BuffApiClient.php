@@ -26,9 +26,27 @@ class BuffApiClient
     }
 
     /** @param array<string, mixed> $data */
+    public function postWithToken(string $path, string $token, array $data = []): BuffApiResult
+    {
+        $request = $this->request(authenticated: false);
+
+        try {
+            return $this->result($request->withToken($token)->post($path, $data));
+        } catch (ConnectionException) {
+            return new BuffApiResult(BuffApiStatus::ConnectionFailed, message: 'Could not connect to Buff.');
+        }
+    }
+
+    /** @param array<string, mixed> $data */
     public function patch(string $path, array $data): BuffApiResult
     {
         return $this->send('patch', $path, $data);
+    }
+
+    /** @param array<string, mixed> $data */
+    public function put(string $path, array $data): BuffApiResult
+    {
+        return $this->send('put', $path, $data);
     }
 
     /** @param array<string, mixed> $data */
@@ -113,6 +131,7 @@ class BuffApiClient
             $response = match ($method) {
                 'get' => $request->get($path, $data),
                 'post' => $request->post($path, $data),
+                'put' => $request->put($path, $data),
                 'patch' => $request->patch($path, $data),
                 'delete' => $request->delete($path, $data),
             };

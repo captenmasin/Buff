@@ -13,6 +13,7 @@ import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import AppSheet from '../Components/AppSheet.vue';
+import FoodThumbnail from '../Components/FoodThumbnail.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import {Calendar} from '../Components/ui/calendar';
@@ -768,7 +769,7 @@ onBeforeUnmount(() => {
                     </Button>
                 </div>
                 <div class="mt-4 flex min-w-0 gap-4">
-                    <img v-if="selectedMeal.image_url" :src="selectedMeal.image_url" alt="" class="h-24 w-24 flex-none rounded-xl object-cover">
+                    <FoodThumbnail v-if="selectedMeal.image_url" :src="selectedMeal.image_url" class="h-24 w-24" :icon-size="28" />
                     <div class="min-w-0 flex-1 text-sm text-muted-foreground">
                         <p v-if="selectedMeal.brand" class="truncate">{{ selectedMeal.brand }}</p>
                         <div>

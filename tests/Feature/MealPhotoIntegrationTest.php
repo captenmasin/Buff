@@ -58,6 +58,19 @@ it('proxies a bounded multipart analysis without exposing the bearer token to Vu
         && $request->hasFile('photos[]', filename: 'meal.jpg'));
 });
 
+it('accepts bridge-safe meal photo data URLs', function (): void {
+    Http::fake(['*/meal-analyses' => Http::response([
+        'analysis' => ['id' => '20000000-0000-4000-8000-000000000002'],
+    ], 201)]);
+    $photo = UploadedFile::fake()->image('meal.jpg', 800, 600);
+
+    $this->postJson('/meal-analyses', [
+        'photos' => ['data:image/jpeg;base64,'.base64_encode((string) file_get_contents($photo->getPathname()))],
+    ])->assertOk();
+
+    Http::assertSent(fn (ClientRequest $request): bool => $request->hasFile('photos[]'));
+});
+
 it('proxies a follow-up correction to revise the draft', function (): void {
     $analysisId = '20000000-0000-4000-8000-000000000002';
 

@@ -355,6 +355,47 @@ it('validates photo count type size and pose', function (): void {
     ])->assertSessionHasErrors('poses');
 });
 
+it('accepts bridge-safe progress photo data URLs', function (): void {
+    stubIdleSync();
+
+    $metric = BodyMetric::query()->create([
+        'date' => '2026-08-20',
+        'weight_kg' => 82.4,
+    ]);
+    $photo = UploadedFile::fake()->image('front.jpg', 800, 600);
+    $dataUrl = 'data:image/jpeg;base64,'.base64_encode((string) file_get_contents($photo->getPathname()));
+
+    $this->postJson("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => [$dataUrl],
+        'poses' => ['front'],
+    ])->assertOk()->assertJsonPath('pending', true);
+
+    $pending = PendingBodyMetricPhotoUpload::query()->sole();
+    Storage::disk('local')->assertExists($pending->paths[0]);
+    expect($pending->poses)->toBe(['front']);
+});
+
+it('rejects invalid bridge-safe progress photo data URLs', function (): void {
+    stubIdleSync();
+
+    $metric = BodyMetric::query()->create([
+        'date' => '2026-08-20',
+        'weight_kg' => 82.4,
+    ]);
+
+    $this->postJson("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => ['data:text/plain;base64,'.base64_encode('not an image')],
+        'poses' => ['front'],
+    ])->assertUnprocessable()->assertJsonValidationErrors('photos.0');
+
+    $this->postJson("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => ['data:image/jpeg;base64,'.base64_encode('not an image')],
+        'poses' => ['front'],
+    ])->assertUnprocessable()->assertJsonValidationErrors('photos.0');
+
+    $this->assertDatabaseEmpty('pending_body_metric_photo_uploads');
+});
+
 it('discards staged photos when a body metric is deleted', function (): void {
     stubIdleSync();
 

@@ -5,7 +5,7 @@ it('uses HealthKit and the NativePHP ephemeral runtime for Apple Health imports'
     $php = file_get_contents(__DIR__.'/../../native-plugins/apple-health/resources/ios/Sources/AppleHealthPHP.swift');
     $functions = file_get_contents(__DIR__.'/../../native-plugins/apple-health/resources/ios/Sources/AppleHealthFunctions.swift');
     $manifest = file_get_contents(__DIR__.'/../../native-plugins/apple-health/nativephp.json');
-    $settings = file_get_contents(__DIR__.'/../../resources/js/Pages/Settings.vue');
+    $settings = file_get_contents(__DIR__.'/../../resources/js/Pages/Settings/Health.vue');
     $today = file_get_contents(__DIR__.'/../../resources/js/Pages/Today.vue');
 
     expect($manifest)

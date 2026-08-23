@@ -241,8 +241,18 @@ textarea {
 }
 
 .app-main {
-    padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
+    padding-top: calc(env(safe-area-inset-top, 0px) + 2.75rem);
     padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.5rem);
+}
+
+@media (width < 40rem) {
+    html[data-offline] .fallback-toast {
+        top: calc(env(safe-area-inset-top, 0px) + 3rem);
+    }
+}
+
+.app-shell.settings-subpage .app-main {
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
 }
 
 .bottom-nav {
@@ -328,7 +338,7 @@ textarea {
 
 @supports (padding-top: max(0px)) {
     .app-main {
-        padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 0.5rem);
+        padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 1.75rem);
     }
 
     .bottom-nav {
@@ -346,7 +356,14 @@ textarea {
 
 @media (width >= 40rem) {
     .app-main {
+        padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+    }
+
+    @supports (padding-top: max(0px)) {
+        .app-main {
+            padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 0.5rem);
+        }
     }
 
     .sheet-scrim {
@@ -375,9 +392,62 @@ textarea {
     }
 }
 
+@keyframes settings-slide-out-left {
+    to {
+        transform: translateX(-30%);
+    }
+}
+
+@keyframes settings-slide-in-right {
+    from {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes settings-slide-out-right {
+    to {
+        transform: translateX(100%);
+    }
+}
+
+@keyframes settings-slide-in-left {
+    from {
+        transform: translateX(-30%);
+    }
+}
+
+html[data-settings-nav='forward']::view-transition-old(root) {
+    z-index: 1;
+    mix-blend-mode: normal;
+    animation: 320ms var(--ease-out) both settings-slide-out-left;
+}
+
+html[data-settings-nav='forward']::view-transition-new(root) {
+    z-index: 2;
+    mix-blend-mode: normal;
+    animation: 320ms var(--ease-out) both settings-slide-in-right;
+}
+
+html[data-settings-nav='back']::view-transition-old(root) {
+    z-index: 2;
+    mix-blend-mode: normal;
+    animation: 320ms var(--ease-out) both settings-slide-out-right;
+}
+
+html[data-settings-nav='back']::view-transition-new(root) {
+    z-index: 1;
+    mix-blend-mode: normal;
+    animation: 320ms var(--ease-out) both settings-slide-in-left;
+}
+
 @media (prefers-reduced-motion: reduce) {
     html {
         scroll-behavior: auto;
+    }
+
+    html::view-transition-old(root),
+    html::view-transition-new(root) {
+        animation: none !important;
     }
 
     .app-shell *:not(.animate-spin):not([data-slot='dialog-overlay']):not([data-slot='dialog-content']):not([data-slot='alert-dialog-overlay']):not([data-slot='alert-dialog-content']),

@@ -12,8 +12,19 @@ import Button from '../Components/ui/button/Button.vue';
 import type { ChartConfig } from '../Components/ui/chart';
 import Input from '../Components/ui/input/Input.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
-import { formatBodyValue, heightFromCm, weightFromKg, weightToKg, type HeightUnit, type WeightUnit } from '../bodyUnits';
+import {
+    formatBodyValue,
+    heightFromCm,
+    measurementFromCm,
+    measurementToCm,
+    weightFromKg,
+    weightToKg,
+    type HeightUnit,
+    type MeasurementUnit,
+    type WeightUnit,
+} from '../bodyUnits';
 import { hapticImpact } from '../haptics';
+import { photoDataUrl } from '../photoDataUrl';
 import { resizePhoto } from '../photoResize';
 import { buildBodyFatChartData, buildWeightChartData, chartXDomain } from '../progressChart';
 import {
@@ -26,7 +37,19 @@ import {
     type ProgressPhotoPose,
 } from '../progressPhotos';
 
-interface BodyMetric { id: string; date: string; weight_kg: number; body_fat_percent: number | null; notes: string | null; trend_kg: number | null }
+interface BodyMetric {
+    id: string;
+    date: string;
+    weight_kg: number;
+    body_fat_percent: number | null;
+    chest_cm: number | null;
+    waist_cm: number | null;
+    hips_cm: number | null;
+    upper_arm_cm: number | null;
+    thigh_cm: number | null;
+    notes: string | null;
+    trend_kg: number | null;
+}
 interface BodyProfile {
     height_cm: number | null;
     age: number | null;
@@ -40,9 +63,20 @@ interface BodyGoals {
 interface EnergyEstimate { bmr: number; tdee: number }
 interface BodyDelta { weight_kg: number; body_fat_percent: number | null }
 interface WeightTrend { weight_kg: number; delta_kg: number | null }
-interface UnitPreferences { weight_unit: WeightUnit; height_unit: HeightUnit }
+interface UnitPreferences { weight_unit: WeightUnit; height_unit: HeightUnit; measurement_unit: MeasurementUnit }
+interface MeasurementSummaryItem { value_cm: number; delta_cm: number | null }
 interface SelectedPhoto { file: File; preview: string; pose: ProgressPhotoPose }
 interface ProgressPhoto { id: string; url: string; mime_type?: string; pose?: string | null }
+
+const measurementFields = [
+    { key: 'chest_cm', label: 'Chest' },
+    { key: 'waist_cm', label: 'Waist' },
+    { key: 'hips_cm', label: 'Hips' },
+    { key: 'upper_arm_cm', label: 'Upper arm' },
+    { key: 'thigh_cm', label: 'Thigh' },
+] as const;
+type MeasurementKey = typeof measurementFields[number]['key'];
+type MeasurementSummary = Record<MeasurementKey, MeasurementSummaryItem | null>;
 
 const props = withDefaults(defineProps<{
     today: string;
@@ -50,6 +84,7 @@ const props = withDefaults(defineProps<{
     range_start: string;
     range_end: string;
     preferences: UnitPreferences;
+    measurements: MeasurementSummary;
     latest?: BodyMetric | null;
     profile: BodyProfile;
     goals?: BodyGoals | null;
@@ -90,6 +125,11 @@ const metricForm = useForm({
     date: props.today,
     weight_kg: props.latest?.date === props.today ? weightFromKg(props.latest.weight_kg, props.preferences.weight_unit) : '',
     body_fat_percent: props.latest?.date === props.today ? props.latest.body_fat_percent : '',
+    chest_cm: props.latest?.date === props.today ? measurementFromCm(props.latest.chest_cm, props.preferences.measurement_unit) ?? '' : '',
+    waist_cm: props.latest?.date === props.today ? measurementFromCm(props.latest.waist_cm, props.preferences.measurement_unit) ?? '' : '',
+    hips_cm: props.latest?.date === props.today ? measurementFromCm(props.latest.hips_cm, props.preferences.measurement_unit) ?? '' : '',
+    upper_arm_cm: props.latest?.date === props.today ? measurementFromCm(props.latest.upper_arm_cm, props.preferences.measurement_unit) ?? '' : '',
+    thigh_cm: props.latest?.date === props.today ? measurementFromCm(props.latest.thigh_cm, props.preferences.measurement_unit) ?? '' : '',
     notes: props.latest?.date === props.today ? props.latest.notes : '',
 });
 
@@ -141,6 +181,7 @@ const bodyFatChartData = computed(() => buildBodyFatChartData(
     props.goals?.target_body_fat_percent ?? null,
 ));
 const hasBodyFatChart = computed(() => bodyFatChartData.value.some((row) => row.bodyFat !== undefined));
+const hasMeasurements = computed(() => measurementFields.some(({ key }) => props.measurements[key] !== null));
 const weightChartLines = computed(() => displayTargetWeight.value === null ? ['weight'] : ['weight', 'goal']);
 const bodyFatChartLines = computed(() => props.goals?.target_body_fat_percent == null ? ['bodyFat'] : ['bodyFat', 'goal']);
 const weightChartConfig: ChartConfig = {
@@ -156,6 +197,16 @@ const activeOverlay = computed(() => overlayByPose.value[capturingPose.value] ??
 const activeOverlayPhoto = computed(() => activeOverlay.value?.photo ?? null);
 const overlaySourceDate = computed(() => activeOverlay.value?.date ?? null);
 const mirrorPreview = computed(() => cameraFacing.value === 'user');
+
+function measurementDisplay(value: number | null | undefined): number | null {
+    return measurementFromCm(value, props.preferences.measurement_unit);
+}
+
+function measurementFormPayload(data: Record<MeasurementKey, number | string>): Partial<Record<MeasurementKey, number | string>> {
+    return Object.fromEntries(measurementFields
+        .filter(({ key }) => data[key] !== '')
+        .map(({ key }) => [key, measurementToCm(data[key], props.preferences.measurement_unit)])) as Partial<Record<MeasurementKey, number | string>>;
+}
 
 function photoPoseLabel(pose: string | null | undefined): string {
     return isProgressPhotoPose(pose) ? progressPhotoLabels[pose] : 'Progress photo';
@@ -432,19 +483,20 @@ async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
     photoUploading.value = true;
     photoUploadError.value = '';
 
-    const data = new FormData();
-
-    for (const pose of progressPhotoPoses) {
-        const photo = selectedPhotos.value[pose];
-
-        if (photo) {
-            data.append('photos[]', photo.file);
-            data.append('poses[]', pose);
-        }
-    }
-
     try {
-        await axios.post(`/progress/body-metrics/${metricId}/photos`, data);
+        const photos: string[] = [];
+        const poses: ProgressPhotoPose[] = [];
+
+        for (const pose of progressPhotoPoses) {
+            const photo = selectedPhotos.value[pose];
+
+            if (photo) {
+                photos.push(await photoDataUrl(photo.file));
+                poses.push(pose);
+            }
+        }
+
+        await axios.post(`/progress/body-metrics/${metricId}/photos`, {photos, poses});
         delete photoCache.value[metricId];
         await loadPhotosForMetric(metricId);
 
@@ -460,7 +512,15 @@ async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
 }
 
 function saveMetric(): void {
-    metricForm.transform((data) => ({ ...data, weight_kg: weightToKg(data.weight_kg, props.preferences.weight_unit) }))
+    metricForm.transform((data) => {
+        const { chest_cm, waist_cm, hips_cm, upper_arm_cm, thigh_cm, ...progress } = data;
+
+        return {
+            ...progress,
+            weight_kg: weightToKg(data.weight_kg, props.preferences.weight_unit),
+            ...measurementFormPayload({ chest_cm, waist_cm, hips_cm, upper_arm_cm, thigh_cm }),
+        };
+    })
         .post(`/progress/body-metrics?range=${encodeURIComponent(props.range)}`, {
             preserveScroll: true,
             onSuccess: async (page) => {
@@ -664,7 +724,7 @@ onUnmounted(() => {
                     <p class="field-label">BMI</p>
                     <p class="mt-2 text-2xl font-semibold tracking-tight">{{ currentBmi ?? '--' }}</p>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        <Link v-if="!displayHeight" href="/settings" class="underline underline-offset-2">Set height</Link>
+                        <Link v-if="!displayHeight" href="/settings/body-profile" class="underline underline-offset-2">Set height</Link>
                         <template v-else>{{ formatBodyValue(displayHeight) }} {{ preferences.height_unit }}</template>
                     </p>
                 </Card>
@@ -727,6 +787,29 @@ onUnmounted(() => {
             </Card>
         </template>
 
+        <Card v-if="hasMeasurements">
+            <div>
+                <h2 class="card-title">Body measurements</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Latest recorded values and change from the previous entry.</p>
+            </div>
+            <div class="mt-4 grid grid-cols-2 gap-x-4 gap-y-4 sm:grid-cols-5">
+                <div v-for="field in measurementFields" :key="field.key">
+                    <p class="field-label">{{ field.label }}</p>
+                    <p class="mt-1 text-xl font-semibold tracking-tight">
+                        {{ formatBodyValue(measurementDisplay(measurements[field.key]?.value_cm)) }}
+                        <span v-if="measurements[field.key]" class="text-xs font-medium text-muted-foreground">{{ preferences.measurement_unit }}</span>
+                    </p>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        <template v-if="measurements[field.key]?.delta_cm !== null && measurements[field.key]?.delta_cm !== undefined">
+                            {{ deltaLabel(measurementDisplay(measurements[field.key]?.delta_cm), ` ${preferences.measurement_unit}`) }}
+                        </template>
+                        <template v-else-if="measurements[field.key]">First entry</template>
+                        <template v-else>Not recorded</template>
+                    </p>
+                </div>
+            </div>
+        </Card>
+
         <Card class="space-y-4">
             <div>
                 <h2 class="card-title">Log measurement</h2>
@@ -752,6 +835,27 @@ onUnmounted(() => {
                         <span v-if="metricForm.errors.body_fat_percent" class="text-sm text-destructive">{{ metricForm.errors.body_fat_percent }}</span>
                     </label>
                 </div>
+                <details class="rounded-xl border border-border/60">
+                    <summary class="flex cursor-pointer items-center justify-between gap-3 px-3 py-3 text-sm font-semibold">
+                        <span>Body measurements</span>
+                        <span class="text-xs font-medium text-muted-foreground">Optional · {{ preferences.measurement_unit }}</span>
+                    </summary>
+                    <div class="grid grid-cols-2 gap-3 border-t border-border/60 p-3">
+                        <label v-for="field in measurementFields" :key="field.key" :class="field.key === 'thigh_cm' ? 'col-span-2' : ''">
+                            <span class="field-label">{{ field.label }} {{ preferences.measurement_unit }}</span>
+                            <Input
+                                v-model="metricForm[field.key]"
+                                type="number"
+                                :min="preferences.measurement_unit === 'cm' ? 1 : 0.4"
+                                :max="preferences.measurement_unit === 'cm' ? 500 : 196.9"
+                                step="0.1"
+                                class="mt-1"
+                                :placeholder="formatBodyValue(measurementDisplay(measurements[field.key]?.value_cm))"
+                            />
+                            <span v-if="metricForm.errors[field.key]" class="text-sm text-destructive">{{ metricForm.errors[field.key] }}</span>
+                        </label>
+                    </div>
+                </details>
                 <label class="block">
                     <span class="field-label">Notes</span>
                     <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />

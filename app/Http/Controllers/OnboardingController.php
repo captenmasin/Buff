@@ -92,6 +92,7 @@ class OnboardingController extends Controller
         AppPreference::current()->update([
             'weight_unit' => $validated['weight_unit'],
             'height_unit' => $validated['height_unit'],
+            'measurement_unit' => $validated['height_unit'],
         ]);
 
         BodyMetric::query()->updateOrCreate(

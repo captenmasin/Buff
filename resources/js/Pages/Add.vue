@@ -2,15 +2,17 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { Barcode, Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X } from '@lucide/vue';
+import { Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import { resizePhoto } from '../photoResize';
+import { photoDataUrl } from '../photoDataUrl';
 import AddChooser from '../Components/Add/AddChooser.vue';
 import MacroSummary from '../Components/Add/MacroSummary.vue';
 import MealTypePicker from '../Components/Add/MealTypePicker.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from "../Components/Card.vue";
+import FoodThumbnail from '../Components/FoodThumbnail.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import RecipeMode from '../Components/RecipeMode.vue';
 import Button from '../Components/ui/button/Button.vue';
@@ -726,12 +728,10 @@ async function analyzePhotos() {
 
     photoAnalysisLoading.value = true;
     photoAnalysisError.value = '';
-    const data = new FormData();
-    selectedPhotos.value.forEach(({file}) => data.append('photos[]', file));
-    data.append('note', photoNote.value);
 
     try {
-        const response = await axios.post('/meal-analyses', data);
+        const photos = await Promise.all(selectedPhotos.value.map(({file}) => photoDataUrl(file)));
+        const response = await axios.post('/meal-analyses', {photos, note: photoNote.value});
         const analysis = response.data.analysis;
         const draft = analysis?.draft;
 
@@ -1048,11 +1048,7 @@ onUnmounted(() => {
                     class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                     @click="selectFoodResult(result)"
                 >
-                    <img v-if="result.image_url" :src="result.image_url" alt="" class="h-12 w-12 shrink-0 rounded-xl object-cover">
-                    <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
-                        <Utensils v-if="result.type === 'previous_meal'" :size="20" />
-                        <Barcode v-else :size="20" />
-                    </span>
+                    <FoodThumbnail :src="result.image_url" :icon="result.type === 'previous_meal' ? 'utensils' : 'barcode'" />
                     <span class="min-w-0 flex-1 flex items-center gap-2 overflow-hidden">
                         <History v-if="result.type === 'previous_meal'" :size="20" />
                         <span class="block truncate font-semibold">
@@ -1073,10 +1069,7 @@ onUnmounted(() => {
                         class="h-auto w-full min-w-0 justify-start overflow-hidden p-3 text-left"
                         @click="selectPreviousMeal(entry)"
                     >
-                        <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-12 w-12 shrink-0 rounded-xl object-cover">
-                        <span v-else class="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
-                            <Utensils :size="20" />
-                        </span>
+                        <FoodThumbnail :src="entry.image_url" />
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ entry.name }}</span>
                             <span class="block truncate text-sm text-muted-foreground">
@@ -1105,11 +1098,12 @@ onUnmounted(() => {
 
             <div v-if="selectedPreviousMeal || product" class="space-y-5">
                 <div class="flex gap-4">
-                    <img v-if="(selectedPreviousMeal || product)?.image_url" :src="(selectedPreviousMeal || product)?.image_url || ''" alt="" class="h-20 w-20 rounded-xl object-cover">
-                    <span v-else class="grid size-20 shrink-0 place-items-center rounded-xl bg-muted text-muted-foreground">
-                        <Utensils v-if="selectedPreviousMeal" :size="26" />
-                        <Barcode v-else :size="26" />
-                    </span>
+                    <FoodThumbnail
+                        :src="(selectedPreviousMeal || product)?.image_url"
+                        :icon="selectedPreviousMeal ? 'utensils' : 'barcode'"
+                        class="size-20"
+                        :icon-size="26"
+                    />
                     <div class="min-w-0 flex-1">
                         <p id="food-add-title" class="truncate text-lg font-semibold text-foreground">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
                         <p class="truncate text-base text-muted-foreground">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>

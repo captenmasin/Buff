@@ -10,7 +10,7 @@ use App\Services\HealthConnectBridge;
 use App\Services\MealReminderBridge;
 use Inertia\Testing\AssertableInertia as Assert;
 
-it('renders unit reminder and body profile settings', function (): void {
+it('renders the settings hub and nested section pages', function (): void {
     app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
         androidDetector: fn (): bool => false,
     ));
@@ -40,13 +40,12 @@ it('renders unit reminder and body profile settings', function (): void {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Settings')
             ->missing('settings')
+            ->missing('bodyProfile')
+            ->missing('timezones')
             ->where('preferences.weight_unit', 'kg')
             ->where('preferences.height_unit', 'cm')
+            ->where('preferences.measurement_unit', 'cm')
             ->where('preferences.eat_back', 'all')
-            ->where('bodyProfile.height_cm', 178)
-            ->where('bodyProfile.age', 32)
-            ->where('bodyProfile.sex', 'male')
-            ->where('bodyProfile.activity_level', 'moderate')
             ->where('mealReminders.breakfast.enabled', false)
             ->where('mealReminders.breakfast.time', '08:00')
             ->where('mealReminders.lunch.enabled', false)
@@ -57,7 +56,70 @@ it('renders unit reminder and body profile settings', function (): void {
             ->where('healthConnect.supported', false)
             ->where('appleHealth.is_ios', false)
             ->where('appleHealth.supported', false)
+        );
+
+    $this->get('/settings/account')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/Account')
             ->where('timezones', timezone_identifiers_list(DateTimeZone::ALL))
+        );
+
+    $this->get('/settings/password')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Settings/Password'));
+
+    $this->get('/settings/appearance')->assertOk()->assertInertia(fn (Assert $page) => $page->component('Settings/Appearance'));
+
+    $this->get('/settings/reminders')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/Reminders')
+            ->where('mealReminders.breakfast.time', '08:00')
+        );
+
+    $this->get('/settings/body-profile')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/BodyProfile')
+            ->where('bodyProfile.height_cm', 178)
+            ->where('bodyProfile.age', 32)
+            ->where('bodyProfile.sex', 'male')
+            ->where('bodyProfile.activity_level', 'moderate')
+            ->where('preferences.height_unit', 'cm')
+        );
+
+    $this->get('/settings/units')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/Units')
+            ->where('preferences.weight_unit', 'kg')
+            ->where('preferences.height_unit', 'cm')
+            ->where('preferences.measurement_unit', 'cm')
+        );
+
+    $this->get('/settings/exercise')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/Exercise')
+            ->where('preferences.eat_back', 'all')
+        );
+
+    $this->get('/settings/health')->assertRedirect('/settings');
+});
+
+it('renders health settings on Android', function (): void {
+    app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
+        androidDetector: fn (): bool => true,
+    ));
+    app()->instance(AppleHealthBridge::class, new AppleHealthBridge(
+        iosDetector: fn (): bool => false,
+    ));
+
+    $this->get('/settings/health')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Settings/Health')
+            ->where('healthConnect.is_android', true)
+            ->where('appleHealth.is_ios', false)
         );
 });
 
@@ -67,12 +129,24 @@ it('updates unit preferences from settings', function (): void {
     $this->put('/settings/units', [
         'weight_unit' => 'lb',
         'height_unit' => 'in',
+        'measurement_unit' => 'in',
     ])->assertRedirect();
 
     $this->assertDatabaseHas('app_preferences', [
         'weight_unit' => 'lb',
         'height_unit' => 'in',
+        'measurement_unit' => 'in',
     ]);
+
+    expect(SyncOutbox::query()->where('record_id', AppPreference::ID)->sole()->payload['measurement_unit'])->toBe('in');
+});
+
+it('rejects invalid measurement units', function (): void {
+    $this->put('/settings/units', [
+        'weight_unit' => 'kg',
+        'height_unit' => 'cm',
+        'measurement_unit' => 'feet',
+    ])->assertSessionHasErrors('measurement_unit');
 });
 
 it('updates eat-back preference from settings', function (): void {

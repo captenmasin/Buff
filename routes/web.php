@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/account/login', [AccountController::class, 'loginPage'])->name('account.login');
 Route::post('/account/login', [AccountController::class, 'login']);
+Route::post('/account/resume', [AccountController::class, 'resume']);
 Route::delete('/account/local-data', [AccountController::class, 'destroyLocalData']);
 Route::get('/account/social/callback', [AccountController::class, 'socialCallback']);
 Route::get('/account/register', [AccountController::class, 'registerPage'])->name('account.register');
@@ -46,11 +47,20 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::put('/goals', [GoalController::class, 'update']);
 
     Route::get('/settings', [SettingsController::class, 'edit']);
+    Route::get('/settings/account', [SettingsController::class, 'account']);
+    Route::get('/settings/password', [SettingsController::class, 'password']);
+    Route::get('/settings/appearance', [SettingsController::class, 'appearance']);
+    Route::get('/settings/reminders', [SettingsController::class, 'reminders']);
+    Route::get('/settings/body-profile', [SettingsController::class, 'bodyProfile']);
+    Route::get('/settings/units', [SettingsController::class, 'units']);
+    Route::get('/settings/exercise', [SettingsController::class, 'exercise']);
+    Route::get('/settings/health', [SettingsController::class, 'health']);
     Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
     Route::put('/settings/eat-back', [SettingsController::class, 'updateEatBack']);
     Route::put('/settings/body-profile', [SettingsController::class, 'updateBodyProfile']);
     Route::put('/settings/meal-reminders', [SettingsController::class, 'updateMealReminders']);
     Route::patch('/account', [AccountController::class, 'update']);
+    Route::put('/account/password', [AccountController::class, 'updatePassword']);
     Route::delete('/account', [AccountController::class, 'destroy']);
     Route::post('/sync', [SyncController::class, 'store']);
     Route::post('/sync/resume', [SyncController::class, 'resume']);

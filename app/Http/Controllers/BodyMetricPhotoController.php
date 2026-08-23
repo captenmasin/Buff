@@ -8,6 +8,7 @@ use App\Models\BodyMetric;
 use App\Services\BodyMetricPhotoUploader;
 use App\Services\BuffApiClient;
 use App\Services\BuffApiResult;
+use App\Services\PhotoDataUrlNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -17,8 +18,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BodyMetricPhotoController extends Controller
 {
-    public function store(Request $request, BodyMetric $bodyMetric, BodyMetricPhotoUploader $uploader): JsonResponse
+    public function store(Request $request, BodyMetric $bodyMetric, BodyMetricPhotoUploader $uploader, PhotoDataUrlNormalizer $normalizer): JsonResponse
     {
+        $normalizer->normalize($request);
+
         $validated = $request->validate([
             'photos' => ['required', 'array', 'min:1', 'max:3'],
             'photos.*' => ['required', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],

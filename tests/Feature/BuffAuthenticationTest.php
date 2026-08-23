@@ -294,6 +294,47 @@ it('blocks the app after a token expires', function (): void {
     $this->get('/')->assertRedirect('/account/login');
 });
 
+it('resumes the saved device account without asking for credentials', function (): void {
+    $account = [
+        'id' => '1',
+        'name' => 'Mason',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+        'email_verified' => true,
+    ];
+    app(BuffCredentialStore::class)->store('expired-token', $account, 'device-refresh-token');
+    app(BuffCredentialStore::class)->clearToken();
+    SyncState::current('1');
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+    Http::fake([
+        '*/auth/resume' => Http::response([
+            'token' => 'resumed-token',
+            'refresh_token' => 'rotated-refresh-token',
+            'user' => [...$account, 'id' => 1],
+        ]),
+    ]);
+
+    $this->get('/account/login')->assertInertia(fn (Assert $page) => $page
+        ->where('buff.account.email', 'mason@example.com')
+        ->where('buff.can_resume', true));
+
+    $this->post('/account/resume')->assertRedirect('/');
+
+    app()->forgetInstance(BuffCredentialStore::class);
+    expect(app(BuffCredentialStore::class)->token())->toBe('resumed-token')
+        ->and(app(BuffCredentialStore::class)->refreshToken())->toBe('rotated-refresh-token');
+    $this->assertDatabaseCount('daily_goals', 1);
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/auth/resume'
+        && $request->hasHeader('Authorization', 'Bearer device-refresh-token')
+        && $request['device_name'] === 'Buff mobile');
+});
+
 it('drops unreadable persisted credentials', function (): void {
     Storage::disk('local')->put('buff/credentials.enc', 'not-encrypted');
     app()->forgetInstance(BuffCredentialStore::class);
@@ -467,16 +508,62 @@ it('keeps account access after an email change', function (): void {
         'email_verified' => false,
     ]])]);
 
-    $this->from('/settings')->patch('/account', [
+    $this->from('/settings/account')->patch('/account', [
         'name' => 'Updated Name',
         'email' => 'updated@example.com',
         'timezone' => 'Europe/London',
-    ])->assertRedirect('/settings');
+    ])->assertRedirect('/settings/account');
 
     expect(app(BuffCredentialStore::class)->account()['email'])->toBe('updated@example.com')
         ->and(app(BuffCredentialStore::class)->account()['id'])->toBe('1');
 
     $this->get('/settings')->assertOk();
+});
+
+it('updates the password from settings', function (): void {
+    $account = [
+        'id' => '1',
+        'name' => 'Mason',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+        'email_verified' => true,
+    ];
+    app(BuffCredentialStore::class)->store('token', $account);
+    SyncState::current($account['id']);
+    Http::fake(['*/account/password' => Http::response(['message' => 'Password updated.'])]);
+
+    $this->from('/settings/password')->put('/account/password', [
+        'current_password' => 'password123',
+        'password' => 'new-password-123',
+        'password_confirmation' => 'new-password-123',
+    ])->assertRedirect('/settings/password');
+
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/account/password'
+        && $request->method() === 'PUT'
+        && $request['current_password'] === 'password123'
+        && $request['password'] === 'new-password-123'
+        && $request['password_confirmation'] === 'new-password-123');
+});
+
+it('maps an incorrect current password onto the change-password form', function (): void {
+    $account = [
+        'id' => '1',
+        'name' => 'Mason',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+        'email_verified' => true,
+    ];
+    app(BuffCredentialStore::class)->store('token', $account);
+    Http::fake(['*/account/password' => Http::response([
+        'message' => 'The given data was invalid.',
+        'errors' => ['current_password' => ['The current password is incorrect.']],
+    ], 422)]);
+
+    $this->from('/settings/password')->put('/account/password', [
+        'current_password' => 'wrong',
+        'password' => 'new-password-123',
+        'password_confirmation' => 'new-password-123',
+    ])->assertRedirect('/settings/password')->assertSessionHasErrors('current_password');
 });
 
 it('requires a successful server deletion before wiping local data', function (): void {

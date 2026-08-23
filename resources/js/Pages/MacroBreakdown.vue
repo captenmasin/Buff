@@ -3,6 +3,7 @@ import { Head, Link } from '@inertiajs/vue3';
 import { ArrowLeft } from '@lucide/vue';
 import { computed } from 'vue';
 import Card from '../Components/Card.vue';
+import FoodThumbnail from '../Components/FoodThumbnail.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Progress from '../Components/ui/progress/Progress.vue';
@@ -101,7 +102,7 @@ function grams(value: number | string | null | undefined) {
 
             <Card v-for="entry in entries" :key="entry.id">
                 <div class="flex gap-3">
-                    <img v-if="entry.image_url" :src="entry.image_url" alt="" class="h-14 w-14 flex-none rounded-xl object-cover">
+                    <FoodThumbnail v-if="entry.image_url" :src="entry.image_url" class="h-14 w-14" :icon-size="22" />
                     <div class="min-w-0 flex-1">
                         <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">

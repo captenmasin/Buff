@@ -10,6 +10,8 @@ class AppPreference extends SyncedModel
 
     public const HEIGHT_UNITS = ['cm', 'in'];
 
+    public const MEASUREMENT_UNITS = ['cm', 'in'];
+
     public const EAT_BACK = ['all', 'half', 'none'];
 
     private const DEFAULT_MEAL_REMINDERS = [
@@ -22,6 +24,7 @@ class AppPreference extends SyncedModel
         'id',
         'weight_unit',
         'height_unit',
+        'measurement_unit',
         'meal_reminders',
         'eat_back',
     ];
@@ -29,6 +32,7 @@ class AppPreference extends SyncedModel
     protected $attributes = [
         'weight_unit' => 'kg',
         'height_unit' => 'cm',
+        'measurement_unit' => 'cm',
         'eat_back' => 'all',
     ];
 

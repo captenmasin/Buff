@@ -1,5 +1,6 @@
 export type WeightUnit = 'kg' | 'lb';
 export type HeightUnit = 'cm' | 'in';
+export type MeasurementUnit = 'cm' | 'in';
 type FeetAndInches = { feet: number | ''; inches: number | '' };
 
 function roundBodyValue(value: number): number {
@@ -36,6 +37,14 @@ export function heightToCm(value: number | string | null | undefined, unit: Heig
     }
 
     return roundBodyValue(unit === 'in' ? Number(value) * 2.54 : Number(value));
+}
+
+export function measurementFromCm(value: number | null | undefined, unit: MeasurementUnit): number | null {
+    return heightFromCm(value, unit);
+}
+
+export function measurementToCm(value: number | string | null | undefined, unit: MeasurementUnit): number | string {
+    return heightToCm(value, unit);
 }
 
 export function feetAndInchesFromInches(value: number | string | null | undefined): FeetAndInches {

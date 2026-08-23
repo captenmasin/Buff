@@ -30,6 +30,7 @@ it('patches the NativePHP v4 Android shell', function (): void {
         $webViewManager = $files->get($buildPath.'/app/src/main/java/com/nativephp/mobile/network/WebViewManager.kt');
 
         expect($mainActivity)
+            ->toContain('webRenderer?.manager?.handleFileChooserResult(requestCode, resultCode, data) == true')
             ->toContain('webRenderer?.manager?.handleCameraPermissionResult(requestCode, grantResults) == true')
             ->toContain('private var swipeRefreshLayout: SwipeRefreshLayout? = null')
             ->toContain('SwipeRefreshLayout(context).apply')
@@ -37,6 +38,9 @@ it('patches the NativePHP v4 Android shell', function (): void {
             ->toContain('fun finishPullRefresh()')
             ->not->toContain('if (::webViewManager.isInitialized')
             ->and($webViewManager)
+            ->toContain('override fun onShowFileChooser(')
+            ->toContain('Intent.EXTRA_INITIAL_INTENTS')
+            ->toContain('fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean')
             ->toContain('fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean')
             ->toContain('(context as? MainActivity)?.finishPullRefresh()')
             ->and($files->get($buildPath.'/app/build.gradle.kts'))

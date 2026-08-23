@@ -59,6 +59,7 @@ it('stores the initial profile and preferences', function (): void {
     $this->assertDatabaseHas('app_preferences', [
         'weight_unit' => 'lb',
         'height_unit' => 'in',
+        'measurement_unit' => 'in',
     ]);
 
     $this->assertDatabaseCount('body_metrics', 1);

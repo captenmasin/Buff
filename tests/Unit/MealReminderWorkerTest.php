@@ -16,6 +16,8 @@ it('registers daily Android meal notifications', function (): void {
         ->toContain('"meal-reminder:check $mealId $localDate"')
         ->toContain('output.contains(MEAL_DUE_PREFIX + mealId)')
         ->toContain('!output.contains(MEAL_LOGGED_PREFIX + mealId)')
+        ->toContain('if (runAttemptCount < MEAL_REMINDER_MAX_RETRIES)')
+        ->toContain('return@withContext Result.retry()')
         ->toContain('NotificationCompat.Builder(context, MEAL_NOTIFICATION_CHANNEL_ID)')
         ->toContain('"notification_url", "/add?mode=food&meal=$mealId"')
         ->toContain('MEAL_TIME_PATTERN.matches(time)');

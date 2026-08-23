@@ -85,6 +85,11 @@ it('pushes local changes, applies remote changes, and advances the cursor atomic
                     'date' => '2026-08-15',
                     'weight_kg' => 80,
                     'body_fat_percent' => 15,
+                    'chest_cm' => 102.5,
+                    'waist_cm' => 84.2,
+                    'hips_cm' => null,
+                    'upper_arm_cm' => 35.1,
+                    'thigh_cm' => 58.4,
                     'notes' => null,
                 ],
             ]],
@@ -97,7 +102,8 @@ it('pushes local changes, applies remote changes, and advances the cursor atomic
 
     expect($result->successful())->toBeTrue()
         ->and(SyncState::current()->cursor)->toBe(9)
-        ->and(BodyMetric::query()->find('20000000-0000-4000-8000-000000000002')?->weight_kg)->toBe('80.00');
+        ->and(BodyMetric::query()->find('20000000-0000-4000-8000-000000000002')?->weight_kg)->toBe('80.00')
+        ->and(BodyMetric::query()->find('20000000-0000-4000-8000-000000000002')?->chest_cm)->toBe('102.50');
     $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $meal->id]);
 
     Http::assertSent(fn (ClientRequest $request): bool => $request->hasHeader('Authorization', 'Bearer sync-token')

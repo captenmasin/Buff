@@ -6,6 +6,7 @@ import axios from 'axios';
 import { createApp, h } from 'vue';
 import AppShell from './Layouts/AppShell.vue';
 import { applyAppearance, watchSystemAppearance } from './appearance';
+import { settingsVisitOptions } from './settingsNavigation';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
@@ -16,6 +17,9 @@ watchSystemAppearance();
 
 createInertiaApp({
     title: (title) => (title ? `${title} - Buff` : 'Buff'),
+    defaults: {
+        visitOptions: (href) => settingsVisitOptions(href),
+    },
     // @ts-ignore
     resolve: async (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue');

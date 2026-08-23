@@ -5,9 +5,11 @@ import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
+import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import { accountReplacementDecision, type SocialProvider } from '../accountReplacement';
+import { avatarColorClass, avatarInitials } from '../avatar';
 
 defineOptions({ layout: null });
 
@@ -25,7 +27,8 @@ const props = withDefaults(defineProps<{
 const page = usePage<{
     flash?: { message?: string };
     buff?: {
-        account?: { email?: string } | null;
+        account?: { name?: string; email?: string } | null;
+        can_resume?: boolean;
         has_local_account?: boolean;
     };
 }>();
@@ -37,7 +40,13 @@ const localAccountEmail = computed(() => {
 });
 const hasLocalAccount = computed(() => page.props.buff?.has_local_account === true);
 const hasDeviceData = computed(() => hasLocalAccount.value || localAccountEmail.value !== null);
+const localAccountName = computed(() => page.props.buff?.account?.name || localAccountEmail.value || 'your account');
+const localAccountInitials = computed(() => avatarInitials(localAccountName.value));
+const localAccountColor = computed(() => avatarColorClass(localAccountName.value));
+const canResume = computed(() => page.props.buff?.can_resume === true);
 const loginForm = useForm({ email: localAccountEmail.value ?? '', password: '', timezone });
+const resumeForm = useForm({ account: '', email: '' });
+const showLoginOptions = ref(localAccountEmail.value === null);
 const switchConfirmOpen = ref(false);
 const clearDataConfirmOpen = ref(false);
 const pendingSocialProvider = ref<SocialProvider | null>(null);
@@ -116,6 +125,23 @@ function submitLogin() {
     loginForm.post('/account/login');
 }
 
+function continueWithLocalAccount() {
+    if (canResume.value) {
+        resumeForm.post('/account/resume');
+
+        return;
+    }
+
+    showLoginOptions.value = true;
+}
+
+function useDifferentAccount() {
+    loginForm.email = '';
+    loginForm.password = '';
+    loginForm.clearErrors();
+    showLoginOptions.value = true;
+}
+
 function cancelSwitch() {
     pendingSocialProvider.value = null;
     switchConfirmOpen.value = false;
@@ -161,6 +187,8 @@ async function signInWith(provider: SocialProvider) {
 </script>
 
 <template>
+    <OfflineBanner />
+
     <main class="grid min-h-dvh place-items-center bg-background px-4 py-10 text-foreground">
         <Head :title="title" />
 
@@ -180,14 +208,32 @@ async function signInWith(provider: SocialProvider) {
             </p>
 
             <template v-if="screen === 'login'">
-                <Card>
+                <Card v-if="localAccountEmail && !showLoginOptions">
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="grid size-11 flex-none place-items-center rounded-full text-lg font-semibold text-white" :class="localAccountColor">
+                                {{ localAccountInitials }}
+                            </div>
+                            <div class="min-w-0">
+                                <p class="font-semibold">{{ localAccountName }}</p>
+                                <p class="truncate text-sm text-muted-foreground">{{ localAccountEmail }}</p>
+                            </div>
+                        </div>
+                        <form @submit.prevent="continueWithLocalAccount">
+                            <Button class="w-full" :disabled="resumeForm.processing">
+                                Continue as {{ localAccountName }}
+                            </Button>
+                        </form>
+                        <p v-if="resumeForm.errors.account || resumeForm.errors.email" class="text-sm text-destructive">
+                            {{ resumeForm.errors.account || resumeForm.errors.email }}
+                        </p>
+                        <Button type="button" variant="surface" class="w-full" @click="useDifferentAccount">
+                            Use a different account
+                        </Button>
+                    </div>
+                </Card>
+                <Card v-else>
                     <form class="space-y-4" @submit.prevent="submitLogin">
-                        <p v-if="hasLocalAccount && localAccountEmail" class="text-sm text-muted-foreground">
-                            This device has data for <strong class="text-foreground">{{ localAccountEmail }}</strong>. Sign in with that account to keep it.
-                        </p>
-                        <p v-else-if="hasLocalAccount" class="text-sm text-muted-foreground">
-                            This device still has data from a previous account. Sign in with that account to keep it, or a different one to replace it.
-                        </p>
                         <label class="block">
                             <span class="field-label">Email</span>
                             <Input v-model="loginForm.email" type="email" autocomplete="email" required class="mt-1" />
