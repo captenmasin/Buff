@@ -213,8 +213,8 @@ onUnmounted(() => {
 
         <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
             <Link href="/" class="mb-8 px-2" aria-label="Buff home">
-                <img :src="'/logo.png'" alt="Buff" class="h-auto w-32 dark:hidden" />
-                <img :src="'/logo-dark.png'" alt="Buff" class="hidden h-auto w-32 dark:block" />
+                    <img :src="'/logo.svg'" alt="Buff" class="h-auto w-32 dark:hidden" />
+                    <img :src="'/logo-dark.svg'" alt="Buff" class="hidden h-auto w-32 dark:block" />
             </Link>
 
             <nav class="grid gap-1" aria-label="Primary">
@@ -271,9 +271,9 @@ onUnmounted(() => {
             class="bottom-drawer"
             @close="closeAddDrawer"
         >
-            <div class="mb-4 flex items-center justify-between">
-                <h2 id="add-drawer-title" class="text-lg font-semibold">Add</h2>
-                <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close add drawer" @click="closeAddDrawer">
+            <div class="mb-5 flex items-center justify-between">
+                <h2 id="add-drawer-title" class="card-title">Add</h2>
+                <Button variant="surface" size="icon" class="rounded-full" aria-label="Close add drawer" @click="closeAddDrawer">
                     <X :size="20" />
                 </Button>
             </div>
@@ -288,7 +288,7 @@ onUnmounted(() => {
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[0].match) ? 'bg-primary/5' : ''"
+                    :class="isActive(navItems[0].match) ? 'bg-primary' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
@@ -300,7 +300,7 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[1].match) ? 'bg-primary/5' : ''"
+                    :class="isActive(navItems[1].match) ? 'bg-primary' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
@@ -310,7 +310,7 @@ onUnmounted(() => {
                 <Button
                     size="icon"
                     variant="default"
-                    class="relative z-10 mx-auto -mt-6 h-[3.6rem] w-[3.6rem] rounded-full border-[5px] border-card shadow-card active:scale-95"
+                    class="relative z-10 mx-auto -translate-y-1 h-[3rem] w-[3rem] rounded-full border-0 border-card active:scale-95"
                     aria-label="Add"
                     @click="openAddDrawer()"
                 >
@@ -322,7 +322,7 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[2].match) ? 'bg-primary/5' : ''"
+                    :class="isActive(navItems[2].match) ? 'bg-primary' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
@@ -334,7 +334,7 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[3].match) ? 'bg-primary/5' : ''"
+                    :class="isActive(navItems[3].match) ? 'bg-primary' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />

@@ -28,14 +28,15 @@ function selectAppearance(value: Appearance) {
         <SettingsPageHeader>Appearance</SettingsPageHeader>
 
         <Card>
-            <div class="mt-1 rounded-xl bg-muted/80 p-1">
+            <div class="mt-1 rounded-xl bg-brand-night p-1">
                 <div class="grid grid-cols-3 gap-1" role="group" aria-label="Appearance">
                     <Button
                         v-for="option in appearanceOptions"
                         :key="option.value"
                         type="button"
                         size="sm"
-                        class="h-10 w-full gap-1.5 rounded-lg px-2"
+                        class="h-10 w-full gap-1.5 rounded-lg px-2 focus-visible:border-brand-white focus-visible:ring-brand-white"
+                        :class="appearance === option.value ? '' : 'text-brand-white hover:bg-brand-white/10 hover:text-brand-white'"
                         :variant="appearance === option.value ? 'default' : 'ghost'"
                         :aria-pressed="appearance === option.value"
                         @click="selectAppearance(option.value)"

@@ -137,10 +137,10 @@ const hasHistory = computed(() => props.history.length > 0);
 const hasDelta = computed(() => Boolean(props.delta));
 const hasTrendDelta = computed(() => props.trend?.delta_kg !== null && props.trend?.delta_kg !== undefined);
 const rangeOptions = [
-    { key: '30', label: '30' },
-    { key: '90', label: '90' },
-    { key: '180', label: '180' },
-    { key: 'all', label: 'All' },
+    { key: '30', label: '30', accessibleLabel: '30 days' },
+    { key: '90', label: '90', accessibleLabel: '90 days' },
+    { key: '180', label: '180', accessibleLabel: '180 days' },
+    { key: 'all', label: 'All', accessibleLabel: 'All time' },
 ] as const;
 const latestWeight = computed(() => weightFromKg(props.trend?.weight_kg ?? props.latest?.weight_kg, props.preferences.weight_unit));
 const previousWeight = computed(() => {
@@ -185,7 +185,7 @@ const hasMeasurements = computed(() => measurementFields.some(({ key }) => props
 const weightChartLines = computed(() => displayTargetWeight.value === null ? ['weight'] : ['weight', 'goal']);
 const bodyFatChartLines = computed(() => props.goals?.target_body_fat_percent == null ? ['bodyFat'] : ['bodyFat', 'goal']);
 const weightChartConfig: ChartConfig = {
-    weight: { label: 'Weight', color: 'var(--primary)' },
+    weight: { label: 'Weight', color: 'var(--chart-1)' },
     goal: { label: 'Goal', color: 'var(--food)' },
 };
 const bodyFatChartConfig: ChartConfig = {
@@ -703,7 +703,12 @@ onUnmounted(() => {
 <template>
     <Head title="Progress" />
     <section class="space-y-5">
-        <PageHeader>Progress</PageHeader>
+        <PageHeader>
+            Progress
+            <template #actions>
+                <Button :as="Link" href="/goals" variant="outline" size="sm">Edit goals</Button>
+            </template>
+        </PageHeader>
 
         <template v-if="hasHistory">
             <article class="grid grid-cols-3 gap-2">
@@ -736,14 +741,17 @@ onUnmounted(() => {
             <Card>
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="card-title">Trends</h2>
-                    <div class="flex rounded-xl bg-muted/80 p-1">
+                    <div class="flex rounded-xl bg-brand-night p-1" role="group" aria-label="Trend date range">
                         <Button
                             v-for="option in rangeOptions"
                             :key="option.key"
                             type="button"
                             size="sm"
-                            class="h-8 min-w-10 rounded-lg px-2.5"
+                            class="h-8 min-w-10 rounded-lg px-2.5 focus-visible:border-brand-white focus-visible:ring-brand-white"
+                            :class="range === option.key ? '' : 'text-brand-white hover:bg-brand-white/10 hover:text-brand-white'"
                             :variant="range === option.key ? 'default' : 'ghost'"
+                            :aria-label="option.accessibleLabel"
+                            :aria-pressed="range === option.key"
                             @click="visitRange(option.key)"
                         >
                             {{ option.label }}

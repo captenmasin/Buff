@@ -4,7 +4,7 @@ import axios from 'axios';
 import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import type {DateValue} from '@internationalized/date';
 import {parseDate} from '@internationalized/date';
-import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
+import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import {dayStatusLabel, type DayStatus} from '../dayStatus';
 import { hapticImpact } from '../haptics';
@@ -173,7 +173,7 @@ const hasGoal = computed(() => Boolean(props.summary.goal));
 const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
-const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short'}));
+const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
 const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
 const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'});
@@ -197,6 +197,7 @@ const showHealthConnect = computed(() => healthImport.value !== null);
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthImport.value?.state.status ?? ''));
 const selectedMeal = ref<SelectedMeal | null>(null);
 const mealSheetMode = ref<'details' | 'edit' | null>(null);
+const selectedWorkout = ref<WorkoutEntry | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
 const mealPhotosLoading = ref(false);
 const pendingDelete = ref<null | { kind: 'meal' | 'workout'; id: string; title: string }>(null);
@@ -215,6 +216,13 @@ const editMealForm = useForm({
     protein_g: 0,
     carbs_g: 0,
     fat_g: 0,
+});
+
+const editWorkoutForm = useForm({
+    date: props.summary.date,
+    title: '',
+    calories_burned: 0,
+    time: '',
 });
 
 const selectedMealMacros = computed(() => {
@@ -502,6 +510,42 @@ function saveMealEdit() {
     });
 }
 
+function startEditingWorkout(workout: WorkoutEntry, closeMenu: () => void) {
+    closeMenu();
+    hapticImpact();
+    selectedWorkout.value = workout;
+    editWorkoutForm.defaults({
+        date: props.summary.date,
+        title: workout.title,
+        calories_burned: workout.calories_burned,
+        time: workout.logged_time ?? '',
+    });
+    editWorkoutForm.reset();
+    editWorkoutForm.clearErrors();
+}
+
+function closeWorkoutEditor() {
+    if (editWorkoutForm.processing) {
+        return;
+    }
+
+    selectedWorkout.value = null;
+    editWorkoutForm.reset();
+    editWorkoutForm.clearErrors();
+}
+
+function saveWorkoutEdit() {
+    if (!selectedWorkout.value) {
+        return;
+    }
+
+    hapticImpact();
+    editWorkoutForm.put(`/workouts/${selectedWorkout.value.id}`, {
+        preserveScroll: true,
+        onSuccess: closeWorkoutEditor,
+    });
+}
+
 function macroPercent(consumed: number, goal?: number) {
     if (!goal) return 0;
 
@@ -656,9 +700,10 @@ onBeforeUnmount(() => {
                                 :href="`/add?mode=food&date=${summary.date}&meal=${mealType}`"
                                 variant="ghost"
                                 size="sm"
+                                class="pr-0"
                                 :aria-label="`Add ${mealLabels[mealType].toLowerCase()}`"
                             >
-                                <Plus class="w-4" />Add meal
+                                <Plus class="w-4" />Add
                             </Button>
                         </div>
 
@@ -717,7 +762,7 @@ onBeforeUnmount(() => {
             <Card class="py-1">
                 <div v-if="summary.workouts?.length" class="divide-y divide-border/60">
                     <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
-                        <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-secondary text-primary">
+                        <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-secondary text-link">
                             <Dumbbell :size="18"/>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -726,17 +771,33 @@ onBeforeUnmount(() => {
                                 {{ workout.logged_time }}
                             </p>
                         </div>
-                        <p class="shrink-0 text-right">
+                        <p class="min-w-10 shrink-0 text-center leading-none">
                             <span class="block text-sm font-semibold tabular-nums">{{ workout.calories_burned }}</span>
-                            <span class="text-[10px] font-medium text-muted-foreground">kcal</span>
+                            <span class="mt-1 block text-[10px] font-medium leading-none text-muted-foreground">kcal</span>
                         </p>
-                        <Button variant="ghost" size="icon" class="h-9 w-9 text-muted-foreground/70" aria-label="Remove workout" @click="requestDelete('workout', workout.id, 'Delete this workout?')">
-                            <Trash2 :size="18"/>
-                        </Button>
+                        <Popover v-slot="{ close }">
+                            <PopoverTrigger as-child>
+                                <Button variant="ghost" size="icon" class="h-9 w-9 text-muted-foreground/70" aria-label="Workout actions">
+                                    <EllipsisVertical :size="20"/>
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" class="w-40 gap-0.5 p-1" role="group" aria-label="Workout actions">
+                                <Button variant="ghost" size="sm" class="w-full justify-start" @click="startEditingWorkout(workout, close)">
+                                    <Pencil :size="16"/>Edit
+                                </Button>
+                                <Button variant="ghost" size="sm" class="w-full justify-start text-destructive hover:text-destructive" @click="close(); requestDelete('workout', workout.id, 'Delete this workout?')">
+                                    <Trash2 :size="16"/>Delete
+                                </Button>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
 
                 <div v-else class="py-6 text-center text-sm text-muted-foreground">No workouts yet.</div>
+                <dl v-if="summary.workouts?.length" class="-mx-5 border-t border-border/60 py-3 text-center">
+                    <dt class="text-xs font-medium text-muted-foreground">Total burned</dt>
+                    <dd class="mt-1 font-semibold tabular-nums">{{ summary.log.burned_calories }} kcal</dd>
+                </dl>
             </Card>
         </section>
 
@@ -845,6 +906,44 @@ onBeforeUnmount(() => {
                 </form>
                 </div>
             </Transition>
+        </AppSheet>
+        <AppSheet
+            :open="selectedWorkout !== null"
+            labelled-by="workout-sheet-title"
+            :dismissible="!editWorkoutForm.processing"
+            @close="closeWorkoutEditor"
+        >
+            <div class="mb-4 flex items-center justify-between gap-3">
+                <h2 id="workout-sheet-title" class="text-xl font-semibold tracking-tight">Edit workout</h2>
+                <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close workout editor" :disabled="editWorkoutForm.processing" @click="closeWorkoutEditor">
+                    <X :size="20"/>
+                </Button>
+            </div>
+
+            <form class="space-y-4" @submit.prevent="saveWorkoutEdit">
+                <label class="block">
+                    <span class="field-label">Title</span>
+                    <Input v-model="editWorkoutForm.title" type="text" class="mt-1" />
+                    <span v-if="editWorkoutForm.errors.title" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.title }}</span>
+                </label>
+
+                <div class="grid grid-cols-2 gap-2">
+                    <label>
+                        <span class="field-label">Calories burnt</span>
+                        <Input v-model.number="editWorkoutForm.calories_burned" type="number" min="1" step="1" class="mt-1 text-right font-semibold" />
+                        <span v-if="editWorkoutForm.errors.calories_burned" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.calories_burned }}</span>
+                    </label>
+                    <label>
+                        <span class="field-label">Time</span>
+                        <Input v-model="editWorkoutForm.time" type="time" class="mt-1 font-semibold" />
+                        <span v-if="editWorkoutForm.errors.time" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.time }}</span>
+                    </label>
+                </div>
+
+                <Button class="w-full" :disabled="editWorkoutForm.processing">
+                    Save workout
+                </Button>
+            </form>
         </AppSheet>
         <ConfirmSheet
             :open="Boolean(pendingDelete)"

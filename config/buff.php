@@ -12,6 +12,7 @@ use App\Models\WorkoutEntry;
 
 return [
     'api_url' => env('BUFF_API_URL'),
+    'mcp_url' => env('BUFF_MCP_URL'),
 
     'http' => [
         'connect_timeout' => 5,

@@ -47,12 +47,12 @@ return [
     |--------------------------------------------------------------------------
     |
     | The deep link scheme to use for opening your app from URLs. For
-    | example, using the scheme "nativephp" allows links like:
-    | nativephp://some/path to open the app directly.
+    | example, using the scheme "buff" allows links like:
+    | buff://some/path to open the app directly.
     |
     */
 
-    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME', 'nativephp'),
+    'deeplink_scheme' => env('NATIVEPHP_DEEPLINK_SCHEME', 'buff'),
 
     /*
     |--------------------------------------------------------------------------

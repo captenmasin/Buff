@@ -11,8 +11,14 @@ interface AddChoice {
     label: string;
     description: string;
     icon: Component;
-    tone: 'food' | 'workout';
+    tone: 'acid' | 'violet' | 'night';
 }
+
+const toneClasses: Record<AddChoice['tone'], string> = {
+    acid: 'bg-brand-acid text-brand-night',
+    violet: 'bg-brand-violet text-brand-white',
+    night: 'bg-brand-night text-brand-white',
+};
 
 const tiles: AddChoice[] = [
     {
@@ -20,7 +26,7 @@ const tiles: AddChoice[] = [
         label: 'Search',
         description: 'Packaged food and previous items',
         icon: Search,
-        tone: 'food',
+        tone: 'acid',
     },
     {
         mode: 'food',
@@ -28,21 +34,21 @@ const tiles: AddChoice[] = [
         label: 'Scan',
         description: 'Look up a barcode',
         icon: ScanBarcode,
-        tone: 'food',
+        tone: 'acid',
     },
     {
         mode: 'photo',
         label: 'Photo',
         description: 'Estimate editable macros',
         icon: Camera,
-        tone: 'food',
+        tone: 'acid',
     },
     {
         mode: 'custom',
         label: 'Custom',
         description: 'Enter name and macros',
         icon: Pencil,
-        tone: 'food',
+        tone: 'acid',
     },
 ];
 
@@ -52,14 +58,14 @@ const rows: AddChoice[] = [
         label: 'Recipe',
         description: 'Saved multi-ingredient meal',
         icon: UtensilsCrossed,
-        tone: 'food',
+        tone: 'violet',
     },
     {
         mode: 'workout',
         label: 'Workout',
         description: 'Log calories burned',
         icon: Dumbbell,
-        tone: 'workout',
+        tone: 'night',
     },
 ];
 
@@ -70,23 +76,24 @@ const emit = defineEmits<{
 
 <template>
     <div class="grid gap-3" role="group" aria-label="Add">
-        <div class="rounded-xl bg-muted/80 p-1">
-            <div class="grid grid-cols-2 gap-1">
-                <Button
-                    v-for="choice in tiles"
-                    :key="choice.label"
-                    type="button"
-                    variant="ghost"
-                    class="h-auto w-full flex-col gap-2 rounded-lg px-2 py-3"
-                    :aria-label="`${choice.label}. ${choice.description}`"
-                    @click="emit('select', choice.mode, choice.extra)"
+        <div class="grid grid-cols-2 gap-2">
+            <Button
+                v-for="choice in tiles"
+                :key="choice.label"
+                type="button"
+                variant="ghost"
+                class="h-auto min-h-28 w-full flex-col gap-2 rounded-2xl bg-secondary/70 px-3 py-4 hover:bg-secondary"
+                :aria-label="`${choice.label}. ${choice.description}`"
+                @click="emit('select', choice.mode, choice.extra)"
+            >
+                <span
+                    class="grid h-12 w-12 place-items-center rounded-xl"
+                    :class="toneClasses[choice.tone]"
                 >
-                    <span class="grid h-10 w-10 place-items-center rounded-xl bg-food text-primary-foreground">
-                        <component :is="choice.icon" :size="20" />
-                    </span>
-                    <span class="text-sm font-semibold">{{ choice.label }}</span>
-                </Button>
-            </div>
+                    <component :is="choice.icon" :size="22" />
+                </span>
+                <span class="text-sm font-semibold">{{ choice.label }}</span>
+            </Button>
         </div>
 
         <Button
@@ -94,19 +101,19 @@ const emit = defineEmits<{
             :key="choice.label"
             type="button"
             variant="ghost"
-            class="h-auto w-full justify-start gap-3 rounded-xl bg-muted/80 px-3 py-3 text-left"
+            class="h-auto min-h-20 w-full justify-start gap-3 rounded-2xl bg-secondary/70 px-3 py-3 text-left hover:bg-secondary"
             :aria-label="`${choice.label}. ${choice.description}`"
             @click="emit('select', choice.mode, choice.extra)"
         >
             <span
-                class="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-primary-foreground"
-                :class="choice.tone === 'food' ? 'bg-food' : 'bg-workout'"
+                class="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+                :class="toneClasses[choice.tone]"
             >
-                <component :is="choice.icon" :size="20" />
+                <component :is="choice.icon" :size="22" />
             </span>
             <span class="min-w-0">
                 <span class="block font-semibold">{{ choice.label }}</span>
-                <span class="block text-sm font-medium text-muted-foreground">{{ choice.description }}</span>
+                <span class="block text-sm text-muted-foreground">{{ choice.description }}</span>
             </span>
         </Button>
     </div>

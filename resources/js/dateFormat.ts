@@ -1,19 +1,6 @@
-const dateFormatter = new Intl.DateTimeFormat('en-GB', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-});
-
-const shortDayDateFormatter = new Intl.DateTimeFormat('en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-});
-
 type FormatDisplayDateOptions = {
     weekday?: 'short' | 'long';
+    year?: boolean;
 };
 
 export function parseLocalDate(value: string): Date {
@@ -33,7 +20,12 @@ export function formatDisplayDate(value: string, options: FormatDisplayDateOptio
         return value;
     }
 
-    return (options.weekday === 'short' ? shortDayDateFormatter : dateFormatter).format(date);
+    return new Intl.DateTimeFormat('en-GB', {
+        weekday: options.weekday ?? 'long',
+        day: 'numeric',
+        month: 'long',
+        year: options.year === false ? undefined : 'numeric',
+    }).format(date);
 }
 
 const chartTickFormatter = new Intl.DateTimeFormat('en-GB', {

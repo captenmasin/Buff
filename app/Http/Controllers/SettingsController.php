@@ -2,13 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\BuffApiStatus;
 use App\Models\AppPreference;
 use App\Models\BodyProfile;
+use App\Services\BuffApiClient;
+use App\Services\BuffApiResult;
+use App\Services\BuffCredentialStore;
 use App\Services\MealReminderBridge;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -85,6 +91,47 @@ class SettingsController extends Controller
         ]);
     }
 
+    public function connectedAssistants(BuffApiClient $api, BuffCredentialStore $credentials): Response|RedirectResponse
+    {
+        $result = $api->get('mcp/connections');
+
+        if ($result->status === BuffApiStatus::Unauthenticated) {
+            $credentials->clearToken();
+
+            return redirect()->guest(route('account.login'));
+        }
+
+        return Inertia::render('Settings/ConnectedAssistants', [
+            'connections' => $this->connections($result),
+            'error' => $result->successful() ? null : $this->connectionError($result),
+            'mcpEndpoint' => config('buff.mcp_url'),
+        ]);
+    }
+
+    public function revokeConnectedAssistant(
+        Request $request,
+        BuffApiClient $api,
+        BuffCredentialStore $credentials,
+        string $connection,
+    ): RedirectResponse {
+        $result = $api->delete("mcp/connections/{$connection}");
+
+        if ($result->status === BuffApiStatus::Unauthenticated) {
+            $credentials->clearToken();
+            $request->session()->put('url.intended', url('/settings/connected-assistants'));
+
+            return redirect()->route('account.login');
+        }
+
+        if (! $result->successful()) {
+            throw ValidationException::withMessages([
+                'connection' => [$this->connectionError($result)],
+            ]);
+        }
+
+        return back()->with('message', 'Assistant access revoked.');
+    }
+
     public function updateUnits(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -153,5 +200,49 @@ class SettingsController extends Controller
             'measurement_unit' => $preferences->measurement_unit,
             'eat_back' => $preferences->eatBack(),
         ];
+    }
+
+    /**
+     * @return array<int, array{id: string, clientName: string, linkedAt: ?string, lastUsedAt: ?string, revokedAt: ?string}>
+     */
+    private function connections(BuffApiResult $result): array
+    {
+        $connections = $result->data['data'] ?? null;
+
+        if (! $result->successful() || ! is_array($connections)) {
+            return [];
+        }
+
+        return collect($connections)
+            ->map(function (mixed $connection): ?array {
+                if (! is_array($connection)
+                    || ! is_string($connection['id'] ?? null)
+                    || ! Str::isUuid($connection['id'])
+                    || ! is_string($connection['client_name'] ?? null)
+                    || trim($connection['client_name']) === '') {
+                    return null;
+                }
+
+                return [
+                    'id' => $connection['id'],
+                    'clientName' => trim($connection['client_name']),
+                    'linkedAt' => is_string($connection['linked_at'] ?? null) ? $connection['linked_at'] : null,
+                    'lastUsedAt' => is_string($connection['last_used_at'] ?? null) ? $connection['last_used_at'] : null,
+                    'revokedAt' => is_string($connection['revoked_at'] ?? null) ? $connection['revoked_at'] : null,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function connectionError(BuffApiResult $result): string
+    {
+        return match ($result->status) {
+            BuffApiStatus::ConnectionFailed => 'Could not connect to Buff. Check your connection and try again.',
+            BuffApiStatus::Unauthenticated => 'Your session expired. Sign in again to manage assistants.',
+            BuffApiStatus::RateLimited => 'Too many attempts. Try again shortly.',
+            default => $result->message ?? 'Connected assistants could not be loaded. Try again.',
+        };
     }
 }

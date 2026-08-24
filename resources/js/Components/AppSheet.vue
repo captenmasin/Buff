@@ -62,7 +62,7 @@ function preventDismiss(event: Event) {
             role="dialog"
             aria-modal="true"
             :aria-labelledby="labelledBy"
-            :class="cn('max-w-md gap-0 overflow-hidden p-0 sm:max-w-lg', props.class)"
+            :class="cn('w-[calc(100%-2rem)] max-w-md gap-0 overflow-hidden p-0 sm:max-w-lg', props.class)"
             @pointer-down-outside="preventDismiss"
             @interact-outside="preventDismiss"
             @escape-key-down="preventDismiss"

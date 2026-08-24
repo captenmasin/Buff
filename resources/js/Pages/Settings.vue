@@ -162,8 +162,9 @@ onMounted(() => {
             <SettingsRow href="/settings/exercise" :detail="eatBackLabels[preferences.eat_back]">Exercise calories</SettingsRow>
         </SettingsGroup>
 
-        <SettingsGroup v-if="healthName" title="Apps & devices">
-            <SettingsRow href="/settings/health">{{ healthName }}</SettingsRow>
+        <SettingsGroup v-if="healthName || page.props.buff.account" title="Apps & devices">
+            <SettingsRow v-if="healthName" href="/settings/health">{{ healthName }}</SettingsRow>
+            <SettingsRow v-if="page.props.buff.account" href="/settings/connected-assistants">Connected assistants</SettingsRow>
         </SettingsGroup>
 
         <SettingsGroup v-if="page.props.buff.account || page.props.buff.has_local_account">
@@ -193,7 +194,7 @@ onMounted(() => {
             <form class="mt-4 space-y-3" @submit.prevent="submitDeleteAccount">
                 <p class="text-sm text-muted-foreground">
                     Signed in with Google or Apple, or don't know your password?
-                    <Link :href="passwordResetUrl" class="text-primary">Set or reset it by email first.</Link>
+                    <Link :href="passwordResetUrl" class="text-link">Set or reset it by email first.</Link>
                 </p>
                 <label for="delete-account-password" class="block field-label">Password</label>
                 <Input

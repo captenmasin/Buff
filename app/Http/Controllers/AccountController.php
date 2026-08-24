@@ -334,7 +334,7 @@ class AccountController extends Controller
 
     private function accountRedirect(): RedirectResponse
     {
-        return redirect('/');
+        return redirect()->intended('/');
     }
 
     private function registrationRedirect(): ?RedirectResponse

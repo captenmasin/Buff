@@ -250,8 +250,8 @@ async function signInWith(provider: SocialProvider) {
                             <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
                         </div>
                         <div class="flex justify-between text-sm">
-                            <Link href="/account/forgot-password" class="text-primary">Forgot password?</Link>
-                            <Link href="/account/register" class="text-primary">Create account</Link>
+                            <Link href="/account/forgot-password" class="text-link">Forgot password?</Link>
+                            <Link href="/account/register" class="text-link">Create account</Link>
                         </div>
                     </form>
                 </Card>
@@ -278,7 +278,7 @@ async function signInWith(provider: SocialProvider) {
                         <Button type="button" variant="surface" class="w-full" @click="signInWith('google')">Continue with Google</Button>
                         <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
                     </div>
-                    <p class="text-center text-sm"><Link href="/account/login" class="text-primary">Back to sign in</Link></p>
+                    <p class="text-center text-sm"><Link href="/account/login" class="text-link">Back to sign in</Link></p>
                 </form>
             </Card>
 
@@ -291,7 +291,7 @@ async function signInWith(provider: SocialProvider) {
                         <span v-if="forgotForm.errors.email" class="mt-1 block text-sm text-destructive">{{ forgotForm.errors.email }}</span>
                     </label>
                     <Button class="w-full" :disabled="forgotForm.processing">Send reset link</Button>
-                    <p class="text-center text-sm"><Link href="/account/login" class="text-primary">Back to sign in</Link></p>
+                    <p class="text-center text-sm"><Link href="/account/login" class="text-link">Back to sign in</Link></p>
                 </form>
             </Card>
 

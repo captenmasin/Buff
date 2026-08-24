@@ -48,7 +48,7 @@ function updatePassword() {
                 <h2 class="card-title">Change password</h2>
                 <p class="text-sm text-muted-foreground">
                     Signed in with Google or Apple, or don't know your current password?
-                    <Link :href="passwordResetUrl" class="text-primary">Reset it by email.</Link>
+                    <Link :href="passwordResetUrl" class="text-link">Reset it by email.</Link>
                 </p>
                 <label class="block">
                     <span class="field-label">Current password</span>

@@ -14,6 +14,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
     {
         if ($this->isAndroid()) {
             $this->installAndroidRefresh();
+            $this->installAndroidDeepLinkScheme();
             $this->installAndroidAddShortcut();
         }
 
@@ -94,6 +95,28 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         $this->info('Installed Android native pull-to-refresh.');
     }
 
+    private function installAndroidDeepLinkScheme(): void
+    {
+        $scheme = (string) config('nativephp.deeplink_scheme');
+
+        if ($scheme === '') {
+            return;
+        }
+
+        $this->patchFile(
+            $this->buildPath().'/app/src/main/java/com/nativephp/mobile/ui/MainActivity.kt',
+            fn (string $content): string => str_replace(
+                ['nativephp://', 'uri.scheme == "nativephp"'],
+                ["{$scheme}://", "uri.scheme == \"{$scheme}\""],
+                $content,
+            ),
+        );
+        $this->patchFile(
+            $this->buildPath().'/app/src/main/java/com/nativephp/mobile/network/WebViewManager.kt',
+            fn (string $content): string => str_replace('nativephp://', "{$scheme}://", $content),
+        );
+    }
+
     private function installAndroidAddShortcut(): void
     {
         $this->patchFile(
@@ -128,7 +151,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         android:shortcutLongLabel="@string/shortcut_add_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="nativephp://add" />
+            android:data="buff://add" />
     </shortcut>
     <shortcut
         android:shortcutId="scan"
@@ -138,7 +161,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         android:shortcutLongLabel="@string/shortcut_scan_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="nativephp://add?mode=food&amp;scan=1" />
+            android:data="buff://add?mode=food&amp;scan=1" />
     </shortcut>
     <shortcut
         android:shortcutId="workout"
@@ -148,7 +171,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         android:shortcutLongLabel="@string/shortcut_workout_long">
         <intent
             android:action="android.intent.action.VIEW"
-            android:data="nativephp://add?mode=workout" />
+            android:data="buff://add?mode=workout" />
     </shortcut>
 </shortcuts>
 XML

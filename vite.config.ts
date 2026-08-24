@@ -18,8 +18,12 @@ export default defineConfig({
             refresh: true,
             hotFile: nativephpHotFile(),
             fonts: [
-                bunny('Instrument Sans', {
+                bunny('IBM Plex Sans', {
                     weights: [400, 500, 600, 700],
+                }),
+                bunny('Fraunces', {
+                    weights: [900],
+                    styles: ['italic'],
                 }),
             ],
         }),

@@ -18,6 +18,10 @@ class EnsureBuffAccount
             return $next($request);
         }
 
+        if ($request->routeIs('mcp.approval.show')) {
+            return redirect()->guest(route('account.login'));
+        }
+
         return redirect()->route('account.login');
     }
 }

@@ -46,6 +46,7 @@ it('reports daily calorie and macro remaining totals', function (): void {
             ->where('summary.totals.protein_remaining', 155.5)
             ->where('summary.totals.carbs_remaining', 164.25)
             ->where('summary.totals.fat_remaining', 59)
+            ->where('summary.log.burned_calories', 300)
             ->has('summary.entries.breakfast', 1)
             ->has('summary.workouts', 1)
             ->where('summary.workouts.0.title', 'Bike ride')

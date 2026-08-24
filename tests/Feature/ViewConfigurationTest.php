@@ -78,6 +78,7 @@ it('shares page chrome across the main screens', function (): void {
     $settingsAccount = file_get_contents(resource_path('js/Pages/Settings/Account.vue'));
     $settingsUnits = file_get_contents(resource_path('js/Pages/Settings/Units.vue'));
     $settingsGroup = file_get_contents(resource_path('js/Components/SettingsGroup.vue'));
+    $settingsPageHeader = file_get_contents(resource_path('js/Components/SettingsPageHeader.vue'));
     $bodyProfileEditor = file_get_contents(resource_path('js/Components/BodyProfileEditor.vue'));
     $shell = file_get_contents(resource_path('js/Layouts/AppShell.vue'));
     $macros = file_get_contents(resource_path('js/Components/Add/MacroSummary.vue'));
@@ -114,6 +115,7 @@ it('shares page chrome across the main screens', function (): void {
         ->and($settingsGroup)->toContain('divide-y divide-border/60')
         ->and($settingsGroup)->toContain('title?: string')
         ->and($settingsGroup)->toContain('v-if="title"')
+        ->and($settingsPageHeader)->toContain('<h1 class="page-title page-title-compact w-full text-center">')
         ->and($settingsAccount)->toContain('Select v-model="accountForm.timezone"')
         ->and($settingsAccount)->toContain("const accountAvatarName = computed(() => page.props.buff.account?.name || page.props.buff.account?.email || 'Account')")
         ->and($settingsAccount)->toContain('<h2 class="card-title">My Account</h2>')
@@ -143,8 +145,8 @@ it('shares page chrome across the main screens', function (): void {
         ->and($shell)->toMatch('/<Button\s+variant="default"\s+class="mt-4 h-11 justify-start px-3 text-sm"/')
         ->and($shell)->not->toContain('isAddActive')
         ->and($shell)->toContain('<Link href="/" class="mb-8 px-2" aria-label="Buff home">')
-        ->and($shell)->toContain(':src="\'/logo.png\'"')
-        ->and($shell)->toContain(':src="\'/logo-dark.png\'"')
+        ->and($shell)->toContain(':src="\'/logo.svg\'"')
+        ->and($shell)->toContain(':src="\'/logo-dark.svg\'"')
         ->and($shell)->toContain('h-auto w-32 dark:hidden')
         ->and($shell)->toContain('hidden h-auto w-32 dark:block')
         ->and($shell)->not->toContain('addHref')
@@ -165,11 +167,12 @@ it('shares page chrome across the main screens', function (): void {
         ->and($css)->toContain('settings-slide-in-right')
         ->and($app)->toContain('settingsVisitOptions')
         ->and($app)->toContain('visitOptions')
-        ->and($css)->not->toContain('text-transform: uppercase');
+        ->and($css)->toContain('text-transform: uppercase');
 });
 
 it('exposes focus, caption, dark domain, and motion tokens', function (): void {
     $css = file_get_contents(resource_path('css/app.css'));
+    $vite = file_get_contents(base_path('vite.config.ts'));
     $button = file_get_contents(resource_path('js/Components/ui/button/index.ts'));
     $card = file_get_contents(resource_path('js/Components/Card.vue'));
     $ring = file_get_contents(resource_path('js/Components/CalorieRing.vue'));
@@ -177,14 +180,21 @@ it('exposes focus, caption, dark domain, and motion tokens', function (): void {
     expect($css)
         ->toContain('prefers-reduced-motion')
         ->toContain('prefers-contrast')
-        ->toContain('--primary: #24382b')
-        ->toContain('--background: #f4f4f5')
-        ->toContain('--card: #ffffff')
+        ->toContain('--brand-night: #0f1125')
+        ->toContain('--brand-white: #ffffff')
+        ->toContain('--brand-acid: #b6ff51')
+        ->toContain('--brand-violet: #7361ff')
+        ->toContain('--primary: var(--brand-acid)')
+        ->toContain('--background: #f5f6f6')
+        ->toContain('--card: var(--brand-white)')
+        ->toContain('--font-sans: \'IBM Plex Sans\'')
+        ->toContain('--font-heading: \'Fraunces\'')
+        ->toContain("font-variation-settings: 'SOFT' 0, 'WONK' 1")
         ->toContain('--radius: 0.5rem')
         ->toContain('--protein: #6eb8d8')
         ->toContain('font-size: 0.8125rem')
         ->not->toContain('font-size: 0.7rem')
-        ->not->toContain('font-size: 0.75rem')
+        ->toContain('font-size: 0.75rem')
         ->and($css)->toContain('font-family: inherit')
         ->and($css)->not->toContain('font: inherit')
         ->and($css)->toContain('--ease-out: cubic-bezier(0.23, 1, 0.32, 1)')
@@ -192,6 +202,8 @@ it('exposes focus, caption, dark domain, and motion tokens', function (): void {
         ->and($css)->toContain('transition-property: color, background-color, border-color, box-shadow, opacity')
         ->and($css)->not->toContain('transition: none !important')
         ->and($css)->toContain('(pointer: fine)')
+        ->and($vite)->toContain("bunny('IBM Plex Sans'")
+        ->and($vite)->toContain("bunny('Fraunces'")
         ->and($button)->toContain('focus-visible:ring-2')
         ->and($button)->toContain('text-xs')
         ->and($button)->not->toContain('text-[10px]')
@@ -218,8 +230,8 @@ it('uses page kickers only for dates', function (): void {
         ->and($add)->toContain('startScan')
         ->and($add)->toContain("addModeUrl('custom')")
         ->and($macros)->toContain(':kicker="displayDate"')
-        ->and($weekly)->toContain('formatDisplayDate(roundup.start_date)')
-        ->and($weekly)->toContain(':kicker=')
+        ->and($weekly)->toContain('<PageHeader>')
+        ->and($weekly)->not->toContain('<PageHeader :kicker')
         ->and($goals)->not->toContain('kicker')
         ->and($progress)->not->toContain('kicker')
         ->and($onboarding)->not->toContain('kicker')
@@ -240,8 +252,12 @@ it('groups add options the same way in the drawer and on the add page', function
         ->toContain("mode: 'recipe'")
         ->toContain("mode: 'workout'")
         ->and($chooser)->toContain('grid-cols-2')
-        ->and($chooser)->toContain('bg-muted/80')
+        ->and($chooser)->toContain('bg-secondary/70')
+        ->and($chooser)->toContain('bg-brand-acid')
+        ->and($chooser)->toContain('bg-brand-violet')
+        ->and($chooser)->toContain('bg-brand-night')
         ->and($shell)->toContain('AddChooser')
+        ->and($shell)->toContain('<h2 id="add-drawer-title" class="card-title">Add</h2>')
         ->and($add)->toContain('AddChooser')
         ->and($add)->toContain('MealTypePicker')
         ->and($add)->toContain('queueFoodSearch')
@@ -279,6 +295,7 @@ it('presents goals as a calorie target and named macro split', function (): void
         ->toContain('NumberField')
         ->toContain('NumberFieldDecrement')
         ->toContain('NumberFieldIncrement')
+        ->toContain(':focus-on-change="false"')
         ->toContain('kcal per day')
         ->toContain(':class="cn(\'mt-1 h-auto')
         ->toContain('text-5xl font-bold')
@@ -343,6 +360,7 @@ it('routes overlays through AppSheet', function (): void {
     expect($sheet)
         ->toContain('role="dialog"')
         ->toContain('aria-modal')
+        ->toContain('w-[calc(100%-2rem)] max-w-md')
         ->toContain('Sheet')
         ->toContain('Dialog')
         ->and($css)->toContain('justify-items: center')
@@ -365,6 +383,35 @@ it('hints previous weigh-in values on progress inputs', function (): void {
         ->toContain('weightFromKg(props.latest?.weight_kg, props.preferences.weight_unit)')
         ->toContain('`/progress/body-metrics?range=${encodeURIComponent(props.range)}`')
         ->toContain('v-for="metric in props.history"');
+});
+
+it('links from progress to edit goals', function (): void {
+    $progress = file_get_contents(resource_path('js/Pages/Progress.vue'));
+
+    expect($progress)->toContain('<Button :as="Link" href="/goals" variant="outline" size="sm">Edit goals</Button>');
+});
+
+it('keeps segmented controls and the weight chart perceptible', function (): void {
+    $progress = file_get_contents(resource_path('js/Pages/Progress.vue'));
+    $appearance = file_get_contents(resource_path('js/Pages/Settings/Appearance.vue'));
+
+    expect($progress)
+        ->toContain('role="group" aria-label="Trend date range"')
+        ->toContain('flex rounded-xl bg-brand-night p-1')
+        ->toContain('text-brand-white hover:bg-brand-white/10 hover:text-brand-white')
+        ->toContain('focus-visible:border-brand-white focus-visible:ring-brand-white')
+        ->toContain("accessibleLabel: '30 days'")
+        ->toContain("accessibleLabel: '90 days'")
+        ->toContain("accessibleLabel: '180 days'")
+        ->toContain("accessibleLabel: 'All time'")
+        ->toContain(':aria-label="option.accessibleLabel"')
+        ->toContain(':aria-pressed="range === option.key"')
+        ->toContain("weight: { label: 'Weight', color: 'var(--chart-1)' }")
+        ->and($appearance)->toContain('rounded-xl bg-brand-night p-1')
+        ->toContain(':variant="appearance === option.value ? \'default\' : \'ghost\'"')
+        ->toContain('text-brand-white hover:bg-brand-white/10 hover:text-brand-white')
+        ->toContain('focus-visible:border-brand-white focus-visible:ring-brand-white')
+        ->toContain(':aria-pressed="appearance === option.value"');
 });
 
 it('leaves calories burnt and custom macros empty so phone number entry is not blocked', function (): void {
@@ -422,6 +469,16 @@ it('confirms deletes in-app', function (): void {
         ->and($confirm)->not->toContain('AlertDialogAction');
 });
 
+it('offers workout edit and delete actions from a menu', function (): void {
+    $today = file_get_contents(resource_path('js/Pages/Today.vue'));
+
+    expect($today)
+        ->toContain('aria-label="Workout actions"')
+        ->toContain('startEditingWorkout(workout, close)')
+        ->toContain('Save workout')
+        ->toContain("requestDelete('workout'");
+});
+
 it('encodes day status with ticks, colour, and words', function (): void {
     $status = file_get_contents(resource_path('js/dayStatus.ts'));
     $indicator = file_get_contents(resource_path('js/Components/DayStatusIndicator.vue'));
@@ -444,6 +501,9 @@ it('encodes day status with ticks, colour, and words', function (): void {
         ->and($today)->not->toContain('${day.status}')
         ->and($weekly)->toContain('DayStatusIndicator')
         ->toContain('dayStatusLabel')
-        ->and($weekly)->toContain('class="divide-y divide-border/60 py-1.5"')
+        ->and($weekly)->toContain('class="divide-y divide-border/60 px-0 py-1.5"')
+        ->and($weekly)->toContain('class="flex items-center gap-3 px-5 py-3.5"')
+        ->and($weekly)->toContain('class="mt-1 truncate text-sm text-muted-foreground"')
+        ->and($weekly)->toContain('class="flex shrink-0 flex-col items-end gap-1.5"')
         ->and($weekly)->not->toContain('first:pt-1 last:pb-1');
 });

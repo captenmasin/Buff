@@ -84,7 +84,7 @@ function grams(value: number | string | null | undefined) {
                 </div>
                 <div class="text-right">
                     <p class="text-sm text-muted-foreground">Goal split</p>
-                    <p class="mt-2 text-2xl font-semibold tracking-tight text-primary">{{ macro.goal_percentage }}%</p>
+                    <p class="mt-2 text-2xl font-semibold tracking-tight text-link">{{ macro.goal_percentage }}%</p>
                 </div>
             </div>
             <Progress class="mt-4 h-2.5" :model-value="progressWidth" :indicator-class="macroColors[macro.key]" />

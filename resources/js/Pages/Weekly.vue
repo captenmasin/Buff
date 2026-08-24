@@ -93,7 +93,7 @@ function applySelection() {
     <Head title="Weekly roundup" />
 
     <section class="space-y-5">
-        <PageHeader :kicker="`${formatDisplayDate(roundup.start_date)} – ${formatDisplayDate(roundup.end_date)}`">
+        <PageHeader>
             Weekly roundup
             <template #actions>
                 <Button :as="Link" :href="`/?date=${selectedDate}`" variant="outline" size="icon" class="rounded-full" aria-label="Back to today">
@@ -180,22 +180,22 @@ function applySelection() {
 
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
-            <Card class="divide-y divide-border/60 py-1.5">
-                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 py-3">
-                    <span class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-muted font-semibold">
+            <Card class="divide-y divide-border/60 px-0 py-1.5">
+                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 px-5 py-3.5">
+                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-muted font-semibold">
                         {{ day.label }}
                     </span>
                     <div class="min-w-0 flex-1">
                         <p class="font-semibold">{{ formatDisplayDate(day.date, { weekday: 'short' }) }}</p>
-                        <p class="truncate text-sm text-muted-foreground">
+                        <p class="mt-1 truncate text-sm text-muted-foreground">
                             {{ day.consumed_calories }} kcal
                             <span v-if="day.effective_target">/ {{ day.effective_target }}</span>
                             <span> · P {{ Math.round(day.protein_g) }}g · C {{ Math.round(day.carbs_g) }}g · F {{ Math.round(day.fat_g) }}g</span>
                         </p>
                     </div>
-                    <div class="flex shrink-0 flex-col items-end gap-1">
+                    <div class="flex shrink-0 flex-col items-end gap-1.5">
                         <DayStatusIndicator :status="day.status" :size="18" />
-                        <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>
+<!--                        <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>-->
                     </div>
                 </div>
             </Card>

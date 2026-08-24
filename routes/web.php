@@ -7,6 +7,7 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\GoalController;
 use App\Http\Controllers\HealthConnectController;
 use App\Http\Controllers\MacroController;
+use App\Http\Controllers\McpApprovalController;
 use App\Http\Controllers\MealAnalysisController;
 use App\Http\Controllers\MealController;
 use App\Http\Controllers\OnboardingController;
@@ -32,6 +33,10 @@ Route::get('/reset-password', [AccountController::class, 'resetPasswordPage']);
 Route::post('/reset-password', [AccountController::class, 'resetPassword']);
 
 Route::middleware(EnsureBuffAccount::class)->group(function (): void {
+    Route::get('/mcp-approve', [McpApprovalController::class, 'show'])->name('mcp.approval.show');
+    Route::post('/mcp-approve', [McpApprovalController::class, 'store'])->name('mcp.approval.store');
+    Route::get('/mcp-approve/complete', [McpApprovalController::class, 'complete'])->name('mcp.approval.complete');
+
     Route::get('/account/verify', [AccountController::class, 'verificationPage'])->name('account.verify');
     Route::get('/account/verification-status', [AccountController::class, 'verificationStatus']);
     Route::post('/account/verification/resend', [AccountController::class, 'resendVerification']);
@@ -55,6 +60,9 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/settings/units', [SettingsController::class, 'units']);
     Route::get('/settings/exercise', [SettingsController::class, 'exercise']);
     Route::get('/settings/health', [SettingsController::class, 'health']);
+    Route::get('/settings/connected-assistants', [SettingsController::class, 'connectedAssistants']);
+    Route::delete('/settings/connected-assistants/{connection}', [SettingsController::class, 'revokeConnectedAssistant'])
+        ->whereUuid('connection');
     Route::put('/settings/units', [SettingsController::class, 'updateUnits']);
     Route::put('/settings/eat-back', [SettingsController::class, 'updateEatBack']);
     Route::put('/settings/body-profile', [SettingsController::class, 'updateBodyProfile']);
@@ -92,6 +100,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/meals/{mealEntry}/photos', [MealAnalysisController::class, 'photos']);
 
     Route::post('/workouts', [WorkoutController::class, 'store']);
+    Route::put('/workouts/{workoutEntry}', [WorkoutController::class, 'update']);
     Route::delete('/workouts/{workoutEntry}', [WorkoutController::class, 'destroy']);
 
     Route::get('/health-connect/status', [HealthConnectController::class, 'status']);

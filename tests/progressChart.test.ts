@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { parseLocalDate } from '../resources/js/dateFormat.ts';
+import { formatDisplayDate, parseLocalDate } from '../resources/js/dateFormat.ts';
 import { buildBodyFatChartData, buildGoalLine, buildWeightChartData, chartXDomain, chartYDomain } from '../resources/js/progressChart.ts';
 
 const metrics = [
@@ -16,6 +16,10 @@ test('parses calendar dates at local midnight', () => {
     assert.equal(date.getMonth(), 7);
     assert.equal(date.getDate(), 20);
     assert.equal(date.getHours(), 0);
+});
+
+test('formats display dates without a year when requested', () => {
+    assert.equal(formatDisplayDate('2026-08-23', { weekday: 'short', year: false }), 'Sun 23 August');
 });
 
 test('uses timestamps for the selected window so Unovis can rescale on range changes', () => {

@@ -155,6 +155,7 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                 :max="calorieMax"
                 :step="calorieStep"
                 :step-snapping="false"
+                :focus-on-change="false"
                 disable-wheel-change
                 :format-options="{ useGrouping: false, maximumFractionDigits: 0 }"
                 class="flex items-center gap-3"

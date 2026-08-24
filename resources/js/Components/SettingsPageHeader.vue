@@ -20,7 +20,7 @@ withDefaults(defineProps<{
         >
             <ChevronLeft :size="26" stroke-width="2.2" />
         </Link>
-        <h1 class="w-full text-center text-lg font-semibold tracking-tight">
+        <h1 class="page-title page-title-compact w-full text-center">
             <slot />
         </h1>
     </header>

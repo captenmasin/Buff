@@ -989,7 +989,7 @@ onUnmounted(() => {
 
         <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 grid place-items-center bg-background/85 px-6 backdrop-blur" role="status" aria-live="polite">
             <div class="text-center">
-                <LoaderCircle :size="36" class="mx-auto animate-spin text-primary" />
+                <LoaderCircle :size="36" class="mx-auto animate-spin text-link" />
                 <p class="mt-3 font-semibold">Analyzing your meal…</p>
                 <p class="mt-1 text-sm text-muted-foreground">Keep Buff open while the estimate is prepared.</p>
             </div>
@@ -1035,7 +1035,7 @@ onUnmounted(() => {
             <p v-if="lookupError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground">{{ lookupError }}</p>
 
             <div v-if="foodSearchLoading" class="mt-4 flex items-center gap-2 rounded-xl bg-muted p-3 text-sm text-muted-foreground" role="status" aria-live="polite">
-                <LoaderCircle :size="17" class="animate-spin text-primary" />
+                <LoaderCircle :size="17" class="animate-spin text-link" />
                 Searching...
             </div>
 
