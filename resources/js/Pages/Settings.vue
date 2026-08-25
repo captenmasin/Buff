@@ -164,7 +164,7 @@ onMounted(() => {
 
         <SettingsGroup v-if="healthName || page.props.buff.account" title="Apps & devices">
             <SettingsRow v-if="healthName" href="/settings/health">{{ healthName }}</SettingsRow>
-            <SettingsRow v-if="page.props.buff.account" href="/settings/connected-assistants">Connected assistants</SettingsRow>
+            <SettingsRow v-if="page.props.buff.account" href="/settings/connected-assistants">Connected AI assistants</SettingsRow>
         </SettingsGroup>
 
         <SettingsGroup v-if="page.props.buff.account || page.props.buff.has_local_account">

@@ -18,14 +18,31 @@ const props = defineProps<{
     error: string | null;
 }>();
 
-const form = useForm({ token: props.token ?? '' });
+const approvalForm = useForm({ token: props.token ?? '' });
+const denialForm = useForm({ token: props.token ?? '', decision: 'denied' as const });
+
+function formatExpiry(timestamp: string): string {
+    const date = new Date(timestamp);
+
+    return Number.isNaN(date.getTime())
+        ? 'Unknown'
+        : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
 
 function approve() {
-    if (props.approval?.status !== 'pending' || !props.token) {
+    if (props.approval?.status !== 'pending' || !props.token || approvalForm.processing || denialForm.processing) {
         return;
     }
 
-    form.post('/mcp-approve');
+    approvalForm.post('/mcp-approve');
+}
+
+function deny() {
+    if (props.approval?.status !== 'pending' || !props.token || approvalForm.processing || denialForm.processing) {
+        return;
+    }
+
+    denialForm.post('/mcp-approve');
 }
 </script>
 
@@ -65,22 +82,32 @@ function approve() {
                         </p>
                     </div>
 
-                    <dl class="grid gap-2 rounded-xl bg-muted p-4 text-sm">
-                        <dt class="font-medium">OAuth redirect origin</dt>
-                        <dd class="break-all font-mono text-xs text-muted-foreground">{{ approval.redirectOrigin }}</dd>
+                    <dl class="grid gap-3 rounded-xl bg-muted p-4 text-sm">
+                        <div class="grid gap-1">
+                            <dt class="font-medium">OAuth redirect origin</dt>
+                            <dd class="break-all font-mono text-xs text-muted-foreground">{{ approval.redirectOrigin }}</dd>
+                        </div>
+                        <div class="grid gap-1">
+                            <dt class="font-medium">Request expires</dt>
+                            <dd class="text-muted-foreground">{{ formatExpiry(approval.expiresAt) }}</dd>
+                        </div>
                     </dl>
 
-                    <form class="grid gap-3" @submit.prevent="approve">
-                        <p v-if="form.errors.token" class="text-sm text-destructive" role="alert">
-                            {{ form.errors.token }}
+                    <div class="grid gap-3">
+                        <p v-if="approvalForm.errors.token || denialForm.errors.token || denialForm.errors.decision" class="text-sm text-destructive" role="alert">
+                            {{ approvalForm.errors.token || denialForm.errors.token || denialForm.errors.decision }}
                         </p>
-                        <Button type="submit" class="w-full" :disabled="form.processing">
-                            {{ form.processing ? 'Approving…' : `Approve ${approval.clientName}` }}
-                        </Button>
-                        <Button :as="Link" href="/" type="button" variant="surface" class="w-full">
-                            Cancel
-                        </Button>
-                    </form>
+                        <form @submit.prevent="approve">
+                            <Button type="submit" class="w-full" :disabled="approvalForm.processing || denialForm.processing">
+                                {{ approvalForm.processing ? 'Approving…' : `Approve ${approval.clientName}` }}
+                            </Button>
+                        </form>
+                        <form @submit.prevent="deny">
+                            <Button type="submit" variant="surface" class="w-full" :disabled="approvalForm.processing || denialForm.processing">
+                                {{ denialForm.processing ? 'Denying…' : `Don't connect ${approval.clientName}` }}
+                            </Button>
+                        </form>
+                    </div>
                 </template>
 
                 <template v-else>

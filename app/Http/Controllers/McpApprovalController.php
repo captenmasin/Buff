@@ -47,6 +47,7 @@ class McpApprovalController extends Controller
     {
         $validated = $request->validate([
             'token' => ['required', 'string', 'size:64', 'alpha_num'],
+            'decision' => ['sometimes', 'string', 'in:denied'],
         ]);
         $result = $this->api->post('mcp/browser-approvals', $validated);
 
@@ -61,6 +62,18 @@ class McpApprovalController extends Controller
             throw ValidationException::withMessages([
                 'token' => [$this->errorMessage($result)],
             ]);
+        }
+
+        $decision = $validated['decision'] ?? 'approved';
+
+        if (($result->data['status'] ?? null) !== $decision) {
+            throw ValidationException::withMessages([
+                'token' => ["The connection request could not be {$decision}. Try again."],
+            ]);
+        }
+
+        if ($decision === 'denied') {
+            return redirect('/')->with('message', 'Connection request denied.');
         }
 
         return redirect()->route('mcp.approval.complete')->with('mcp_approval_complete', true);

@@ -58,7 +58,7 @@ it('approves only after the local consent form is posted', function (): void {
 
     Http::assertSentCount(1);
     Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'POST'
-        && $request['token'] === $token
+        && $request->data() === ['token' => $token]
         && $request->hasHeader('Authorization', 'Bearer mobile-token'));
 
     $this->get('/mcp-approve/complete')
@@ -69,6 +69,36 @@ it('approves only after the local consent form is posted', function (): void {
             ->where('token', null));
 
     $this->get('/mcp-approve/complete')->assertNotFound();
+});
+
+it('denies a pending connection request from the consent form', function (): void {
+    $token = str_repeat('H', 64);
+    Http::fake([
+        '*/mcp/browser-approvals' => Http::response(['status' => 'denied']),
+    ]);
+
+    $this->post('/mcp-approve', ['token' => $token, 'decision' => 'denied'])
+        ->assertRedirect('/')
+        ->assertSessionHas('message', 'Connection request denied.')
+        ->assertSessionMissing('mcp_approval_complete');
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'POST'
+        && $request->data() === ['token' => $token, 'decision' => 'denied']
+        && $request->hasHeader('Authorization', 'Bearer mobile-token'));
+});
+
+it('does not claim denial unless the account API confirms it', function (): void {
+    $token = str_repeat('I', 64);
+    Http::fake([
+        '*/mcp/browser-approvals' => Http::response(['status' => 'approved']),
+    ]);
+
+    $this->from('/mcp-approve?token='.$token)
+        ->post('/mcp-approve', ['token' => $token, 'decision' => 'denied'])
+        ->assertRedirect('/mcp-approve?token='.$token)
+        ->assertSessionHasErrors(['token' => 'The connection request could not be denied. Try again.'])
+        ->assertSessionMissing('message');
 });
 
 it('requires a signed-in Buff account and a valid opaque token', function (): void {
