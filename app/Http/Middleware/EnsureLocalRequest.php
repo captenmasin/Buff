@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
+use Symfony\Component\HttpFoundation\IpUtils;
 use Symfony\Component\HttpFoundation\Response;
 
 class EnsureLocalRequest
@@ -33,16 +33,7 @@ class EnsureLocalRequest
 
     private function isLoopbackAddress(?string $ip): bool
     {
-        if ($ip === null) {
-            return false;
-        }
-
-        if ($ip === '::1' || Str::startsWith($ip, '127.')) {
-            return true;
-        }
-
-        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false
-            && Str::lower($ip) === '0:0:0:0:0:0:0:1';
+        return IpUtils::checkIp($ip ?? '', ['127.0.0.0/8', '::1']);
     }
 
     private function isNativeRuntimeRequest(Request $request): bool

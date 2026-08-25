@@ -8,8 +8,9 @@ import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
-import { accountReplacementDecision, type SocialProvider } from '../accountReplacement';
 import { avatarColorClass, avatarInitials } from '../avatar';
+
+type SocialProvider = 'google' | 'apple';
 
 defineOptions({ layout: null });
 
@@ -173,16 +174,14 @@ async function launchSocialSignIn(provider: SocialProvider) {
 }
 
 async function signInWith(provider: SocialProvider) {
-    const decision = accountReplacementDecision(hasLocalAccount.value, provider);
-
-    if (decision.type === 'confirm') {
-        pendingSocialProvider.value = decision.provider;
+    if (hasLocalAccount.value) {
+        pendingSocialProvider.value = provider;
         switchConfirmOpen.value = true;
 
         return;
     }
 
-    await launchSocialSignIn(decision.provider);
+    await launchSocialSignIn(provider);
 }
 </script>
 

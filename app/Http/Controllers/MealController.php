@@ -44,7 +44,6 @@ class MealController extends Controller
             'autoScan' => $request->boolean('scan'),
             'previousFoodEntries' => $this->previousFoodEntries(),
             'previousCustomMeals' => $this->previousCustomMeals(),
-            'previousBreakfastMeals' => $this->previousBreakfastMeals(),
             'recipes' => Recipe::query()
                 ->latest()
                 ->get()
@@ -404,40 +403,6 @@ class MealController extends Controller
             ->map(fn (MealEntry $entry): array => [
                 'id' => $entry->id,
                 'name' => $entry->name,
-                'portion_quantity' => $entry->portion_quantity !== null ? (float) $entry->portion_quantity : null,
-                'portion_unit' => $entry->portion_unit,
-                'calories' => $entry->calories,
-                'protein_g' => (float) $entry->protein_g,
-                'carbs_g' => (float) $entry->carbs_g,
-                'fat_g' => (float) $entry->fat_g,
-                'last_used_at' => $entry->created_at?->toDateTimeString(),
-            ])
-            ->values()
-            ->all();
-    }
-
-    private function previousBreakfastMeals(): array
-    {
-        return MealEntry::query()
-            ->with('foodProduct')
-            ->where('meal_type', 'breakfast')
-            ->latest()
-            ->limit(200)
-            ->get()
-            ->unique(fn (MealEntry $entry): string => implode('|', [
-                mb_strtolower($entry->name),
-                (float) $entry->portion_quantity,
-                (string) $entry->portion_unit,
-                (float) $entry->protein_g,
-                (float) $entry->carbs_g,
-                (float) $entry->fat_g,
-            ]))
-            ->take(8)
-            ->map(fn (MealEntry $entry): array => [
-                'id' => $entry->id,
-                'name' => $entry->name,
-                'brand' => $entry->foodProduct?->brand,
-                'image_url' => $entry->foodProduct?->image_url,
                 'portion_quantity' => $entry->portion_quantity !== null ? (float) $entry->portion_quantity : null,
                 'portion_unit' => $entry->portion_unit,
                 'calories' => $entry->calories,

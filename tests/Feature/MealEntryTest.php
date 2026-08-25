@@ -229,27 +229,6 @@ it('opens legacy add food modes on the food page', function (): void {
     }
 });
 
-it('passes recent breakfast meals to add page', function (): void {
-    MealEntry::query()->create([
-        'date' => '2026-05-18',
-        'meal_type' => 'breakfast',
-        'source_type' => MealEntry::SOURCE_CUSTOM,
-        'name' => 'Porridge',
-        'calories' => 300,
-        'protein_g' => 20,
-        'carbs_g' => 40,
-        'fat_g' => 6,
-    ]);
-
-    $this->get('/add')
-        ->assertOk()
-        ->assertInertia(fn (Assert $page) => $page
-            ->component('Add')
-            ->has('previousBreakfastMeals', 1)
-            ->where('previousBreakfastMeals.0.name', 'Porridge')
-        );
-});
-
 it('repeats a previous meal for a date', function (): void {
     $entry = MealEntry::query()->create([
         'date' => '2026-05-18',

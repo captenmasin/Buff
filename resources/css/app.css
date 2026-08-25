@@ -410,54 +410,6 @@ textarea {
     }
 }
 
-@keyframes settings-slide-out-left {
-    to {
-        transform: translateX(-30%);
-    }
-}
-
-@keyframes settings-slide-in-right {
-    from {
-        transform: translateX(100%);
-    }
-}
-
-@keyframes settings-slide-out-right {
-    to {
-        transform: translateX(100%);
-    }
-}
-
-@keyframes settings-slide-in-left {
-    from {
-        transform: translateX(-30%);
-    }
-}
-
-html[data-settings-nav='forward']::view-transition-old(root) {
-    z-index: 1;
-    mix-blend-mode: normal;
-    animation: 320ms var(--ease-out) both settings-slide-out-left;
-}
-
-html[data-settings-nav='forward']::view-transition-new(root) {
-    z-index: 2;
-    mix-blend-mode: normal;
-    animation: 320ms var(--ease-out) both settings-slide-in-right;
-}
-
-html[data-settings-nav='back']::view-transition-old(root) {
-    z-index: 2;
-    mix-blend-mode: normal;
-    animation: 320ms var(--ease-out) both settings-slide-out-right;
-}
-
-html[data-settings-nav='back']::view-transition-new(root) {
-    z-index: 1;
-    mix-blend-mode: normal;
-    animation: 320ms var(--ease-out) both settings-slide-in-left;
-}
-
 @media (prefers-reduced-motion: reduce) {
     html {
         scroll-behavior: auto;
@@ -501,6 +453,49 @@ html[data-settings-nav='back']::view-transition-new(root) {
         transform: none !important;
         translate: none !important;
     }
+}
+
+html[data-reduce-motion] {
+    scroll-behavior: auto;
+}
+
+html[data-reduce-motion]::view-transition-old(root),
+html[data-reduce-motion]::view-transition-new(root) {
+    animation: none !important;
+}
+
+html[data-reduce-motion] .app-shell *:not(.animate-spin):not([data-slot='dialog-overlay']):not([data-slot='dialog-content']):not([data-slot='alert-dialog-overlay']):not([data-slot='alert-dialog-content']),
+html[data-reduce-motion] .bottom-drawer,
+html[data-reduce-motion] [data-slot='sheet-overlay'],
+html[data-reduce-motion] [data-slot='sheet-content'] {
+    animation: none !important;
+    transition-property: color, background-color, border-color, box-shadow, opacity !important;
+}
+
+html[data-reduce-motion] [data-slot='sheet-content'],
+html[data-reduce-motion] [data-slot='button'] {
+    transform: none !important;
+    translate: none !important;
+    scale: none !important;
+}
+
+html[data-reduce-motion] [data-slot='dialog-overlay'],
+html[data-reduce-motion] [data-slot='dialog-content'],
+html[data-reduce-motion] [data-slot='alert-dialog-overlay'],
+html[data-reduce-motion] [data-slot='alert-dialog-content'] {
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-scale: 1 !important;
+    transform: none !important;
+    scale: none !important;
+}
+
+html[data-reduce-motion] .app-shell [role='status'] {
+    transform: none !important;
+    translate: none !important;
 }
 
 @media (prefers-contrast: more) {

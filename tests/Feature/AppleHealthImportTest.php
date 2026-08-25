@@ -51,7 +51,7 @@ it('imports apple health workouts', function (): void {
         ->and($workout->external_source)->toBe('Apple Watch')
         ->and($workout->external_source_package)->toBe('com.apple.health')
         ->and($workout->duration_seconds)->toBe(2700)
-        ->and(HealthConnectSyncState::appleHealth()->last_status)->toBe('success');
+        ->and(HealthConnectSyncState::query()->whereKey(HealthConnectSyncState::APPLE_HEALTH_SOURCE_TYPE)->value('last_status'))->toBe('success');
 });
 
 it('does not reimport locally ignored apple health workouts', function (): void {

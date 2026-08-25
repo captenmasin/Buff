@@ -35,18 +35,4 @@ class HealthConnectSyncState extends Model
             'deleted_records' => 'integer',
         ];
     }
-
-    public static function healthConnect(): self
-    {
-        return self::query()->firstOrCreate([
-            'source_type' => self::SOURCE_TYPE,
-        ]);
-    }
-
-    public static function appleHealth(): self
-    {
-        return self::query()->firstOrCreate([
-            'source_type' => self::APPLE_HEALTH_SOURCE_TYPE,
-        ]);
-    }
 }

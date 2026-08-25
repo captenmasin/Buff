@@ -51,7 +51,7 @@ it('imports health connect workouts', function (): void {
         ->and($workout->external_source)->toBe('Google Fit')
         ->and($workout->external_source_package)->toBe('com.google.android.apps.fitness')
         ->and($workout->duration_seconds)->toBe(2700)
-        ->and(HealthConnectSyncState::healthConnect()->last_status)->toBe('success');
+        ->and(HealthConnectSyncState::query()->whereKey(HealthConnectSyncState::SOURCE_TYPE)->value('last_status'))->toBe('success');
 });
 
 it('accepts payload option from native runtime', function (): void {

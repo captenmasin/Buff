@@ -5,21 +5,19 @@ import { createInertiaApp, http, router } from '@inertiajs/vue3';
 import axios from 'axios';
 import { createApp, h } from 'vue';
 import AppShell from './Layouts/AppShell.vue';
-import { applyAppearance, watchSystemAppearance } from './appearance';
-import { settingsVisitOptions } from './settingsNavigation';
+import { applyAppearance, applyReducedMotion, watchSystemAppearance, watchSystemReducedMotion } from './appearance';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
 http.setClient(axiosAdapter(axios));
 applyAppearance();
+applyReducedMotion();
 watchSystemAppearance();
+watchSystemReducedMotion();
 (window as typeof window & { router?: typeof router }).router = router;
 
 createInertiaApp({
     title: (title) => (title ? `${title} - Buff` : 'Buff'),
-    defaults: {
-        visitOptions: (href) => settingsVisitOptions(href),
-    },
     // @ts-ignore
     resolve: async (name) => {
         const pages = import.meta.glob('./Pages/**/*.vue');

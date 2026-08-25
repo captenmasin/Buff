@@ -38,18 +38,8 @@ class WorkoutEntry extends SyncedModel
         ];
     }
 
-    public function isHealthConnect(): bool
-    {
-        return $this->source_type === self::SOURCE_HEALTH_CONNECT;
-    }
-
-    public function isAppleHealth(): bool
-    {
-        return $this->source_type === self::SOURCE_APPLE_HEALTH;
-    }
-
     public function isImportedHealth(): bool
     {
-        return $this->isHealthConnect() || $this->isAppleHealth();
+        return in_array($this->source_type, [self::SOURCE_HEALTH_CONNECT, self::SOURCE_APPLE_HEALTH], true);
     }
 }

@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FoodProduct extends Model
 {
@@ -38,10 +37,5 @@ class FoodProduct extends Model
             'carbs_per_100' => 'decimal:2',
             'fat_per_100' => 'decimal:2',
         ];
-    }
-
-    public function mealEntries(): HasMany
-    {
-        return $this->hasMany(MealEntry::class);
     }
 }

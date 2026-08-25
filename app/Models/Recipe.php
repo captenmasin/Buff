@@ -2,8 +2,6 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Relations\HasMany;
-
 class Recipe extends SyncedModel
 {
     protected $fillable = [
@@ -47,10 +45,5 @@ class Recipe extends SyncedModel
             ...$this->totals(),
             'items' => $this->items ?? [],
         ];
-    }
-
-    public function mealEntries(): HasMany
-    {
-        return $this->hasMany(MealEntry::class);
     }
 }

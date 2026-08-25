@@ -1,3 +1,5 @@
+import { parseLocalDate } from './dateFormat.ts';
+
 export type TrendChartRow = {
     date: Date;
     weight?: number;
@@ -14,16 +16,6 @@ export type BodyFatChartInput = {
     date: string;
     bodyFat: number | null;
 };
-
-function parseLocalDate(value: string): Date {
-    const [year, month, day] = String(value).split('-').map(Number);
-
-    if (!year || !month || !day) {
-        return new Date(Number.NaN);
-    }
-
-    return new Date(year, month - 1, day);
-}
 
 function attachGoal(rows: TrendChartRow[], goal: number | null): TrendChartRow[] {
     if (goal === null) {

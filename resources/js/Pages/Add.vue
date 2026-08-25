@@ -132,14 +132,12 @@ const props = withDefaults(defineProps<{
     autoScan?: boolean;
     previousFoodEntries?: PreviousMeal[];
     previousCustomMeals?: PreviousMeal[];
-    previousBreakfastMeals?: PreviousMeal[];
     recipes?: RecipeSummary[];
 }>(), {
     meal: null,
     autoScan: false,
     previousFoodEntries: () => [],
     previousCustomMeals: () => [],
-    previousBreakfastMeals: () => [],
     recipes: () => [],
 });
 

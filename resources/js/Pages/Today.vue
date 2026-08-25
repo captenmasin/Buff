@@ -734,29 +734,32 @@ onBeforeUnmount(() => {
         </section>
 
         <section class="space-y-3">
-            <div class="flex items-center justify-between">
+            <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">Workouts</h2>
-                <template v-if="showHealthConnect">
-                    <Button
-                        v-if="canSyncHealthConnect"
-                        variant="outline"
-                        size="icon"
-                        class="rounded-full"
-                        :disabled="healthConnectLoading"
-                        aria-label="Sync health workouts"
-                        @click="syncHealthConnect"
-                    >
-                        <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
-                    </Button>
-                    <Button
-                        v-else
-                        size="sm"
-                        :disabled="healthConnectLoading || !healthImport?.state.available"
-                        @click="connectHealthConnect"
-                    >
-                        Connect
-                    </Button>
-                </template>
+                <div class="flex items-center gap-2">
+                    <template v-if="showHealthConnect">
+                        <Button
+                            v-if="canSyncHealthConnect"
+                            variant="outline"
+                            size="icon"
+                            class="rounded-full"
+                            :disabled="healthConnectLoading"
+                            aria-label="Sync health workouts"
+                            @click="syncHealthConnect"
+                        >
+                            <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
+                        </Button>
+                        <Button
+                            v-else
+                            size="sm"
+                            :disabled="healthConnectLoading || !healthImport?.state.available"
+                            @click="connectHealthConnect"
+                        >
+                            Connect
+                        </Button>
+                    </template>
+                    <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" size="sm"><Plus class="w-4" />Add workout</Button>
+                </div>
             </div>
 
             <Card class="py-1">

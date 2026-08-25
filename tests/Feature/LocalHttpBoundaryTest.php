@@ -12,14 +12,19 @@ beforeEach(function (): void {
     ]);
 });
 
-it('allows loopback http requests', function (): void {
+it('allows loopback http requests', function (string $address): void {
     config(['app.allow_remote_http' => false]);
 
     $this
-        ->withServerVariables(['REMOTE_ADDR' => '127.0.0.1'])
+        ->withServerVariables(['REMOTE_ADDR' => $address])
         ->get('/')
         ->assertOk();
-});
+})->with([
+    'IPv4' => '127.0.0.1',
+    'IPv4 loopback subnet' => '127.255.255.255',
+    'compressed IPv6' => '::1',
+    'expanded IPv6' => '0:0:0:0:0:0:0:1',
+]);
 
 it('rejects remote http requests by default', function (): void {
     config(['app.allow_remote_http' => false]);

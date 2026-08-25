@@ -180,9 +180,9 @@ function applySelection() {
 
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
-            <Card class="divide-y divide-border/60 px-0 py-1.5">
-                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 px-5 py-3.5">
-                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-muted font-semibold">
+            <Card class="divide-y divide-border/60 px-0 py-0">
+                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 px-4 py-3.5">
+                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-primary text-primary-foreground font-semibold">
                         {{ day.label }}
                     </span>
                     <div class="min-w-0 flex-1">

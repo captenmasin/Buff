@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\BodyMetricPhotoPose;
-use App\BuffApiStatus;
 use App\Models\BodyMetric;
 use App\Services\BodyMetricPhotoUploader;
 use App\Services\BuffApiClient;
-use App\Services\BuffApiResult;
 use App\Services\PhotoDataUrlNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -35,7 +33,7 @@ class BodyMetricPhotoController extends Controller
             ]);
         }
 
-        return $this->response($uploader->upload($bodyMetric, $validated['photos'], $validated['poses']));
+        return $this->buffApiResponse($uploader->upload($bodyMetric, $validated['photos'], $validated['poses']));
     }
 
     public function index(BodyMetric $bodyMetric, BuffApiClient $api, BodyMetricPhotoUploader $uploader): JsonResponse
@@ -44,7 +42,7 @@ class BodyMetricPhotoController extends Controller
         $cloudPhotos = $result->successful() ? ($result->data['photos'] ?? []) : [];
 
         if (is_array($cloudPhotos) && $cloudPhotos !== []) {
-            return $this->response($result);
+            return $this->buffApiResponse($result);
         }
 
         $pending = $uploader->pendingPhotosFor($bodyMetric);
@@ -56,7 +54,7 @@ class BodyMetricPhotoController extends Controller
             ]);
         }
 
-        return $this->response($result);
+        return $this->buffApiResponse($result);
     }
 
     public function pending(BodyMetric $bodyMetric, string $pending, int $index, BodyMetricPhotoUploader $uploader): StreamedResponse
@@ -66,25 +64,6 @@ class BodyMetricPhotoController extends Controller
 
     public function destroy(BodyMetric $bodyMetric, string $photo, BuffApiClient $api): JsonResponse
     {
-        return $this->response($api->delete("body-metrics/{$bodyMetric->id}/photos/{$photo}"));
-    }
-
-    private function response(BuffApiResult $result): JsonResponse
-    {
-        $status = match ($result->status) {
-            BuffApiStatus::Success => $result->httpStatus === 204 ? 204 : 200,
-            BuffApiStatus::Unauthenticated => 401,
-            BuffApiStatus::EmailNotVerified, BuffApiStatus::Forbidden => 403,
-            BuffApiStatus::ValidationFailed => 422,
-            BuffApiStatus::RateLimited => 429,
-            default => $result->httpStatus ?? 503,
-        };
-
-        return response()->json([
-            ...$result->data,
-            'message' => $result->message ?? ($result->data['message'] ?? null),
-            'code' => $result->code,
-            'errors' => $result->errors,
-        ], $status);
+        return $this->buffApiResponse($api->delete("body-metrics/{$bodyMetric->id}/photos/{$photo}"));
     }
 }
