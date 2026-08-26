@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\BuffApiStatus;
+use App\Models\DailyGoal;
 use App\Models\SyncState;
 use App\Services\BuffApiClient;
 use App\Services\BuffApiResult;
@@ -340,6 +341,10 @@ class AccountController extends Controller
 
     private function accountRedirect(): RedirectResponse
     {
+        if (DailyGoal::query()->doesntExist()) {
+            $this->sync->sync();
+        }
+
         return redirect()->intended('/');
     }
 

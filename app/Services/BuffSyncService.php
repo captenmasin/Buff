@@ -5,6 +5,8 @@ namespace App\Services;
 use App\BuffApiStatus;
 use App\Models\AppPreference;
 use App\Models\BodyMetric;
+use App\Models\BodyProfile;
+use App\Models\DailyGoal;
 use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\SyncedModel;
@@ -13,6 +15,7 @@ use App\Models\SyncState;
 use App\Observers\SyncableObserver;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
@@ -349,6 +352,20 @@ class BuffSyncService
             return false;
         }
 
+        $fields = config('buff.sync_models')[$modelClass]['fields'] ?? null;
+
+        if (! is_array($fields)) {
+            return false;
+        }
+
+        if ($modelClass === DailyGoal::class && BodyProfile::query()->doesntExist()) {
+            $legacyProfile = Arr::only($change['data'], ['height_cm', 'age', 'sex', 'activity_level']);
+
+            if (array_filter($legacyProfile, fn (mixed $value): bool => $value !== null) !== []) {
+                BodyProfile::current()->forceFill($legacyProfile)->save();
+            }
+        }
+
         if ($model === null
             && $modelClass === BodyMetric::class
             && is_string($change['data']['date'] ?? null)) {
@@ -366,7 +383,7 @@ class BuffSyncService
 
         $model ??= new $modelClass;
         $model->setAttribute($model->getKeyName(), $id);
-        $model->forceFill($change['data']);
+        $model->forceFill(Arr::only($change['data'], $fields));
         $model->timestamps = false;
         $updatedAt = Date::parse($change['updated_at'])->utc();
         $model->setAttribute($model->getUpdatedAtColumn(), $updatedAt);

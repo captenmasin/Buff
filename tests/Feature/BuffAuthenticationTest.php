@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureBuffAccount;
+use App\Models\BodyProfile;
 use App\Models\DailyGoal;
 use App\Models\FoodProduct;
 use App\Models\Recipe;
@@ -278,6 +279,81 @@ it('stays signed in across requests after login', function (): void {
     $this->get('/')->assertOk();
     expect(app(BuffCredentialStore::class)->token())->toBe('login-token')
         ->and(app(BuffCredentialStore::class)->rotationIsDue())->toBeFalse();
+});
+
+it('restores synced onboarding before redirecting after login', function (): void {
+    $account = [
+        'id' => '1',
+        'name' => 'Mason',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+        'email_verified' => true,
+    ];
+    app(BuffCredentialStore::class)->store('original-token', $account);
+    SyncState::current($account['id']);
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    Http::fake([
+        '*/auth/logout' => Http::response(['message' => 'Signed out.']),
+        '*/auth/login' => Http::response([
+            'token' => 'login-token',
+            'user' => [
+                'id' => 1,
+                'name' => 'Mason',
+                'email' => 'mason@example.com',
+                'timezone' => 'Europe/London',
+                'email_verified' => true,
+            ],
+        ]),
+        '*/sync' => Http::response([
+            'acknowledged' => [],
+            'changes' => [[
+                'type' => 'daily_goals',
+                'id' => '10000000-0000-4000-8000-000000000001',
+                'updated_at' => '2026-08-26T10:00:00.000000Z',
+                'source_device_id' => '20000000-0000-4000-8000-000000000002',
+                'deleted' => false,
+                'data' => [
+                    'calories' => 2000,
+                    'protein_g' => 170,
+                    'carbs_g' => 195,
+                    'fat_g' => 60,
+                    'macro_calories' => 2000,
+                    'target_weight_kg' => 80,
+                    'target_body_fat_percent' => 15,
+                    'height_cm' => 180,
+                    'age' => 35,
+                    'sex' => 'male',
+                    'activity_level' => 'moderate',
+                ],
+            ]],
+            'cursor' => 1,
+            'has_more' => false,
+        ]),
+    ]);
+
+    $this->post('/account/logout')->assertRedirect('/account/login');
+    $this->assertDatabaseEmpty('daily_goals');
+
+    $this->post('/account/login', [
+        'email' => 'mason@example.com',
+        'password' => 'password123',
+        'timezone' => 'Europe/London',
+    ])->assertRedirect('/');
+
+    $this->assertDatabaseHas('daily_goals', ['calories' => 2000]);
+    $this->assertDatabaseHas('body_profiles', [
+        'id' => BodyProfile::ID,
+        'height_cm' => 180,
+        'age' => 35,
+    ]);
+    $this->get('/')->assertOk();
 });
 
 it('blocks the app after a token expires', function (): void {

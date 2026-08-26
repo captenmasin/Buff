@@ -6,7 +6,9 @@
     "scripts": {
         "build": "vite build",
         "build:android": "vite build --mode=android",
+        "build:ios": "vite build --mode=ios",
         "dev": "vite",
+        "native:ios": "pnpm run build:ios && php artisan native:run ios",
         "type-check": "vue-tsc --noEmit",
         "test:frontend": "node --test tests/*.test.ts"
     },
