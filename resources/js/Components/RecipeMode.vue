@@ -4,6 +4,7 @@ import { computed, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { Plus, Search, Trash2, UtensilsCrossed } from '@lucide/vue';
 import Card from './Card.vue';
+import ConfirmSheet from './ConfirmSheet.vue';
 import MealTypePicker from './Add/MealTypePicker.vue';
 import Button from './ui/button/Button.vue';
 import Input from './ui/input/Input.vue';
@@ -59,6 +60,7 @@ const props = withDefaults(defineProps<{
 
 const creating = ref(false);
 const selectedRecipe = ref<Recipe | null>(null);
+const pendingRecipeDelete = ref<Recipe | null>(null);
 const searchQuery = ref('');
 const searchResults = ref<FoodProduct[]>([]);
 const searchLoading = ref(false);
@@ -73,7 +75,7 @@ const recipeForm = useForm({
 
 const logForm = useForm({
     date: props.date,
-    meal_type: props.meal ?? 'breakfast',
+    meal_type: props.meal || 'breakfast',
     recipe_id: '',
     servings: 1,
 });
@@ -126,7 +128,7 @@ function startLog(recipe: Recipe): void {
     creating.value = false;
     logForm.recipe_id = recipe.id;
     logForm.servings = recipe.servings;
-    logForm.meal_type = props.meal ?? 'breakfast';
+    logForm.meal_type = props.meal || 'breakfast';
 }
 
 function addCustomItem(): void {
@@ -194,14 +196,28 @@ async function searchFoods(): Promise<void> {
 }
 
 function saveRecipe(): void {
-    recipeForm.post('/recipes');
+    recipeForm.post('/recipes', {
+        onSuccess: () => {
+            recipeForm.reset();
+            creating.value = false;
+        },
+    });
 }
 
 function logRecipe(): void {
     logForm.post('/meals/recipe');
 }
 
-function deleteRecipe(recipe: Recipe): void {
+function requestRecipeDelete(recipe: Recipe): void { pendingRecipeDelete.value = recipe; }
+function cancelRecipeDelete(): void { pendingRecipeDelete.value = null; }
+function confirmRecipeDelete(): void {
+    const recipe = pendingRecipeDelete.value;
+
+    if (!recipe) {
+        return;
+    }
+
+    pendingRecipeDelete.value = null;
     logForm.delete(`/recipes/${recipe.id}`, { preserveScroll: true });
 }
 </script>
@@ -222,6 +238,7 @@ function deleteRecipe(recipe: Recipe): void {
                 <label class="block">
                     <span class="field-label">Servings</span>
                     <Input v-model.number="recipeForm.servings" type="number" min="0.1" step="0.1" class="mt-1" />
+                    <span v-if="recipeForm.errors.servings" class="mt-1 block text-sm text-destructive" role="alert">{{ recipeForm.errors.servings }}</span>
                 </label>
 
                 <div v-if="recipeForm.items.length" class="divide-y divide-border/60 rounded-xl bg-muted/60 px-3">
@@ -303,9 +320,11 @@ function deleteRecipe(recipe: Recipe): void {
             <p class="mt-1 text-sm text-muted-foreground">{{ selectedRecipe.calories }} kcal per {{ selectedRecipe.servings }} serving{{ selectedRecipe.servings === 1 ? '' : 's' }}</p>
             <form class="mt-4 space-y-3" @submit.prevent="logRecipe">
                 <MealTypePicker v-model="logForm.meal_type" :meal-types="mealTypes" />
+                <span v-if="logForm.errors.meal_type" class="block text-sm text-destructive" role="alert">{{ logForm.errors.meal_type }}</span>
                 <label class="block">
                     <span class="field-label">Servings</span>
                     <Input v-model.number="logForm.servings" type="number" min="0.1" step="0.1" class="mt-1" />
+                    <span v-if="logForm.errors.servings" class="mt-1 block text-sm text-destructive" role="alert">{{ logForm.errors.servings }}</span>
                 </label>
                 <div class="grid grid-cols-2 gap-2">
                     <Button type="button" variant="surface" @click="selectedRecipe = null">Back</Button>
@@ -340,11 +359,18 @@ function deleteRecipe(recipe: Recipe): void {
                             <span class="block truncate text-sm text-muted-foreground">{{ recipe.calories }} kcal · {{ recipe.items.length }} ingredients</span>
                         </span>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" aria-label="Delete recipe" @click="deleteRecipe(recipe)">
+                    <Button type="button" variant="ghost" size="icon" aria-label="Delete recipe" @click="requestRecipeDelete(recipe)">
                         <Trash2 :size="16" />
                     </Button>
                 </div>
             </div>
         </Card>
+        <ConfirmSheet
+            :open="Boolean(pendingRecipeDelete)"
+            title="Delete recipe"
+            :message="pendingRecipeDelete ? `Delete ${pendingRecipeDelete.name}?` : ''"
+            @cancel="cancelRecipeDelete"
+            @confirm="confirmRecipeDelete"
+        />
     </div>
 </template>

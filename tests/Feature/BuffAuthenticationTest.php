@@ -222,6 +222,7 @@ it('registers during onboarding without blocking unverified accounts', function 
         'carbs_g' => 200,
         'fat_g' => 66.6667,
         'height_cm' => 180,
+        'current_weight_kg' => 90,
         'target_weight_kg' => 82,
         'target_body_fat_percent' => 15,
         'weight_unit' => 'kg',
@@ -512,12 +513,32 @@ it('keeps account access after an email change', function (): void {
         'name' => 'Updated Name',
         'email' => 'updated@example.com',
         'timezone' => 'Europe/London',
-    ])->assertRedirect('/settings/account');
+    ])->assertRedirect('/settings/account')
+        ->assertSessionHas('message', 'Account updated. Check your new email address when you can to verify it.');
 
     expect(app(BuffCredentialStore::class)->account()['email'])->toBe('updated@example.com')
         ->and(app(BuffCredentialStore::class)->account()['id'])->toBe('1');
 
     $this->get('/settings')->assertOk();
+});
+
+it('does not ask for email verification after a profile-only change', function (): void {
+    $account = [
+        'id' => '1',
+        'name' => 'Mason',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+        'email_verified' => false,
+    ];
+    app(BuffCredentialStore::class)->store('token', $account);
+    Http::fake(['*/account' => Http::response(['data' => [...$account, 'name' => 'Updated Name']])]);
+
+    $this->from('/settings/account')->patch('/account', [
+        'name' => 'Updated Name',
+        'email' => 'mason@example.com',
+        'timezone' => 'Europe/London',
+    ])->assertRedirect('/settings/account')
+        ->assertSessionHas('message', 'Account updated.');
 });
 
 it('updates the password from settings', function (): void {

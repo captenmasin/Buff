@@ -141,6 +141,7 @@ it('deletes imported workouts missing from the sync window', function (): void {
 
 it('does not reimport locally ignored health connect workouts', function (): void {
     HealthConnectIgnoredWorkout::query()->create([
+        'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
         'external_id' => 'hc-ignored',
         'ignored_at' => now(),
     ]);
@@ -161,6 +162,27 @@ it('does not reimport locally ignored health connect workouts', function (): voi
     expect(WorkoutEntry::query()->count())->toBe(0);
 });
 
+it('does not apply an apple health ignore to a health connect workout with the same id', function (): void {
+    HealthConnectIgnoredWorkout::query()->create([
+        'source_type' => WorkoutEntry::SOURCE_APPLE_HEALTH,
+        'external_id' => 'shared-provider-id',
+        'ignored_at' => now(),
+    ]);
+
+    $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
+        'records' => [[
+            'external_id' => 'shared-provider-id',
+            'title' => 'Health Connect run',
+            'calories_burned' => 300,
+            'date' => '2026-05-20',
+            'started_at' => '2026-05-20T07:00:00+01:00',
+            'ended_at' => '2026-05-20T07:30:00+01:00',
+        ]],
+    ])])->assertSuccessful();
+
+    expect(WorkoutEntry::query()->where('source_type', WorkoutEntry::SOURCE_HEALTH_CONNECT)->count())->toBe(1);
+});
+
 it('creates an ignore record when deleting an imported workout', function (): void {
     $workout = WorkoutEntry::query()->create([
         'date' => '2026-05-20',
@@ -175,7 +197,10 @@ it('creates an ignore record when deleting an imported workout', function (): vo
     $this->delete("/workouts/{$workout->id}")
         ->assertRedirect('/?date=2026-05-20');
 
-    $this->assertDatabaseHas('health_connect_ignored_workouts', ['external_id' => 'hc-1']);
+    $this->assertDatabaseHas('health_connect_ignored_workouts', [
+        'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
+        'external_id' => 'hc-1',
+    ]);
     $this->assertDatabaseMissing('workout_entries', ['id' => $workout->id]);
 });
 

@@ -6,9 +6,11 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
+import SocialLoginButtons from '../Components/SocialLoginButtons.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
 import { avatarColorClass, avatarInitials } from '../avatar';
+import { publicAssetUrl } from '../publicAssetUrl';
 
 type SocialProvider = 'google' | 'apple';
 
@@ -193,8 +195,8 @@ async function signInWith(provider: SocialProvider) {
 
         <div class="w-full max-w-sm space-y-6">
             <header class="flex flex-col items-center gap-4 text-center">
-                <img :src="'/icon.png'" alt="Buff" class="size-20 rounded-2xl dark:hidden" />
-                <img :src="'/icon-dark.png'" alt="Buff" class="hidden size-20 rounded-2xl dark:block" />
+                <img :src="publicAssetUrl('/icon.png')" alt="Buff" class="size-20 rounded-2xl dark:hidden" />
+                <img :src="publicAssetUrl('/icon-dark.png')" alt="Buff" class="hidden size-20 rounded-2xl dark:block" />
                 <h1 class="page-title">{{ title }}</h1>
             </header>
 
@@ -244,10 +246,7 @@ async function signInWith(provider: SocialProvider) {
                             <span v-if="loginForm.errors.password" class="mt-1 block text-sm text-destructive">{{ loginForm.errors.password }}</span>
                         </label>
                         <Button class="w-full" :disabled="loginForm.processing">Sign in</Button>
-                        <div class="space-y-2 border-t pt-4">
-                            <Button type="button" variant="surface" class="w-full" @click="signInWith('google')">Continue with Google</Button>
-                            <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
-                        </div>
+                        <SocialLoginButtons :apple-login-available="appleLoginAvailable" @sign-in="signInWith" />
                         <div class="flex justify-between text-sm">
                             <Link href="/account/forgot-password" class="text-link">Forgot password?</Link>
                             <Link href="/account/register" class="text-link">Create account</Link>
@@ -273,10 +272,7 @@ async function signInWith(provider: SocialProvider) {
                     <label class="block"><span class="field-label">Password</span><Input v-model="registerForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /><span v-if="registerForm.errors.password" class="mt-1 block text-sm text-destructive">{{ registerForm.errors.password }}</span></label>
                     <label class="block"><span class="field-label">Confirm password</span><Input v-model="registerForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" /></label>
                     <Button class="w-full" :disabled="registerForm.processing">Create account</Button>
-                    <div class="space-y-2 border-t pt-4">
-                        <Button type="button" variant="surface" class="w-full" @click="signInWith('google')">Continue with Google</Button>
-                        <Button v-if="appleLoginAvailable" type="button" variant="surface" class="w-full" @click="signInWith('apple')">Continue with Apple</Button>
-                    </div>
+                    <SocialLoginButtons :apple-login-available="appleLoginAvailable" @sign-in="signInWith" />
                     <p class="text-center text-sm"><Link href="/account/login" class="text-link">Back to sign in</Link></p>
                 </form>
             </Card>

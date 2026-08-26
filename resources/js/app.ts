@@ -17,6 +17,7 @@ watchSystemReducedMotion();
 (window as typeof window & { router?: typeof router }).router = router;
 
 createInertiaApp({
+    dev: import.meta.env.DEV,
     title: (title) => (title ? `${title} - Buff` : 'Buff'),
     // @ts-ignore
     resolve: async (name) => {

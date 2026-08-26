@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, nextTick, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { Camera, Check, Circle, Image as ImageIcon, LoaderCircle, SwitchCamera, Trash2, TrendingDown, TrendingUp, X } from '@lucide/vue';
 import AppSheet from '../Components/AppSheet.vue';
 import Card from '../Components/Card.vue';
@@ -66,7 +66,7 @@ interface WeightTrend { weight_kg: number; delta_kg: number | null }
 interface UnitPreferences { weight_unit: WeightUnit; height_unit: HeightUnit; measurement_unit: MeasurementUnit }
 interface MeasurementSummaryItem { value_cm: number; delta_cm: number | null }
 interface SelectedPhoto { file: File; preview: string; pose: ProgressPhotoPose }
-interface ProgressPhoto { id: string; url: string; mime_type?: string; pose?: string | null }
+interface ProgressPhoto { id: string; url: string; mime_type?: string; pose?: string | null; pending?: boolean }
 
 const measurementFields = [
     { key: 'chest_cm', label: 'Chest' },
@@ -95,6 +95,7 @@ const props = withDefaults(defineProps<{
 }>(), { latest: null, goals: null, energy: null, trend: null, delta: null });
 
 const pendingDelete = ref<BodyMetric | null>(null);
+const pendingPhotoDelete = ref<ProgressPhoto | null>(null);
 const photoInput = ref<HTMLInputElement | null>(null);
 const sheetPhotoInput = ref<HTMLInputElement | null>(null);
 const selectedPhotos = ref<Partial<Record<ProgressPhotoPose, SelectedPhoto>>>({});
@@ -565,6 +566,30 @@ function confirmDelete(): void {
     });
 }
 
+function requestPhotoDelete(photo: ProgressPhoto): void { pendingPhotoDelete.value = photo; }
+function cancelPhotoDelete(): void { pendingPhotoDelete.value = null; }
+async function confirmPhotoDelete(): Promise<void> {
+    const metric = photosMetric.value;
+    const photo = pendingPhotoDelete.value;
+
+    if (!metric || !photo || photo.pending) {
+        return;
+    }
+
+    pendingPhotoDelete.value = null;
+    photoUploadError.value = '';
+
+    try {
+        await axios.delete(`/progress/body-metrics/${metric.id}/photos/${encodeURIComponent(photo.id)}`);
+        remotePhotos.value = remotePhotos.value.filter((entry) => entry.id !== photo.id);
+        photoCache.value[metric.id] = remotePhotos.value;
+        void loadOverlayPhotos();
+    } catch (error) {
+        photoUploadError.value = (axios.isAxiosError(error) ? error.response?.data?.message : null)
+            || 'Could not delete the progress photo. Check your connection.';
+    }
+}
+
 function openPhotos(metric: BodyMetric, event: Event): void {
     event.preventDefault();
     event.stopPropagation();
@@ -652,6 +677,15 @@ async function closeCamera(): Promise<void> {
     }
 }
 
+function handleNativeAndroidBack(event: Event): void {
+    if (!cameraOpen.value) {
+        return;
+    }
+
+    event.preventDefault();
+    void closeCamera();
+}
+
 async function uploadTargetedPhotos(): Promise<void> {
     const metric = photoTargetMetric.value;
 
@@ -693,7 +727,12 @@ watch(() => props.history.map((metric) => metric.id).join(','), () => {
     });
 }, { immediate: true });
 
+onMounted(() => {
+    window.addEventListener('buff:android-back', handleNativeAndroidBack);
+});
+
 onUnmounted(() => {
+    window.removeEventListener('buff:android-back', handleNativeAndroidBack);
     overlayRequest++;
     stopCamera();
     clearSelectedPhotos();
@@ -976,12 +1015,23 @@ onUnmounted(() => {
                 Loading progress photos…
             </div>
             <div v-else-if="remotePhotos.length" class="grid grid-cols-3 gap-2">
-                <figure v-for="photo in remotePhotos" :key="photo.id" class="space-y-1">
+                <figure v-for="photo in remotePhotos" :key="photo.id" class="relative space-y-1">
                     <img
                         :src="photo.url"
                         :alt="photoPoseLabel(photo.pose)"
                         class="aspect-square w-full rounded-xl object-cover"
                     >
+                    <Button
+                        v-if="!photo.pending"
+                        type="button"
+                        variant="destructive"
+                        size="icon-sm"
+                        class="absolute right-1 top-1 rounded-full"
+                        :aria-label="`Delete ${photoPoseLabel(photo.pose).toLowerCase()} photo`"
+                        @click="requestPhotoDelete(photo)"
+                    >
+                        <Trash2 :size="15" />
+                    </Button>
                     <figcaption class="text-center text-xs text-muted-foreground">{{ photoPoseLabel(photo.pose) }}</figcaption>
                 </figure>
             </div>
@@ -1012,24 +1062,31 @@ onUnmounted(() => {
             @cancel="cancelDelete"
             @confirm="confirmDelete"
         />
+        <ConfirmSheet
+            :open="Boolean(pendingPhotoDelete)"
+            title="Delete progress photo"
+            :message="pendingPhotoDelete ? `Delete the ${photoPoseLabel(pendingPhotoDelete.pose).toLowerCase()} photo?` : ''"
+            @cancel="cancelPhotoDelete"
+            @confirm="confirmPhotoDelete"
+        />
 
         <Teleport to="body">
-        <div v-if="cameraOpen" class="fixed inset-0 z-[80] flex flex-col bg-foreground text-primary-foreground">
-            <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
+        <div v-if="cameraOpen" class="fixed inset-0 z-[80] flex flex-col bg-foreground text-background">
+            <div class="flex items-center justify-between gap-3 bg-background px-4 py-3 text-foreground pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
-                    <p class="text-sm text-primary-foreground/70">{{ progressPhotoLabels[capturingPose] }} photo</p>
+                    <p class="text-sm text-muted-foreground">{{ progressPhotoLabels[capturingPose] }} photo</p>
                     <h2 class="truncate text-xl font-semibold">
                         {{ cameraStarting ? 'Opening camera…' : activeOverlayPhoto ? (overlaySourceDate ? `Match ${progressPhotoLabels[capturingPose].toLowerCase()} · ${overlaySourceDate}` : `Match your last ${progressPhotoLabels[capturingPose].toLowerCase()}`) : `Line up your ${progressPhotoLabels[capturingPose].toLowerCase()}` }}
                     </h2>
                 </div>
-                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-primary-foreground/10 text-primary-foreground active:bg-primary-foreground/15" aria-label="Close camera" @click="closeCamera">
+                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-muted text-foreground active:bg-muted/80" aria-label="Close camera" @click="closeCamera">
                     <X :size="22" />
                 </Button>
             </div>
 
             <div class="relative min-h-0 flex-1 bg-foreground">
                 <div v-if="cameraStarting || !cameraReady" class="absolute inset-0 z-20 grid place-items-center bg-foreground">
-                    <LoaderCircle :size="34" class="animate-spin text-primary-foreground/70" />
+                    <LoaderCircle :size="34" class="animate-spin text-background/70" />
                 </div>
 
                 <video
@@ -1063,10 +1120,10 @@ onUnmounted(() => {
                         type="button"
                         class="inline-flex min-w-16 items-center justify-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium"
                         :class="pose === capturingPose
-                            ? 'border-primary-foreground bg-primary-foreground text-foreground'
+                            ? 'border-background bg-background text-foreground'
                             : selectedPhotos[pose]
-                                ? 'border-transparent bg-primary-foreground/15 text-primary-foreground'
-                                : 'border-dashed border-primary-foreground/45 bg-transparent text-primary-foreground/70'"
+                                ? 'border-transparent bg-background/15 text-background'
+                                : 'border-dashed border-background/45 bg-transparent text-background/70'"
                         :aria-label="selectedPhotos[pose] ? `${progressPhotoLabels[pose]} photo captured` : `${progressPhotoLabels[pose]} photo, empty`"
                         :aria-pressed="pose === capturingPose"
                         @click="capturingPose = pose"
@@ -1080,7 +1137,7 @@ onUnmounted(() => {
 
             <div class="grid gap-3 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+1rem)] pt-3">
                 <label class="block">
-                    <span class="mb-1 flex justify-between text-xs text-primary-foreground/70">
+                    <span class="mb-1 flex justify-between text-xs text-background/70">
                         <span>{{ activeOverlayPhoto ? 'Ghost overlay' : `No previous ${progressPhotoLabels[capturingPose].toLowerCase()} photo to ghost yet` }}</span>
                         <span v-if="activeOverlayPhoto">{{ Math.round(overlayOpacity * 100) }}%</span>
                     </span>
@@ -1090,19 +1147,19 @@ onUnmounted(() => {
                         min="0"
                         max="0.7"
                         step="0.05"
-                        class="w-full accent-primary-foreground disabled:opacity-40"
+                        class="w-full accent-background disabled:opacity-40"
                         aria-label="Overlay opacity"
                         :disabled="!activeOverlayPhoto"
                     >
                 </label>
                 <div class="grid grid-cols-[auto_1fr_auto] items-center gap-3">
-                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-primary-foreground/10 text-primary-foreground" aria-label="Flip camera" @click="flipCamera">
+                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-background/10 text-background" aria-label="Flip camera" @click="flipCamera">
                         <SwitchCamera :size="22" />
                     </Button>
                     <Button type="button" variant="inverse" class="h-14 w-full rounded-full text-base" :disabled="!cameraReady" @click="captureProgressPhoto">
                         Capture {{ progressPhotoLabels[capturingPose].toLowerCase() }}
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-primary-foreground/10 text-primary-foreground" :aria-label="`Choose ${progressPhotoLabels[capturingPose].toLowerCase()} from library`" @click="openLibrary(capturingPose)">
+                    <Button type="button" variant="ghost" size="icon" class="h-12 w-12 bg-background/10 text-background" :aria-label="`Choose ${progressPhotoLabels[capturingPose].toLowerCase()} from library`" @click="openLibrary(capturingPose)">
                         <ImageIcon :size="22" />
                     </Button>
                 </div>

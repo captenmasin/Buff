@@ -17,7 +17,10 @@ class HealthConnectWorkoutImporter
             $windowStart = $this->dateTime($payload['window_start'] ?? null) ?? now()->subDays(30);
             $windowEnd = $this->dateTime($payload['window_end'] ?? null) ?? now();
             $records = collect($payload['records'] ?? []);
-            $ignoredIds = HealthConnectIgnoredWorkout::query()->pluck('external_id')->all();
+            $ignoredIds = HealthConnectIgnoredWorkout::query()
+                ->where('source_type', $sourceType)
+                ->pluck('external_id')
+                ->all();
             $importedIds = [];
             $importedCount = 0;
             $defaultTitle = $this->defaultTitle($sourceType);

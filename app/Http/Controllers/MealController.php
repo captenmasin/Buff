@@ -25,6 +25,7 @@ class MealController extends Controller
 {
     public function create(Request $request): Response
     {
+        $validated = $request->validate(['date' => ['nullable', 'date']]);
         $mode = $request->string('mode')->toString();
         $mode = match ($mode) {
             'barcode', 'search' => 'food',
@@ -35,8 +36,8 @@ class MealController extends Controller
         $availableModes = ['food', 'custom', 'workout', 'photo', 'recipe'];
 
         return Inertia::render('Add', [
-            'date' => $request->filled('date')
-                ? Carbon::parse($request->string('date')->toString())->toDateString()
+            'date' => isset($validated['date'])
+                ? Carbon::parse($validated['date'])->toDateString()
                 : today()->toDateString(),
             'mealTypes' => MealEntry::MEAL_TYPES,
             'meal' => $meal,

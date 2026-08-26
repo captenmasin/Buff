@@ -9,6 +9,7 @@ use App\Models\DailyGoal;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -72,37 +73,39 @@ class OnboardingController extends Controller
             ]);
         }
 
-        DailyGoal::query()->firstOrCreate([], [
-            'calories' => $validated['calories'],
-            'protein_g' => $validated['protein_g'],
-            'carbs_g' => $validated['carbs_g'],
-            'fat_g' => $validated['fat_g'],
-            'macro_calories' => $macroCalories,
-            'target_weight_kg' => $validated['target_weight_kg'] ?? null,
-            'target_body_fat_percent' => $validated['target_body_fat_percent'] ?? null,
-        ]);
+        DB::transaction(function () use ($validated, $macroCalories): void {
+            DailyGoal::query()->firstOrCreate([], [
+                'calories' => $validated['calories'],
+                'protein_g' => $validated['protein_g'],
+                'carbs_g' => $validated['carbs_g'],
+                'fat_g' => $validated['fat_g'],
+                'macro_calories' => $macroCalories,
+                'target_weight_kg' => $validated['target_weight_kg'] ?? null,
+                'target_body_fat_percent' => $validated['target_body_fat_percent'] ?? null,
+            ]);
 
-        BodyProfile::current()->update([
-            'height_cm' => $validated['height_cm'] ?? null,
-            'age' => $validated['age'] ?? null,
-            'sex' => $validated['sex'] ?? null,
-            'activity_level' => $validated['activity_level'] ?? null,
-        ]);
+            BodyProfile::current()->update([
+                'height_cm' => $validated['height_cm'] ?? null,
+                'age' => $validated['age'] ?? null,
+                'sex' => $validated['sex'] ?? null,
+                'activity_level' => $validated['activity_level'] ?? null,
+            ]);
 
-        AppPreference::current()->update([
-            'weight_unit' => $validated['weight_unit'],
-            'height_unit' => $validated['height_unit'],
-            'measurement_unit' => $validated['height_unit'],
-        ]);
+            AppPreference::current()->update([
+                'weight_unit' => $validated['weight_unit'],
+                'height_unit' => $validated['height_unit'],
+                'measurement_unit' => $validated['height_unit'],
+            ]);
 
-        BodyMetric::query()->updateOrCreate(
-            ['date' => today()->startOfDay()],
-            [
-                'weight_kg' => $validated['current_weight_kg'],
-                'body_fat_percent' => null,
-                'notes' => null,
-            ]
-        );
+            BodyMetric::query()->updateOrCreate(
+                ['date' => today()->startOfDay()],
+                [
+                    'weight_kg' => $validated['current_weight_kg'],
+                    'body_fat_percent' => null,
+                    'notes' => null,
+                ]
+            );
+        });
 
         return redirect('/')->with('message', 'Buff is ready.');
     }

@@ -10,6 +10,7 @@ use App\Models\SyncState;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BodyMetricPhotoUploader
@@ -138,7 +139,17 @@ class BodyMetricPhotoUploader
         foreach ($photos as $photo) {
             $filename = Str::uuid()->toString().'.'.$photo->getClientOriginalExtension();
             $path = $directory.'/'.$filename;
-            Storage::disk('local')->put($path, $photo->get());
+
+            if (! Storage::disk('local')->put($path, $photo->get())) {
+                foreach ($paths as $storedPath) {
+                    Storage::disk('local')->delete($storedPath);
+                }
+
+                throw ValidationException::withMessages([
+                    'photos' => ['Progress photos could not be stored. Try again.'],
+                ]);
+            }
+
             $paths[] = $path;
             $names[] = $photo->getClientOriginalName();
         }

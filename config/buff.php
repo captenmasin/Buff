@@ -51,7 +51,7 @@ return [
         ],
         HealthConnectIgnoredWorkout::class => [
             'type' => 'health_connect_ignored_workouts',
-            'fields' => ['external_id', 'ignored_at'],
+            'fields' => ['source_type', 'external_id', 'ignored_at'],
         ],
         AppPreference::class => [
             'type' => 'app_preferences',

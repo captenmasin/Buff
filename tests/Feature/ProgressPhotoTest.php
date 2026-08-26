@@ -153,6 +153,25 @@ it('stages photos while the body metric is still in the sync outbox', function (
     }
 });
 
+it('does not report staging success when a photo cannot be written', function (): void {
+    stubIdleSync();
+
+    $metric = BodyMetric::query()->create([
+        'date' => '2026-08-20',
+        'weight_kg' => 82.4,
+    ]);
+    $disk = Mockery::mock();
+    $disk->shouldReceive('put')->once()->andReturnFalse();
+    Storage::shouldReceive('disk')->with('local')->once()->andReturn($disk);
+
+    $this->post("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => [UploadedFile::fake()->image('front.jpg', 800, 600)->size(700)],
+        'poses' => ['front'],
+    ])->assertSessionHasErrors('photos');
+
+    $this->assertDatabaseEmpty('pending_body_metric_photo_uploads');
+});
+
 it('lists and serves staged pending photos when cloud has none yet', function (): void {
     stubIdleSync();
 
@@ -188,6 +207,42 @@ it('lists and serves staged pending photos when cloud has none yet', function ()
     expect($url)->toContain("/progress/body-metrics/{$metric->id}/photos/pending/{$pending->id}/0");
 
     $this->get($url)->assertOk();
+});
+
+it('merges staged photos with existing cloud photos', function (): void {
+    stubIdleSync();
+
+    $metric = BodyMetric::query()->create([
+        'date' => '2026-08-20',
+        'weight_kg' => 82.4,
+    ]);
+
+    $this->post("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => [UploadedFile::fake()->image('front.jpg', 800, 600)->size(700)],
+        'poses' => ['front'],
+    ])->assertOk()->assertJsonPath('pending', true);
+
+    Http::fake([
+        "*/body-metrics/{$metric->id}/photos" => Http::response(['photos' => [[
+            'id' => '30000000-0000-4000-8000-000000000003',
+            'url' => 'https://objects.example.com/side.jpg',
+            'mime_type' => 'image/jpeg',
+            'pose' => 'side',
+        ]]]),
+        '*/sync' => Http::response([
+            'acknowledged' => [],
+            'changes' => [],
+            'cursor' => 0,
+            'has_more' => false,
+        ]),
+    ]);
+
+    $this->getJson("/progress/body-metrics/{$metric->id}/photos")
+        ->assertOk()
+        ->assertJsonCount(2, 'photos')
+        ->assertJsonPath('photos.0.pose', 'front')
+        ->assertJsonPath('photos.0.pending', true)
+        ->assertJsonPath('photos.1.pose', 'side');
 });
 
 it('uploads staged photos after the body metric syncs', function (): void {

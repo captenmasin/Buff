@@ -278,6 +278,22 @@ it('updates and schedules meal reminders', function (): void {
         ]]);
 });
 
+it('keeps the previous reminder settings when native scheduling fails', function (): void {
+    $previous = AppPreference::current()->mealReminders();
+
+    app()->instance(MealReminderBridge::class, new MealReminderBridge(
+        fn (): string => json_encode(['status' => 'error'], JSON_THROW_ON_ERROR),
+    ));
+
+    $this->put('/settings/meal-reminders', [
+        'breakfast' => ['enabled' => true, 'time' => '07:30'],
+        'lunch' => ['enabled' => true, 'time' => '12:15'],
+        'dinner' => ['enabled' => true, 'time' => '19:00'],
+    ])->assertRedirect();
+
+    expect(AppPreference::current()->fresh()->mealReminders())->toBe($previous);
+});
+
 it('validates every meal reminder setting', function (): void {
     $this->put('/settings/meal-reminders', [
         'breakfast' => ['enabled' => 'yes', 'time' => '25:00'],

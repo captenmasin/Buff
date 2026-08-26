@@ -40,21 +40,24 @@ class BodyMetricPhotoController extends Controller
     {
         $result = $api->get("body-metrics/{$bodyMetric->id}/photos");
         $cloudPhotos = $result->successful() ? ($result->data['photos'] ?? []) : [];
+        $pending = $uploader->pendingPhotosFor($bodyMetric);
 
-        if (is_array($cloudPhotos) && $cloudPhotos !== []) {
+        if ($pending === []) {
             return $this->buffApiResponse($result);
         }
 
-        $pending = $uploader->pendingPhotosFor($bodyMetric);
+        $photos = collect([...$pending, ...(is_array($cloudPhotos) ? $cloudPhotos : [])])
+            ->filter(fn (mixed $photo): bool => is_array($photo))
+            ->unique(fn (array $photo): string => (string) (($photo['pose'] ?? null) ?: ($photo['id'] ?? json_encode($photo))))
+            ->sortBy(fn (array $photo): int => BodyMetricPhotoPose::sortKey($photo['pose'] ?? null))
+            ->take(3)
+            ->values()
+            ->all();
 
-        if ($pending !== []) {
-            return response()->json([
-                'photos' => $pending,
-                'pending' => true,
-            ]);
-        }
-
-        return $this->buffApiResponse($result);
+        return response()->json([
+            'photos' => $photos,
+            'pending' => true,
+        ]);
     }
 
     public function pending(BodyMetric $bodyMetric, string $pending, int $index, BodyMetricPhotoUploader $uploader): StreamedResponse

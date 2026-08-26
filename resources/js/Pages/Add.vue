@@ -954,7 +954,6 @@ onUnmounted(() => {
                 ref="photoInput"
                 type="file"
                 accept="image/*"
-                capture="environment"
                 multiple
                 class="hidden"
                 @change="selectPhotos"

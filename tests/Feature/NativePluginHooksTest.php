@@ -29,6 +29,9 @@ it('patches the NativePHP v4 Android shell', function (): void {
         $mainActivity = $files->get($buildPath.'/app/src/main/java/com/nativephp/mobile/ui/MainActivity.kt');
         $webViewManager = $files->get($buildPath.'/app/src/main/java/com/nativephp/mobile/network/WebViewManager.kt');
 
+        $manifest = $files->get($buildPath.'/app/src/main/AndroidManifest.xml');
+        $mainActivityManifest = (string) str($manifest)->between('android:name=".ui.MainActivity"', '</activity>');
+
         expect($mainActivity)
             ->toContain('webRenderer?.manager?.handleFileChooserResult(requestCode, resultCode, data) == true')
             ->toContain('webRenderer?.manager?.handleCameraPermissionResult(requestCode, grantResults) == true')
@@ -36,6 +39,8 @@ it('patches the NativePHP v4 Android shell', function (): void {
             ->toContain('SwipeRefreshLayout(context).apply')
             ->toContain('val webView = renderer.webView')
             ->toContain('fun finishPullRefresh()')
+            ->toContain('window.__buffHandleAndroidBack')
+            ->toContain('web.evaluateJavascript(')
             ->not->toContain('if (::webViewManager.isInitialized')
             ->toContain('uri.scheme == "buff"')
             ->not->toContain('nativephp://')
@@ -49,7 +54,9 @@ it('patches the NativePHP v4 Android shell', function (): void {
             ->not->toContain('nativephp://')
             ->and($files->get($buildPath.'/app/build.gradle.kts'))
             ->toContain('androidx.swiperefreshlayout:swiperefreshlayout:1.1.0')
-            ->and($files->get($buildPath.'/app/src/main/AndroidManifest.xml'))
+            ->and(substr_count($manifest, 'android.app.shortcuts'))
+            ->toBe(1)
+            ->and($mainActivityManifest)
             ->toContain('android.app.shortcuts')
             ->and($files->get($buildPath.'/app/src/main/res/xml/shortcuts.xml'))
             ->toContain('buff://add')
@@ -63,4 +70,76 @@ it('keeps valid orientation defaults for both native platforms', function (): vo
     expect(config('nativephp.ipad'))->toBeFalse()
         ->and(config('nativephp.orientation.iphone.portrait'))->toBeTrue()
         ->and(config('nativephp.orientation.android.portrait'))->toBeTrue();
+});
+
+it('installs the iOS shell integrations', function (): void {
+    $files = new Filesystem;
+    $buildPath = storage_path('framework/testing/nativephp-ios-'.uniqid());
+    $appDelegatePath = $buildPath.'/NativePHP/AppDelegate.swift';
+    $contentViewPath = $buildPath.'/NativePHP/ContentView.swift';
+    $schemeHandlerPath = $buildPath.'/NativePHP/PHPSchemeHandler.swift';
+    $infoPlistPath = $buildPath.'/NativePHP/Info.plist';
+    $simulatorInfoPlistPath = $buildPath.'/NativePHP-simulator-Info.plist';
+    $xcodeProjectPath = $buildPath.'/NativePHP.xcodeproj/project.pbxproj';
+
+    $files->ensureDirectoryExists(dirname($appDelegatePath));
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP/AppDelegate.swift'),
+        $appDelegatePath,
+    );
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP/ContentView.swift'),
+        $contentViewPath,
+    );
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP/PHPSchemeHandler.swift'),
+        $schemeHandlerPath,
+    );
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP/Info.plist'),
+        $infoPlistPath,
+    );
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP-simulator-Info.plist'),
+        $simulatorInfoPlistPath,
+    );
+    $files->ensureDirectoryExists(dirname($xcodeProjectPath));
+    $files->copy(
+        base_path('vendor/nativephp/mobile/resources/xcode/NativePHP.xcodeproj/project.pbxproj'),
+        $xcodeProjectPath,
+    );
+
+    try {
+        $this->artisan('native-refresh:install', [
+            '--platform' => 'ios',
+            '--build-path' => $buildPath,
+            '--plugin-path' => base_path('native-plugins/native-refresh'),
+            '--app-id' => 'com.mason.buff',
+        ])->assertSuccessful();
+
+        expect($files->get($appDelegatePath))
+            ->toContain('performActionFor shortcutItem: UIApplicationShortcutItem')
+            ->toContain('DeepLinkRouter.shared.handle(url: url)')
+            ->and($files->get($contentViewPath))
+            ->toContain('func addPullToRefresh(')
+            ->toContain('#selector(Coordinator.refreshWebView(_:))')
+            ->toContain('webView.scrollView.refreshControl?.endRefreshing()')
+            ->and($files->get($schemeHandlerPath))
+            ->toContain('uri = encodedPath.isEmpty ? "/" : encodedPath')
+            ->toContain('request.query = redirectComponents?.percentEncodedQuery')
+            ->toContain('if !trimmedLocation.hasPrefix("http://")')
+            ->not->toContain('request.uri = location.trimmingCharacters(in: .whitespaces)')
+            ->and($files->get($infoPlistPath))
+            ->toContain('<key>UIApplicationShortcutItems</key>')
+            ->toContain('<string>buff://add?mode=food&amp;scan=1</string>')
+            ->and($files->get($simulatorInfoPlistPath))
+            ->toContain('<key>UIApplicationShortcutItems</key>')
+            ->and(substr_count(
+                $files->get($xcodeProjectPath),
+                'CODE_SIGN_ENTITLEMENTS = NativePHP/NativePHP.entitlements;',
+            ))
+            ->toBe(4);
+    } finally {
+        $files->deleteDirectory($buildPath);
+    }
 });

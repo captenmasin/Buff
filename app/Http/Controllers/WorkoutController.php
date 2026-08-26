@@ -70,7 +70,10 @@ class WorkoutController extends Controller
     {
         if ($workoutEntry->isImportedHealth() && $workoutEntry->external_id) {
             HealthConnectIgnoredWorkout::query()->firstOrCreate(
-                ['external_id' => $workoutEntry->external_id],
+                [
+                    'source_type' => $workoutEntry->source_type,
+                    'external_id' => $workoutEntry->external_id,
+                ],
                 ['ignored_at' => now()],
             );
         }

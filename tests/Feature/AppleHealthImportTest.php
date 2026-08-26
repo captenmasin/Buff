@@ -56,6 +56,7 @@ it('imports apple health workouts', function (): void {
 
 it('does not reimport locally ignored apple health workouts', function (): void {
     HealthConnectIgnoredWorkout::query()->create([
+        'source_type' => WorkoutEntry::SOURCE_APPLE_HEALTH,
         'external_id' => 'hk-ignored',
         'ignored_at' => now(),
     ]);
@@ -90,7 +91,10 @@ it('creates an ignore record when deleting an imported apple health workout', fu
     $this->delete("/workouts/{$workout->id}")
         ->assertRedirect('/?date=2026-05-20');
 
-    $this->assertDatabaseHas('health_connect_ignored_workouts', ['external_id' => 'hk-1']);
+    $this->assertDatabaseHas('health_connect_ignored_workouts', [
+        'source_type' => WorkoutEntry::SOURCE_APPLE_HEALTH,
+        'external_id' => 'hk-1',
+    ]);
     $this->assertDatabaseMissing('workout_entries', ['id' => $workout->id]);
 });
 

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import {
     overlayPhotoForPose,
@@ -86,4 +87,16 @@ test('prefers another day over the current day when retaking photos', () => {
 
     assert.equal(overlays.front?.photo.id, 'older-front');
     assert.equal(overlays.front?.date, '2026-08-10');
+});
+
+test('keeps native camera controls visible and lets Android Back close the camera', () => {
+    const progressSource = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
+    const shellSource = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
+
+    assert.match(progressSource, /bg-foreground text-background/);
+    assert.match(progressSource, /bg-background[^>]+text-foreground[^>]+safe-area-inset-top/);
+    assert.match(progressSource, /bg-background\/10 text-background" aria-label="Flip camera"/);
+    assert.match(progressSource, /window\.addEventListener\('buff:android-back', handleNativeAndroidBack\)/);
+    assert.match(shellSource, /new Event\('buff:android-back', \{ cancelable: true \}\)/);
+    assert.match(shellSource, /router\.visit\('\/settings', \{ replace: true \}\)/);
 });

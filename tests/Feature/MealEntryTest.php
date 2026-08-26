@@ -68,6 +68,13 @@ it('creates a barcode meal from a product portion', function (): void {
         ->and($entry->source_type)->toBe(MealEntry::SOURCE_BARCODE);
 });
 
+it('rejects invalid add-screen dates without a server error', function (): void {
+    $this->from('/add')
+        ->get('/add?date=not-a-date')
+        ->assertRedirect('/add')
+        ->assertSessionHasErrors('date');
+});
+
 it('creates a barcode meal from a liquid product portion', function (): void {
     $product = FoodProduct::query()->create([
         'barcode' => '5000181036312',

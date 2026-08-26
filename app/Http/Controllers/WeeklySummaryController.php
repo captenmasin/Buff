@@ -30,7 +30,7 @@ class WeeklySummaryController extends Controller
             $startDate = Carbon::parse($validated['start_date']);
             $endDate = Carbon::parse($validated['end_date']);
 
-            if ($startDate->diffInDays($endDate) > 90) {
+            if ($startDate->diffInDays($endDate) >= 90) {
                 throw ValidationException::withMessages([
                     'end_date' => 'Choose a range of 90 days or less.',
                 ]);

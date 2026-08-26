@@ -141,6 +141,13 @@ it('renders a custom date range roundup', function (): void {
         );
 });
 
+it('limits custom roundups to 90 inclusive calendar dates', function (): void {
+    $this->from('/weekly')
+        ->get('/weekly?start_date=2026-01-01&end_date=2026-04-01')
+        ->assertRedirect('/weekly')
+        ->assertSessionHasErrors('end_date');
+});
+
 it('uses eat-back none for the weekly effective target', function (): void {
     AppPreference::current()->update(['eat_back' => 'none']);
 

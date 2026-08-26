@@ -9,7 +9,7 @@ import { nativephpHotFile, nativephpMobile } from './vendor/nativephp/mobile/res
 export default defineConfig({
     resolve: {
         alias: {
-            '@': path.resolve(__dirname, 'resources/js'),
+            '@': path.resolve(import.meta.dirname, 'resources/js'),
         },
     },
     plugins: [
@@ -20,10 +20,12 @@ export default defineConfig({
             fonts: [
                 bunny('IBM Plex Sans', {
                     weights: [400, 500, 600, 700],
+                    optimizedFallbacks: false,
                 }),
                 bunny('Fraunces', {
                     weights: [900],
                     styles: ['italic'],
+                    optimizedFallbacks: false,
                 }),
             ],
         }),

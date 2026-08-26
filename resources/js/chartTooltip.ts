@@ -1,6 +1,9 @@
+import type { Component } from 'vue';
+
 export type TooltipSeriesConfig = Record<string, {
     label?: unknown;
     color?: string;
+    icon?: string | Component;
 } | undefined>;
 
 export type TooltipSeriesEntry = {

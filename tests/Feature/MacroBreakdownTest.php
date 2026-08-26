@@ -93,3 +93,10 @@ it('rejects unknown macros', function (): void {
     $this->get('/macros/fiber?date=2026-05-20')
         ->assertNotFound();
 });
+
+it('rejects invalid macro dates without a server error', function (): void {
+    $this->from('/macros/protein')
+        ->get('/macros/protein?date=not-a-date')
+        ->assertRedirect('/macros/protein')
+        ->assertSessionHasErrors('date');
+});

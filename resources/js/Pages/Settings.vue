@@ -114,7 +114,7 @@ function closeDeleteAccountModal() {
 }
 
 function submitDeleteAccount() {
-    deleteAccountForm.delete('/account', {
+    deleteAccountForm.transform((data) => ({...data, _method: 'delete'})).post('/account', {
         preserveScroll: true,
         onError: () => {
             deleteAccountOpen.value = true;

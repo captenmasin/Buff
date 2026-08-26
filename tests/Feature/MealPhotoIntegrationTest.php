@@ -184,6 +184,48 @@ it('keeps a failed confirmation for the next successful sync', function (): void
     $this->assertDatabaseMissing('pending_meal_analysis_confirmations', ['analysis_id' => $analysisId]);
 });
 
+it('retries an old pending confirmation instead of silently deleting it', function (): void {
+    $meal = MealEntry::query()->create([
+        'date' => '2026-08-15',
+        'meal_type' => 'dinner',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Chicken bowl',
+        'calories' => 526,
+        'protein_g' => 42,
+        'carbs_g' => 58,
+        'fat_g' => 14,
+    ]);
+    $analysisId = '20000000-0000-4000-8000-000000000002';
+    PendingMealAnalysisConfirmation::query()->create([
+        'analysis_id' => $analysisId,
+        'meal_record_id' => $meal->id,
+        'created_at' => now()->subDays(2),
+        'updated_at' => now()->subDays(2),
+    ]);
+
+    Http::fake(function (ClientRequest $request) {
+        if (str_ends_with($request->url(), '/sync')) {
+            return Http::response([
+                'acknowledged' => collect($request['changes'])->map(fn (array $change): array => [
+                    'type' => $change['type'],
+                    'id' => $change['id'],
+                    'accepted' => true,
+                ])->all(),
+                'changes' => [],
+                'cursor' => 1,
+                'has_more' => false,
+            ]);
+        }
+
+        return Http::response(['data' => ['status' => 'confirmed']]);
+    });
+
+    app(BuffSyncService::class)->sync();
+
+    Http::assertSent(fn (ClientRequest $request): bool => str_ends_with($request->url(), "/meal-analyses/{$analysisId}/confirm"));
+    $this->assertDatabaseMissing('pending_meal_analysis_confirmations', ['analysis_id' => $analysisId]);
+});
+
 it('proxies cancellation and temporary meal photo URLs without storing them', function (): void {
     $meal = MealEntry::query()->create([
         'date' => '2026-08-15',

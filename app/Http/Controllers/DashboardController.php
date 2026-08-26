@@ -24,8 +24,9 @@ class DashboardController extends Controller
             return redirect('/add'.($request->filled('date') ? '?date='.$request->string('date')->toString() : ''));
         }
 
-        $date = $request->filled('date')
-            ? Carbon::parse($request->string('date')->toString())
+        $validated = $request->validate(['date' => ['nullable', 'date']]);
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : today();
 
         return Inertia::render('Today', [

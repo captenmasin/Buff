@@ -36,8 +36,9 @@ class MacroController extends Controller
     {
         abort_unless(array_key_exists($macro, self::MACROS), 404);
 
-        $date = $request->filled('date')
-            ? Carbon::parse($request->string('date')->toString())
+        $validated = $request->validate(['date' => ['nullable', 'date']]);
+        $date = isset($validated['date'])
+            ? Carbon::parse($validated['date'])
             : today();
 
         $macroDefinition = self::MACROS[$macro];

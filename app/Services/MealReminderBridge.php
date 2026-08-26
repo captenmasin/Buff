@@ -12,14 +12,10 @@ class MealReminderBridge
     public function sync(array $reminders): array
     {
         if (! $this->nativeCaller && (
-            ! config('nativephp-internal.running')
-            || config('nativephp-internal.platform') !== 'android'
-            || ! function_exists('nativephp_call')
+            ! function_exists('nativephp_call')
+            || ! function_exists('nativephp_can')
+            || ! nativephp_can('BackgroundTasks.RegisterMealReminders')
         )) {
-            return ['status' => 'unsupported'];
-        }
-
-        if (! $this->nativeCaller && function_exists('nativephp_can') && ! nativephp_can('BackgroundTasks.RegisterMealReminders')) {
             return ['status' => 'unsupported'];
         }
 

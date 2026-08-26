@@ -141,6 +141,21 @@ it('redirects new users to onboarding until goals exist', function (): void {
         );
 });
 
+it('rejects invalid dashboard dates without a server error', function (): void {
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    $this->from('/')
+        ->get('/?date=not-a-date')
+        ->assertRedirect('/')
+        ->assertSessionHasErrors('date');
+});
+
 it('returns only populated meal groups', function (): void {
     DailyGoal::query()->create([
         'calories' => 2000,

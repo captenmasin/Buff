@@ -525,10 +525,6 @@ function startEditingWorkout(workout: WorkoutEntry, closeMenu: () => void) {
 }
 
 function closeWorkoutEditor() {
-    if (editWorkoutForm.processing) {
-        return;
-    }
-
     selectedWorkout.value = null;
     editWorkoutForm.reset();
     editWorkoutForm.clearErrors();

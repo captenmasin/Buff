@@ -1,6 +1,6 @@
 {
     "namespace": "NativeRefresh",
-    "platforms": ["android"],
+    "platforms": ["android", "ios"],
     "hooks": {
         "post_compile": "native-refresh:install"
     },

@@ -228,6 +228,9 @@ class AccountController extends Controller
             'email' => ['required', 'email', 'max:255'],
             'timezone' => ['required', 'timezone:all'],
         ]);
+        $previousEmail = $this->credentials->account()['email'] ?? null;
+        $emailChanged = ! is_string($previousEmail)
+            || Str::lower(trim($previousEmail)) !== Str::lower(trim($validated['email']));
         $result = $this->api->patch('account', $validated);
         $this->ensureSuccessful($result);
         $account = $result->data['data'] ?? null;
@@ -236,7 +239,7 @@ class AccountController extends Controller
             $this->credentials->updateAccount($account);
         }
 
-        $message = ($account['email_verified'] ?? true) === false
+        $message = $emailChanged && ($account['email_verified'] ?? true) === false
             ? 'Account updated. Check your new email address when you can to verify it.'
             : 'Account updated.';
 

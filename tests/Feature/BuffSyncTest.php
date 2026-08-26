@@ -161,7 +161,7 @@ it('applies the server record after a stale local conflict', function (): void {
     $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $meal->id]);
 });
 
-it('accepts concurrent logical records and meals whose catalogue item is not cached', function (): void {
+it('reconciles concurrent body metrics by date and accepts meals whose catalogue item is not cached', function (): void {
     BodyMetric::query()->create([
         'date' => '2026-08-15',
         'weight_kg' => 80,
@@ -207,7 +207,11 @@ it('accepts concurrent logical records and meals whose catalogue item is not cac
     ])]);
 
     expect(app(BuffSyncService::class)->sync()->successful())->toBeTrue();
-    $this->assertDatabaseCount('body_metrics', 2);
+    $this->assertDatabaseCount('body_metrics', 1);
+    $this->assertDatabaseHas('body_metrics', [
+        'id' => $remoteMetricId,
+        'weight_kg' => 81,
+    ]);
     $this->assertDatabaseHas('meal_entries', [
         'id' => $remoteMealId,
         'food_product_id' => '50000000-0000-4000-8000-000000000005',

@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\BuffApiStatus;
 use App\Models\AppPreference;
+use App\Models\BodyMetric;
+use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\SyncedModel;
 use App\Models\SyncOutbox;
@@ -290,6 +292,21 @@ class BuffSyncService
             ->where('record_id', $id)
             ->first();
 
+        if ($pending === null
+            && $type === 'body_metrics'
+            && ($change['deleted'] ?? false) === false
+            && is_array($change['data'] ?? null)
+            && is_string($change['data']['date'] ?? null)) {
+            $localIds = BodyMetric::query()
+                ->whereDate('date', $change['data']['date'])
+                ->pluck('id');
+            $pending = SyncOutbox::query()
+                ->where('record_type', $type)
+                ->whereIn('record_id', $localIds)
+                ->latest('client_updated_at')
+                ->first();
+        }
+
         if ($pending === null) {
             return true;
         }
@@ -332,6 +349,21 @@ class BuffSyncService
             return false;
         }
 
+        if ($model === null
+            && $modelClass === BodyMetric::class
+            && is_string($change['data']['date'] ?? null)) {
+            $model = BodyMetric::query()
+                ->whereDate('date', $change['data']['date'])
+                ->latest('updated_at')
+                ->first();
+
+            if ($model !== null) {
+                PendingBodyMetricPhotoUpload::query()
+                    ->where('body_metric_id', $model->getKey())
+                    ->update(['body_metric_id' => $id]);
+            }
+        }
+
         $model ??= new $modelClass;
         $model->setAttribute($model->getKeyName(), $id);
         $model->forceFill($change['data']);
@@ -363,10 +395,6 @@ class BuffSyncService
 
     private function retryPendingConfirmations(): void
     {
-        PendingMealAnalysisConfirmation::query()
-            ->where('created_at', '<', Date::now()->subDay())
-            ->delete();
-
         PendingMealAnalysisConfirmation::query()->oldest()->each(function (PendingMealAnalysisConfirmation $pending): void {
             if (SyncState::query()->doesntExist() || SyncOutbox::query()
                 ->where('record_type', 'meal_entries')

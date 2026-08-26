@@ -5,6 +5,7 @@ use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
 use App\Models\SyncOutbox;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Date;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -49,6 +50,18 @@ it('creates and updates a body metric for a date', function (): void {
 
     expect($outbox->payload['chest_cm'])->toBe('102.40')
         ->and($outbox->payload['waist_cm'])->toBe('84.20');
+});
+
+it('enforces one body metric per date at the database boundary', function (): void {
+    BodyMetric::query()->create([
+        'date' => '2026-05-19',
+        'weight_kg' => 82.4,
+    ]);
+
+    expect(fn () => BodyMetric::query()->create([
+        'date' => '2026-05-19',
+        'weight_kg' => 81.9,
+    ]))->toThrow(QueryException::class);
 });
 
 it('validates body measurements', function (string $field, mixed $value): void {

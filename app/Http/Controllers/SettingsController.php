@@ -174,13 +174,16 @@ class SettingsController extends Controller
             'dinner.time' => ['required', 'date_format:H:i'],
         ]);
 
-        AppPreference::current()->update(['meal_reminders' => $validated]);
-
         $result = $bridge->sync($validated);
+
+        if ($result['status'] !== 'error') {
+            AppPreference::current()->update(['meal_reminders' => $validated]);
+        }
+
         $message = match ($result['status']) {
             'permission_requested' => 'Meal reminders saved. Allow notifications when prompted.',
             'notifications_disabled' => 'Meal reminders saved, but Android notifications are off.',
-            'error' => 'Meal reminder settings saved, but reminders could not be scheduled.',
+            'error' => 'Meal reminder settings were not saved because reminders could not be scheduled.',
             default => null,
         };
 

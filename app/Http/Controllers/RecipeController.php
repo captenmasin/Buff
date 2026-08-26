@@ -9,15 +9,14 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class RecipeController extends Controller
 {
     public function store(Request $request, NutritionCalculator $calculator): RedirectResponse
     {
+        $date = Carbon::parse($request->validate(['date' => ['nullable', 'date']])['date'] ?? today())->toDateString();
         $recipe = Recipe::query()->create($this->validatedRecipe($request, $calculator));
-        $date = $request->filled('date')
-            ? Carbon::parse($request->string('date')->toString())->toDateString()
-            : today()->toDateString();
 
         return redirect('/add?mode=recipe&date='.$date)
             ->with('message', "{$recipe->name} saved.");
@@ -57,9 +56,16 @@ class RecipeController extends Controller
         ]);
 
         $items = collect($validated['items'])
-            ->map(function (array $item) use ($calculator): array {
+            ->map(function (array $item, int $index) use ($calculator): array {
                 if (is_string($item['food_product_id'] ?? null)) {
                     $product = FoodProduct::query()->findOrFail($item['food_product_id']);
+
+                    if ($item['portion_unit'] !== $product->nutrition_unit) {
+                        throw ValidationException::withMessages([
+                            "items.{$index}.portion_unit" => "Use {$product->nutrition_unit} for this product because its nutrition data is per 100{$product->nutrition_unit}.",
+                        ]);
+                    }
+
                     $macros = $calculator->macrosForPortion($product, $item['portion_quantity']);
                     $item = [
                         ...$item,

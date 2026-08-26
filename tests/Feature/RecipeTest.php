@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\FoodProduct;
 use App\Models\MealEntry;
 use App\Models\Recipe;
 use Inertia\Testing\AssertableInertia as Assert;
@@ -54,6 +55,59 @@ it('creates a recipe and logs it as one meal entry', function (): void {
         ->and((float) $entry->portion_quantity)->toBe(1.0)
         ->and($entry->portion_unit)->toBeNull()
         ->and($entry->recipe_id)->toBe($recipe->id);
+});
+
+it('rejects an invalid redirect date before persisting a recipe', function (): void {
+    $this->from('/add?mode=recipe')
+        ->post('/recipes', [
+            'date' => 'not-a-date',
+            'name' => 'Overnight oats',
+            'servings' => 1,
+            'items' => [[
+                'name' => 'Oats',
+                'food_product_id' => null,
+                'portion_quantity' => 80,
+                'portion_unit' => 'g',
+                'calories' => 300,
+                'protein_g' => 10,
+                'carbs_g' => 50,
+                'fat_g' => 5,
+            ]],
+        ])
+        ->assertRedirect('/add?mode=recipe')
+        ->assertSessionHasErrors('date');
+
+    $this->assertDatabaseEmpty('recipes');
+});
+
+it('requires a product ingredient to use its nutrition unit', function (): void {
+    $product = FoodProduct::query()->create([
+        'barcode' => '1234567890123',
+        'name' => 'Yoghurt',
+        'nutrition_unit' => 'g',
+        'calories_per_100' => 120,
+        'protein_per_100' => 8,
+        'carbs_per_100' => 12,
+        'fat_per_100' => 4,
+    ]);
+
+    $this->post('/recipes', [
+        'date' => '2026-05-19',
+        'name' => 'Yoghurt bowl',
+        'servings' => 1,
+        'items' => [[
+            'name' => 'Yoghurt',
+            'food_product_id' => $product->id,
+            'portion_quantity' => 150,
+            'portion_unit' => 'ml',
+            'calories' => 180,
+            'protein_g' => 12,
+            'carbs_g' => 18,
+            'fat_g' => 6,
+        ]],
+    ])->assertSessionHasErrors('items.0.portion_unit');
+
+    $this->assertDatabaseEmpty('recipes');
 });
 
 it('scales recipe macros by logged servings', function (): void {

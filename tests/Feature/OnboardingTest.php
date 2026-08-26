@@ -68,6 +68,31 @@ it('stores the initial profile and preferences', function (): void {
     ]);
 });
 
+it('rolls back every onboarding write when completion fails', function (): void {
+    BodyProfile::creating(function (): void {
+        throw new RuntimeException('Simulated profile write failure.');
+    });
+
+    try {
+        expect(fn () => $this->withoutExceptionHandling()->post('/onboarding', [
+            'calories' => 2000,
+            'protein_g' => 150,
+            'carbs_g' => 200,
+            'fat_g' => 66.6667,
+            'current_weight_kg' => 90,
+            'weight_unit' => 'kg',
+            'height_unit' => 'cm',
+        ]))->toThrow(RuntimeException::class, 'Simulated profile write failure.');
+    } finally {
+        BodyProfile::flushEventListeners();
+    }
+
+    $this->assertDatabaseEmpty('daily_goals');
+    $this->assertDatabaseEmpty('body_profiles');
+    $this->assertDatabaseEmpty('app_preferences');
+    $this->assertDatabaseEmpty('body_metrics');
+});
+
 it('requires current weight during onboarding', function (): void {
     $this->post('/onboarding', [
         'calories' => 2000,

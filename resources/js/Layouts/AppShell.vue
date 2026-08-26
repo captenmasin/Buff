@@ -8,6 +8,7 @@ import AddChooser from '../Components/Add/AddChooser.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
+import { publicAssetUrl } from '../publicAssetUrl';
 
 const page = usePage<{
     summary?: { date: string };
@@ -82,8 +83,21 @@ function handlePopState() {
 }
 
 function handleNativeAndroidBack() {
+    const event = new Event('buff:android-back', { cancelable: true });
+    window.dispatchEvent(event);
+
+    if (event.defaultPrevented) {
+        return true;
+    }
+
     if (addDrawerOpen.value) {
         closeAddDrawer();
+
+        return true;
+    }
+
+    if (isSettingsSubpage.value) {
+        router.visit('/settings', { replace: true });
 
         return true;
     }
@@ -213,8 +227,8 @@ onUnmounted(() => {
 
         <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
             <Link href="/" class="mb-8 px-2" aria-label="Buff home">
-                    <img :src="'/logo.svg'" alt="Buff" class="h-auto w-32 dark:hidden" />
-                    <img :src="'/logo-dark.svg'" alt="Buff" class="hidden h-auto w-32 dark:block" />
+                    <img :src="publicAssetUrl('/logo.svg')" alt="Buff" class="h-auto w-32 dark:hidden" />
+                    <img :src="publicAssetUrl('/logo-dark.svg')" alt="Buff" class="hidden h-auto w-32 dark:block" />
             </Link>
 
             <nav class="grid gap-1" aria-label="Primary">
