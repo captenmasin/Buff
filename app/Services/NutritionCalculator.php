@@ -20,6 +20,24 @@ class NutritionCalculator
     /**
      * @return array{calories: int, protein_g: float, carbs_g: float, fat_g: float, macro_calories: int}
      */
+    public function dailyGoalForCalories(int $calories): array
+    {
+        $protein = round(($calories * 0.3) / 4, 2);
+        $carbs = round(($calories * 0.4) / 4, 2);
+        $fat = round(($calories - ($protein * 4) - ($carbs * 4)) / 9, 2);
+
+        return [
+            'calories' => $calories,
+            'protein_g' => $protein,
+            'carbs_g' => $carbs,
+            'fat_g' => $fat,
+            'macro_calories' => $this->macroCalories($protein, $carbs, $fat),
+        ];
+    }
+
+    /**
+     * @return array{calories: int, protein_g: float, carbs_g: float, fat_g: float, macro_calories: int}
+     */
     public function effectiveDailyGoal(DailyGoal $goal, int $burnedCalories, string $eatBack = 'all'): array
     {
         $effectiveCalories = $goal->calories + $this->eatenBackCalories($burnedCalories, $eatBack);

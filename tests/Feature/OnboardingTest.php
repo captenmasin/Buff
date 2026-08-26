@@ -26,6 +26,53 @@ it('renders onboarding for an authenticated user', function (): void {
         );
 });
 
+it('recommends a personalized adult plan', function (): void {
+    $this->postJson('/onboarding/plan', [
+        'age' => 30,
+        'sex' => 'male',
+        'height_cm' => 178,
+        'activity_level' => 'moderate',
+        'current_weight_kg' => 80,
+        'goal' => 'lose',
+        'weekly_goal_kg' => 0.5,
+    ])->assertOk()
+        ->assertJsonPath('personalized', true)
+        ->assertJsonPath('teen_maintenance_only', false)
+        ->assertJsonPath('maintenance_calories', 2750)
+        ->assertJsonPath('calories', 2200)
+        ->assertJsonPath('protein_g', 165)
+        ->assertJsonPath('carbs_g', 220)
+        ->assertJsonPath('macro_calories', 2200);
+});
+
+it('keeps teen recommendations at maintenance', function (): void {
+    $this->postJson('/onboarding/plan', [
+        'age' => 16,
+        'sex' => 'female',
+        'height_cm' => 170,
+        'activity_level' => 'moderate',
+        'current_weight_kg' => 60,
+        'goal' => 'lose',
+    ])->assertOk()
+        ->assertJsonPath('personalized', true)
+        ->assertJsonPath('teen_maintenance_only', true)
+        ->assertJsonPath('maintenance_calories', 2550)
+        ->assertJsonPath('calories', 2550);
+});
+
+it('falls back to editable defaults when profile data is incomplete', function (): void {
+    $this->postJson('/onboarding/plan', [
+        'current_weight_kg' => 80,
+        'goal' => 'maintain',
+    ])->assertOk()
+        ->assertJsonPath('personalized', false)
+        ->assertJsonPath('maintenance_calories', null)
+        ->assertJsonPath('calories', 2000)
+        ->assertJsonPath('protein_g', 170)
+        ->assertJsonPath('carbs_g', 195)
+        ->assertJsonPath('fat_g', 60);
+});
+
 it('stores the initial profile and preferences', function (): void {
     $this->post('/onboarding', [
         'calories' => 2000,

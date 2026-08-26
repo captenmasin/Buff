@@ -2,11 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\ActivityLevel;
 use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use App\Services\EnergyEstimator;
 use App\Services\NutritionCalculator;
+use App\Sex;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,6 +21,13 @@ use Inertia\Response;
 
 class OnboardingController extends Controller
 {
+    private const DEFAULT_GOAL = [
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+    ];
+
     public function create(): Response|RedirectResponse
     {
         if (DailyGoal::query()->exists()) {
@@ -27,10 +38,7 @@ class OnboardingController extends Controller
 
         return Inertia::render('Onboarding', [
             'defaults' => [
-                'calories' => 2000,
-                'protein_g' => 170,
-                'carbs_g' => 195,
-                'fat_g' => 60,
+                ...self::DEFAULT_GOAL,
                 ...($profile?->toPayload() ?? [
                     'height_cm' => null,
                     'age' => null,
@@ -43,6 +51,53 @@ class OnboardingController extends Controller
                 'weight_unit' => 'kg',
                 'height_unit' => 'cm',
             ],
+        ]);
+    }
+
+    public function plan(Request $request, EnergyEstimator $estimator, NutritionCalculator $calculator): JsonResponse
+    {
+        $validated = $request->validate([
+            ...BodyProfile::rules(),
+            'current_weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
+            'goal' => ['required', Rule::in(['lose', 'maintain', 'gain'])],
+            'weekly_goal_kg' => [
+                Rule::requiredIf(fn (): bool => $request->integer('age') >= 18 && $request->string('goal')->toString() !== 'maintain'),
+                'nullable',
+                'numeric',
+                'min:0.05',
+                'max:1',
+            ],
+        ]);
+
+        $estimate = $estimator->dailyCalories(
+            $validated['current_weight_kg'],
+            $validated['height_cm'] ?? null,
+            $validated['age'] ?? null,
+            isset($validated['sex']) ? Sex::from($validated['sex']) : null,
+            isset($validated['activity_level']) ? ActivityLevel::from($validated['activity_level']) : null,
+            $validated['goal'],
+            $validated['weekly_goal_kg'] ?? null,
+        );
+
+        if ($estimate === null) {
+            return response()->json([
+                ...self::DEFAULT_GOAL,
+                'macro_calories' => self::DEFAULT_GOAL['calories'],
+                'maintenance_calories' => null,
+                'personalized' => false,
+                'teen_maintenance_only' => false,
+                'notice' => 'Complete age, sex, height, and activity for a personalized estimate, or start with these editable defaults.',
+            ]);
+        }
+
+        return response()->json([
+            ...$calculator->dailyGoalForCalories($estimate['calories']),
+            'maintenance_calories' => $estimate['maintenance_calories'],
+            'personalized' => true,
+            'teen_maintenance_only' => $estimate['teen_maintenance_only'],
+            'notice' => $estimate['teen_maintenance_only']
+                ? 'For ages 13–17, Buff recommends maintenance calories only. Ask a parent or guardian and a qualified health professional about weight-change goals.'
+                : 'This is a starting estimate. Track your progress and adjust it in Goals as needed.',
         ]);
     }
 

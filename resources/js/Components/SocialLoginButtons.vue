@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import Button from './ui/button/Button.vue';
 
-defineProps<{
+withDefaults(defineProps<{
     appleLoginAvailable: boolean;
-}>();
+    divided?: boolean;
+}>(), {
+    divided: true,
+});
 
 const emit = defineEmits<{
     signIn: [provider: 'google' | 'apple'];
@@ -11,7 +14,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div class="space-y-2 border-t pt-4">
+    <div class="space-y-2" :class="divided ? 'border-t pt-4' : ''">
         <Button
             type="button"
             variant="surface"

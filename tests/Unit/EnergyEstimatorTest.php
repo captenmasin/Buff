@@ -25,3 +25,31 @@ it('returns null until weight height age sex and activity are all set', function
         ->and($estimator->estimate(80, 178, 30, null, ActivityLevel::Moderate))->toBeNull()
         ->and($estimator->estimate(80, 178, 30, Sex::Male, null))->toBeNull();
 });
+
+it('recommends adult calories from maintenance and goal pace', function (): void {
+    $estimator = new EnergyEstimator;
+
+    expect($estimator->dailyCalories(80, 178, 30, Sex::Male, ActivityLevel::Moderate, 'lose', 0.5))->toBe([
+        'maintenance_calories' => 2750,
+        'calories' => 2200,
+        'teen_maintenance_only' => false,
+    ])->and($estimator->dailyCalories(80, 178, 30, Sex::Male, ActivityLevel::Moderate, 'gain', 0.25))->toBe([
+        'maintenance_calories' => 2750,
+        'calories' => 3000,
+        'teen_maintenance_only' => false,
+    ]);
+});
+
+it('uses adolescent energy requirements without a weight change adjustment', function (): void {
+    $estimator = new EnergyEstimator;
+
+    expect($estimator->dailyCalories(60, 170, 16, Sex::Male, ActivityLevel::Moderate, 'lose', 0.5))->toBe([
+        'maintenance_calories' => 3050,
+        'calories' => 3050,
+        'teen_maintenance_only' => true,
+    ])->and($estimator->dailyCalories(60, 170, 16, Sex::Female, ActivityLevel::Moderate, 'gain', 0.25))->toBe([
+        'maintenance_calories' => 2550,
+        'calories' => 2550,
+        'teen_maintenance_only' => true,
+    ]);
+});

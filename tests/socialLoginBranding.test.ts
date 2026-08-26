@@ -15,3 +15,13 @@ test('uses branded Google and Apple sign-in buttons everywhere', () => {
     assert.match(socialLoginSource, /Continue with Google/);
     assert.match(socialLoginSource, /Continue with Apple/);
 });
+
+test('falls back to browser navigation when native social auth is unavailable', () => {
+    assert.match(accountSource, /if \(await Browser\.auth\(url\)\)/);
+    assert.match(accountSource, /window\.location\.assign\(url\)/);
+});
+
+test('carries the preferred name through social registration', () => {
+    assert.match(accountSource, /query\.set\('flow', 'register'\)/);
+    assert.match(accountSource, /query\.set\('preferred_name', registerForm\.name\.trim\(\)\)/);
+});

@@ -2,7 +2,7 @@
     "namespace": "NativeRefresh",
     "platforms": ["android", "ios"],
     "hooks": {
-        "post_compile": "native-refresh:install"
+        "post_compile": "native-shell:install"
     },
     "android": {
         "min_version": 33

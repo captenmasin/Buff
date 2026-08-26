@@ -2,7 +2,7 @@
 
 namespace Buff\NativeRefresh;
 
-use Buff\NativeRefresh\Commands\InstallNativePullRefreshCommand;
+use Buff\NativeRefresh\Commands\InstallNativeShellIntegrationsCommand;
 use Illuminate\Support\ServiceProvider;
 
 class NativeRefreshServiceProvider extends ServiceProvider
@@ -11,7 +11,7 @@ class NativeRefreshServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             $this->commands([
-                InstallNativePullRefreshCommand::class,
+                InstallNativeShellIntegrationsCommand::class,
             ]);
         }
     }

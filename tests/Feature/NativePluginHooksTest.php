@@ -19,7 +19,7 @@ it('patches the NativePHP v4 Android shell', function (): void {
             '--app-id' => 'com.mason.buff',
         ])->assertSuccessful();
 
-        $this->artisan('native-refresh:install', [
+        $this->artisan('native-shell:install', [
             '--platform' => 'android',
             '--build-path' => $buildPath,
             '--plugin-path' => base_path('native-plugins/native-refresh'),
@@ -81,6 +81,7 @@ it('installs the iOS shell integrations', function (): void {
     $infoPlistPath = $buildPath.'/NativePHP/Info.plist';
     $simulatorInfoPlistPath = $buildPath.'/NativePHP-simulator-Info.plist';
     $xcodeProjectPath = $buildPath.'/NativePHP.xcodeproj/project.pbxproj';
+    $appIconPath = $buildPath.'/NativePHP/AppIcon.icon';
 
     $files->ensureDirectoryExists(dirname($appDelegatePath));
     $files->copy(
@@ -110,7 +111,7 @@ it('installs the iOS shell integrations', function (): void {
     );
 
     try {
-        $this->artisan('native-refresh:install', [
+        $this->artisan('native-shell:install', [
             '--platform' => 'ios',
             '--build-path' => $buildPath,
             '--plugin-path' => base_path('native-plugins/native-refresh'),
@@ -134,6 +135,15 @@ it('installs the iOS shell integrations', function (): void {
             ->toContain('<string>buff://add?mode=food&amp;scan=1</string>')
             ->and($files->get($simulatorInfoPlistPath))
             ->toContain('<key>UIApplicationShortcutItems</key>')
+            ->and($files->get($appIconPath.'/icon.json'))
+            ->toBe($files->get(public_path('icon.icon/icon.json')))
+            ->and($files->get($appIconPath.'/Assets/Vector.svg'))
+            ->toBe($files->get(public_path('icon.icon/Assets/Vector.svg')))
+            ->and(substr_count(
+                $files->get($xcodeProjectPath),
+                'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;',
+            ))
+            ->toBe(4)
             ->and(substr_count(
                 $files->get($xcodeProjectPath),
                 'CODE_SIGN_ENTITLEMENTS = NativePHP/NativePHP.entitlements;',

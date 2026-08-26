@@ -139,14 +139,17 @@ class AccountController extends Controller
 
     public function socialCallback(Request $request, LocalAccountData $localData): RedirectResponse
     {
+        $isRegistration = $request->string('flow')->toString() === 'register';
+        $failureRoute = $isRegistration ? 'account.register' : 'account.login';
+
         if ($error = $request->string('error')->toString()) {
-            return redirect()->route('account.login')->with('message', $error);
+            return redirect()->route($failureRoute)->with('message', $error);
         }
 
         $code = $request->string('code')->toString();
 
         if ($code === '') {
-            return redirect()->route('account.login')->with('message', 'Social sign-in could not be completed.');
+            return redirect()->route($failureRoute)->with('message', 'Social sign-in could not be completed.');
         }
 
         $result = $this->api->post('auth/social/redeem', [
@@ -157,10 +160,10 @@ class AccountController extends Controller
         try {
             $this->finishAuthentication($result, $localData);
         } catch (ValidationException) {
-            return redirect()->route('account.login')->with('message', 'Social sign-in could not be completed.');
+            return redirect()->route($failureRoute)->with('message', 'Social sign-in could not be completed.');
         }
 
-        return $this->accountRedirect();
+        return $isRegistration ? redirect('/onboarding') : $this->accountRedirect();
     }
 
     public function forgotPassword(Request $request): RedirectResponse

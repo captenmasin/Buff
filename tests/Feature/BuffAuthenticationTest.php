@@ -650,3 +650,35 @@ it('redeems a social sign-in code into local credentials', function (): void {
     expect(app(BuffCredentialStore::class)->token())->toBe('social-token');
     Http::assertSent(fn (ClientRequest $request): bool => str_ends_with($request->url(), '/auth/social/redeem'));
 });
+
+it('continues social registration into onboarding', function (): void {
+    Http::fake([
+        '*/auth/social/redeem' => Http::response([
+            'token' => 'social-token',
+            'user' => [
+                'id' => 1,
+                'name' => 'Mase',
+                'email' => 'mason@example.com',
+                'timezone' => 'Europe/London',
+                'email_verified' => true,
+            ],
+        ]),
+        '*/sync' => Http::response([
+            'acknowledged' => [],
+            'changes' => [],
+            'cursor' => 0,
+            'has_more' => false,
+        ]),
+    ]);
+
+    $this->get('/account/social/callback?flow=register&code='.str_repeat('a', 64))
+        ->assertRedirect('/onboarding');
+});
+
+it('returns failed social registration to the registration flow', function (): void {
+    $this->get('/account/social/callback?flow=register&error=Sign-in+was+cancelled.')
+        ->assertRedirect('/account/register')
+        ->assertSessionHas('message', 'Sign-in was cancelled.');
+
+    Http::assertNothingSent();
+});

@@ -42,6 +42,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::post('/account/verification/resend', [AccountController::class, 'resendVerification']);
     Route::post('/account/logout', [AccountController::class, 'logout']);
     Route::get('/onboarding', [OnboardingController::class, 'create']);
+    Route::post('/onboarding/plan', [OnboardingController::class, 'plan']);
     Route::post('/onboarding', [OnboardingController::class, 'store']);
 
     Route::get('/', DashboardController::class);

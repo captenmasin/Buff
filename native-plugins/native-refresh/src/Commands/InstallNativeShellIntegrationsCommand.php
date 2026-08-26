@@ -4,11 +4,11 @@ namespace Buff\NativeRefresh\Commands;
 
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
 
-class InstallNativePullRefreshCommand extends NativePluginHookCommand
+class InstallNativeShellIntegrationsCommand extends NativePluginHookCommand
 {
-    protected $signature = 'native-refresh:install';
+    protected $signature = 'native-shell:install';
 
-    protected $description = 'Install native pull-to-refresh into the generated NativePHP WebView shell.';
+    protected $description = 'Install Buff integrations into the generated NativePHP shell.';
 
     public function handle(): int
     {
@@ -20,6 +20,7 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         }
 
         if ($this->isIos()) {
+            $this->installIosIcon();
             $this->installIosRefresh();
             $this->installIosRootPathNormalization();
             $this->installIosShortcuts();
@@ -27,6 +28,20 @@ class InstallNativePullRefreshCommand extends NativePluginHookCommand
         }
 
         return self::SUCCESS;
+    }
+
+    private function installIosIcon(): void
+    {
+        $source = public_path('icon.icon');
+
+        if (! is_dir($source)) {
+            return;
+        }
+
+        $destination = $this->buildPath().'/NativePHP/AppIcon.icon';
+
+        $this->delete($destination);
+        $this->copyDirectory($source, $destination);
     }
 
     private function installIosRefresh(): void

@@ -18,6 +18,18 @@ it('matches rounded odd-calorie macro totals', function (): void {
     expect($calculator->goalMatchesCalories(1999, 174.91, 224.89, 44.42))->toBeTrue();
 });
 
+it('builds a balanced macro target from calories', function (): void {
+    $calculator = new NutritionCalculator;
+
+    expect($calculator->dailyGoalForCalories(2200))->toBe([
+        'calories' => 2200,
+        'protein_g' => 165.0,
+        'carbs_g' => 220.0,
+        'fat_g' => 73.33,
+        'macro_calories' => 2200,
+    ]);
+});
+
 it('calculates product portions from per 100 values', function (): void {
     $calculator = new NutritionCalculator;
     $product = new FoodProduct([
