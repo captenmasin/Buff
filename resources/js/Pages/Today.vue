@@ -173,6 +173,7 @@ const hasGoal = computed(() => Boolean(props.summary.goal));
 const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
+const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
 const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
@@ -636,7 +637,7 @@ onBeforeUnmount(() => {
             <Link href="/goals" class="font-semibold underline">Set goals</Link>
         </div>
 
-        <Card v-if="hasGoal && isEmptyDay">
+        <Card v-if="hasGoal && isEmptyDay && isToday">
             <div class="flex items-start gap-3">
                 <div class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-primary text-primary-foreground">
                     <Plus :size="20" />
