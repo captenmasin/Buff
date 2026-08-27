@@ -302,7 +302,7 @@ onUnmounted(() => {
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[0].match) ? 'bg-primary' : ''"
+                    :class="isActive(navItems[0].match) ? 'bg-primary dark:text-primary-foreground' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
@@ -314,7 +314,7 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[1].match) ? 'bg-primary' : ''"
+                    :class="isActive(navItems[1].match) ? 'bg-primary dark:text-primary-foreground' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
@@ -336,7 +336,7 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[2].match) ? 'bg-primary' : ''"
+                    :class="isActive(navItems[2].match) ? 'bg-primary dark:text-primary-foreground' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
@@ -348,7 +348,7 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[3].match) ? 'bg-primary' : ''"
+                    :class="isActive(navItems[3].match) ? 'bg-primary dark:text-primary-foreground' : ''"
                     class="flex rounded-xl font-normal"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
