@@ -307,7 +307,7 @@ async function signInWith(provider: SocialProvider) {
                     <template v-if="registerStep === 'name'">
                         <header>
                             <h1 class="text-3xl font-bold tracking-tight">First, what can we call you?</h1>
-                            <p class="mt-2 text-lg font-medium text-muted-foreground">We’d like to get to know you. 🙂</p>
+                            <p class="mt-2 text-lg font-medium text-muted-foreground">We’d like to get to know you</p>
                         </header>
                         <label class="block">
                             <span class="field-label">Preferred first name</span>
