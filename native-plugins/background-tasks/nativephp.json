@@ -1,6 +1,6 @@
 {
     "namespace": "BackgroundTasks",
-    "platforms": ["android"],
+    "platforms": ["android", "ios"],
     "bridge_functions": [
         {
             "name": "BackgroundTasks.Register",
@@ -12,7 +12,15 @@
             "name": "BackgroundTasks.RegisterMealReminders",
             "android": "com.buff.backgroundtasks.BackgroundTaskFunctions.RegisterMealReminders",
             "android_params": ["activity"],
-            "description": "Register daily meal reminder notifications with Android WorkManager."
+            "ios": "BackgroundTaskFunctions.RegisterMealReminders",
+            "description": "Register daily meal reminder notifications."
+        },
+        {
+            "name": "BackgroundTasks.SendNotification",
+            "android": "com.buff.backgroundtasks.BackgroundTaskFunctions.SendNotification",
+            "android_params": ["activity"],
+            "ios": "BackgroundTaskFunctions.SendNotification",
+            "description": "Send an immediate local device notification."
         }
     ],
     "android": {
@@ -27,6 +35,12 @@
         }
     },
     "ios": {
-        "min_version": "18.0"
+        "min_version": "18.0",
+        "init_function": "BackgroundTasksNotifications.start"
+    },
+    "assets": {
+        "android": {
+            "android/res/drawable/buff_notification.xml": "res/drawable/buff_notification.xml"
+        }
     }
 }

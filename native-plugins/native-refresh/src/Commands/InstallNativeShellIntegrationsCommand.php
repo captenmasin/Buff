@@ -410,7 +410,7 @@ KOTLIN,
     <shortcut
         android:shortcutId="add"
         android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/shortcut_add"
         android:shortcutShortLabel="@string/shortcut_add_short"
         android:shortcutLongLabel="@string/shortcut_add_long">
         <intent
@@ -420,7 +420,7 @@ KOTLIN,
     <shortcut
         android:shortcutId="scan"
         android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/shortcut_scan"
         android:shortcutShortLabel="@string/shortcut_scan_short"
         android:shortcutLongLabel="@string/shortcut_scan_long">
         <intent
@@ -430,7 +430,7 @@ KOTLIN,
     <shortcut
         android:shortcutId="workout"
         android:enabled="true"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@mipmap/shortcut_workout"
         android:shortcutShortLabel="@string/shortcut_workout_short"
         android:shortcutLongLabel="@string/shortcut_workout_long">
         <intent

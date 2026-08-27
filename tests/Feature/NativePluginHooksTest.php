@@ -60,7 +60,10 @@ it('patches the NativePHP v4 Android shell', function (): void {
             ->toContain('android.app.shortcuts')
             ->and($files->get($buildPath.'/app/src/main/res/xml/shortcuts.xml'))
             ->toContain('buff://add')
-            ->toContain('buff://add?mode=food&amp;scan=1');
+            ->toContain('buff://add?mode=food&amp;scan=1')
+            ->toContain('@mipmap/shortcut_add')
+            ->toContain('@mipmap/shortcut_scan')
+            ->toContain('@mipmap/shortcut_workout');
     } finally {
         $files->deleteDirectory($buildPath);
     }

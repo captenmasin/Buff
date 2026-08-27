@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background>
+        <shape android:shape="rectangle">
+            <solid android:color="#FFB6FF51" />
+        </shape>
+    </background>
+    <foreground>
+        <vector
+            android:width="108dp"
+            android:height="108dp"
+            android:viewportWidth="108"
+            android:viewportHeight="108">
+            <group
+                android:pivotX="54"
+                android:pivotY="54"
+                android:scaleX="0.8"
+                android:scaleY="0.8">
+                <path
+                    android:fillColor="#00000000"
+                    android:pathData="M27,44V64M36,35V73M27,54H36M36,54H72M72,35V73M72,54H81M81,44V64"
+                    android:strokeColor="#FF0F1125"
+                    android:strokeLineCap="round"
+                    android:strokeWidth="7" />
+            </group>
+        </vector>
+    </foreground>
+</adaptive-icon>

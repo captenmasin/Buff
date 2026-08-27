@@ -5,9 +5,9 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('meal-reminder:check {meal} {date}', function (): int {
-    $meal = (string) $this->argument('meal');
-    $date = (string) $this->argument('date');
+Artisan::command('meal-reminder:check {--meal=} {--date=}', function (): int {
+    $meal = (string) $this->option('meal');
+    $date = (string) $this->option('date');
 
     if (! in_array($meal, ['breakfast', 'lunch', 'dinner'], true) || preg_match('/\A\d{4}-\d{2}-\d{2}\z/', $date) !== 1) {
         $this->error('Invalid meal reminder.');

@@ -142,7 +142,7 @@ class SettingsController extends Controller
 
         AppPreference::current()->update($validated);
 
-        return back();
+        return back()->with('message', 'Units saved.');
     }
 
     public function updateEatBack(Request $request): RedirectResponse
@@ -153,7 +153,7 @@ class SettingsController extends Controller
 
         AppPreference::current()->update($validated);
 
-        return back();
+        return back()->with('message', 'Exercise calorie setting saved.');
     }
 
     public function updateBodyProfile(Request $request): RedirectResponse
@@ -182,12 +182,12 @@ class SettingsController extends Controller
 
         $message = match ($result['status']) {
             'permission_requested' => 'Meal reminders saved. Allow notifications when prompted.',
-            'notifications_disabled' => 'Meal reminders saved, but Android notifications are off.',
+            'notifications_disabled' => 'Meal reminders saved, but notifications are off.',
             'error' => 'Meal reminder settings were not saved because reminders could not be scheduled.',
-            default => null,
+            default => 'Meal reminders saved.',
         };
 
-        return $message ? back()->with('message', $message) : back();
+        return back()->with('message', $message);
     }
 
     /**

@@ -9,5 +9,12 @@
     },
     "ios": {
         "min_version": "18.0"
+    },
+    "assets": {
+        "android": {
+            "android/res/mipmap-anydpi-v26/shortcut_add.xml": "res/mipmap-anydpi-v26/shortcut_add.xml",
+            "android/res/mipmap-anydpi-v26/shortcut_scan.xml": "res/mipmap-anydpi-v26/shortcut_scan.xml",
+            "android/res/mipmap-anydpi-v26/shortcut_workout.xml": "res/mipmap-anydpi-v26/shortcut_workout.xml"
+        }
     }
 }

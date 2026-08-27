@@ -22,6 +22,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import com.nativephp.mobile.R
 import com.nativephp.mobile.bridge.BridgeError
 import com.nativephp.mobile.bridge.BridgeFunction
 import com.nativephp.mobile.bridge.BridgeResponse
@@ -34,6 +35,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Duration
 import java.time.ZonedDateTime
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 private const val PREFERENCES_NAME = "buff-background-tasks"
@@ -51,6 +53,7 @@ private const val MEAL_ID_KEY = "meal-id"
 private const val MEAL_TIME_KEY = "meal-time"
 private const val MEAL_WORK_NAME_PREFIX = "buff-meal-reminder-"
 private const val MEAL_NOTIFICATION_CHANNEL_ID = "meal-reminders"
+private const val DEVICE_NOTIFICATION_CHANNEL_ID = "notifications"
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 private const val NOTIFICATION_PERMISSION_REQUESTED_KEY = "notification-permission-requested"
 private const val MEAL_REMINDER_MAX_RETRIES = 3
@@ -174,7 +177,7 @@ object BackgroundTaskFunctions {
                     "permission_requested"
                 }
                 !hasPermission -> "notifications_disabled"
-                !mealNotificationsEnabled(context) -> "notifications_disabled"
+                !notificationsEnabled(context, MEAL_NOTIFICATION_CHANNEL_ID) -> "notifications_disabled"
                 else -> "scheduled"
             }
 
@@ -206,6 +209,78 @@ object BackgroundTaskFunctions {
             }
         }
     }
+
+    class SendNotification(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val notification = parseNotification(parameters)
+            val context = activity.applicationContext
+            val preferences = context.getSharedPreferences(MEAL_PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+            createDeviceNotificationChannel(context)
+
+            val hasPermission = ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.POST_NOTIFICATIONS
+            ) == PackageManager.PERMISSION_GRANTED
+            val permissionAlreadyRequested = preferences.getBoolean(
+                NOTIFICATION_PERMISSION_REQUESTED_KEY,
+                false
+            )
+            val status = when {
+                !hasPermission && !permissionAlreadyRequested -> {
+                    preferences.edit()
+                        .putBoolean(NOTIFICATION_PERMISSION_REQUESTED_KEY, true)
+                        .apply()
+                    activity.runOnUiThread {
+                        ActivityCompat.requestPermissions(
+                            activity,
+                            arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                            NOTIFICATION_PERMISSION_REQUEST_CODE
+                        )
+                    }
+                    "permission_requested"
+                }
+                !hasPermission -> "notifications_disabled"
+                !notificationsEnabled(context, DEVICE_NOTIFICATION_CHANNEL_ID) -> "notifications_disabled"
+                else -> {
+                    showDeviceNotification(context, notification)
+                    "sent"
+                }
+            }
+
+            return BridgeResponse.success(mapOf("status" to status))
+        }
+
+        private fun parseNotification(parameters: Map<String, Any>): DeviceNotification {
+            if (parameters.keys.any { it !in setOf("title", "body", "url") }) {
+                throw BridgeError.InvalidParameters("only title, body, and url are supported")
+            }
+
+            val title = parameters["title"] as? String
+                ?: throw BridgeError.InvalidParameters("title must be a string")
+            val body = parameters["body"] as? String
+                ?: throw BridgeError.InvalidParameters("body must be a string")
+            val url = parameters["url"]?.let { value ->
+                if (value !is String) {
+                    throw BridgeError.InvalidParameters("url must be a string")
+                }
+
+                value
+            }
+
+            if (title.isBlank() || title.length > 120) {
+                throw BridgeError.InvalidParameters("title must be between 1 and 120 characters")
+            }
+            if (body.isBlank() || body.length > 500) {
+                throw BridgeError.InvalidParameters("body must be between 1 and 500 characters")
+            }
+            if (url != null && (url.length > 2048 || !url.startsWith('/') || url.startsWith("//"))) {
+                throw BridgeError.InvalidParameters("url must be an internal path")
+            }
+
+            return DeviceNotification(title, body, url)
+        }
+    }
 }
 
 private data class RegisteredTask(
@@ -217,6 +292,12 @@ private data class MealReminder(
     val id: String,
     val enabled: Boolean,
     val time: String
+)
+
+private data class DeviceNotification(
+    val title: String,
+    val body: String,
+    val url: String?
 )
 
 class ScheduledTaskWorker(
@@ -327,14 +408,17 @@ class MealReminderWorker(
         val canNotify = ContextCompat.checkSelfPermission(
             applicationContext,
             Manifest.permission.POST_NOTIFICATIONS
-        ) == PackageManager.PERMISSION_GRANTED && mealNotificationsEnabled(applicationContext)
+        ) == PackageManager.PERMISSION_GRANTED && notificationsEnabled(
+            applicationContext,
+            MEAL_NOTIFICATION_CHANNEL_ID
+        )
 
         if (canNotify) {
             try {
                 val localDate = ZonedDateTime.now().toLocalDate()
                 val output = runBackgroundArtisan(
                     applicationContext,
-                    "meal-reminder:check $mealId $localDate"
+                    "meal-reminder:check --meal=$mealId --date=$localDate"
                 )
 
                 when {
@@ -434,15 +518,51 @@ private fun createMealReminderChannel(context: Context) {
     context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
 }
 
-private fun mealNotificationsEnabled(context: Context): Boolean {
+private fun createDeviceNotificationChannel(context: Context) {
+    val channel = NotificationChannel(
+        DEVICE_NOTIFICATION_CHANNEL_ID,
+        "Buff notifications",
+        NotificationManager.IMPORTANCE_DEFAULT
+    )
+
+    context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+}
+
+private fun notificationsEnabled(context: Context, channelId: String): Boolean {
     if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) {
         return false
     }
 
     val channel = context.getSystemService(NotificationManager::class.java)
-        .getNotificationChannel(MEAL_NOTIFICATION_CHANNEL_ID)
+        .getNotificationChannel(channelId)
 
     return channel == null || channel.importance != NotificationManager.IMPORTANCE_NONE
+}
+
+@SuppressLint("MissingPermission")
+private fun showDeviceNotification(context: Context, deviceNotification: DeviceNotification) {
+    val notificationId = UUID.randomUUID().hashCode()
+    val notification = NotificationCompat.Builder(context, DEVICE_NOTIFICATION_CHANNEL_ID)
+        .setSmallIcon(R.drawable.buff_notification)
+        .setContentTitle(deviceNotification.title)
+        .setContentText(deviceNotification.body)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(deviceNotification.body))
+        .setAutoCancel(true)
+        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+
+    context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { launchIntent ->
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        deviceNotification.url?.let { launchIntent.putExtra("notification_url", it) }
+
+        notification.setContentIntent(PendingIntent.getActivity(
+            context,
+            notificationId,
+            launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        ))
+    }
+
+    NotificationManagerCompat.from(context).notify(notificationId, notification.build())
 }
 
 @SuppressLint("MissingPermission")
@@ -451,7 +571,7 @@ private fun showMealReminder(context: Context, mealId: String) {
 
     val label = mealId.replaceFirstChar { it.titlecase() }
     val notification = NotificationCompat.Builder(context, MEAL_NOTIFICATION_CHANNEL_ID)
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setSmallIcon(R.drawable.buff_notification)
         .setContentTitle("$label reminder")
         .setContentText("Time to log your $mealId in Buff.")
         .setCategory(NotificationCompat.CATEGORY_REMINDER)

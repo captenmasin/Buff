@@ -130,7 +130,8 @@ it('updates unit preferences from settings', function (): void {
         'weight_unit' => 'lb',
         'height_unit' => 'in',
         'measurement_unit' => 'in',
-    ])->assertRedirect();
+    ])->assertRedirect()
+        ->assertSessionHas('message', 'Units saved.');
 
     $this->assertDatabaseHas('app_preferences', [
         'weight_unit' => 'lb',
@@ -154,7 +155,8 @@ it('updates eat-back preference from settings', function (): void {
 
     $this->put('/settings/eat-back', [
         'eat_back' => 'half',
-    ])->assertRedirect();
+    ])->assertRedirect()
+        ->assertSessionHas('message', 'Exercise calorie setting saved.');
 
     $this->assertDatabaseHas('app_preferences', [
         'eat_back' => 'half',
@@ -269,7 +271,8 @@ it('updates and schedules meal reminders', function (): void {
     ];
 
     $this->put('/settings/meal-reminders', $reminders)
-        ->assertRedirect();
+        ->assertRedirect()
+        ->assertSessionHas('message', 'Meal reminders saved.');
 
     expect(AppPreference::current()->fresh()->mealReminders())->toBe($reminders)
         ->and($calls)->toBe([[
@@ -337,7 +340,7 @@ it('only marks a meal reminder due when that meal is not logged', function (): v
         'fat_g' => 5,
     ]);
 
-    $this->artisan('meal-reminder:check', ['meal' => 'breakfast', 'date' => $date->toDateString()])
+    $this->artisan('meal-reminder:check', ['--meal' => 'breakfast', '--date' => $date->toDateString()])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_DUE:breakfast')
         ->assertSuccessful();
 
@@ -352,11 +355,11 @@ it('only marks a meal reminder due when that meal is not logged', function (): v
         'fat_g' => 5,
     ]);
 
-    $this->artisan('meal-reminder:check', ['meal' => 'breakfast', 'date' => $date->toDateString()])
+    $this->artisan('meal-reminder:check', ['--meal' => 'breakfast', '--date' => $date->toDateString()])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_LOGGED:breakfast')
         ->assertSuccessful();
 
-    $this->artisan('meal-reminder:check', ['meal' => 'lunch', 'date' => $date->toDateString()])
+    $this->artisan('meal-reminder:check', ['--meal' => 'lunch', '--date' => $date->toDateString()])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_DUE:lunch')
         ->assertSuccessful();
 });

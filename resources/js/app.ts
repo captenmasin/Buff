@@ -18,6 +18,7 @@ watchSystemReducedMotion();
 
 createInertiaApp({
     dev: import.meta.env.DEV,
+    progress: { color: 'var(--brand-violet)' },
     title: (title) => (title ? `${title} - Buff` : 'Buff'),
     // @ts-ignore
     resolve: async (name) => {
