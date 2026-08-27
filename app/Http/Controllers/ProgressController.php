@@ -93,6 +93,12 @@ class ProgressController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        if (! $request->filled('weight_kg')) {
+            $request->merge([
+                'weight_kg' => BodyMetric::query()->latest('date')->value('weight_kg'),
+            ]);
+        }
+
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],

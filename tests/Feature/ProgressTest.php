@@ -52,6 +52,28 @@ it('creates and updates a body metric for a date', function (): void {
         ->and($outbox->payload['waist_cm'])->toBe('84.20');
 });
 
+it('uses the most recent weight when the weight field is empty', function (): void {
+    BodyMetric::query()->create([
+        'date' => '2026-05-18',
+        'weight_kg' => 82.4,
+    ]);
+
+    BodyMetric::query()->create([
+        'date' => '2026-05-20',
+        'weight_kg' => 81.6,
+    ]);
+
+    $this->post('/progress/body-metrics', [
+        'date' => '2026-05-21',
+        'weight_kg' => '',
+    ])->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('body_metrics', [
+        'date' => '2026-05-21 00:00:00',
+        'weight_kg' => 81.6,
+    ]);
+});
+
 it('enforces one body metric per date at the database boundary', function (): void {
     BodyMetric::query()->create([
         'date' => '2026-05-19',
