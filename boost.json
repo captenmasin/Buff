@@ -7,14 +7,18 @@
     "mcp": true,
     "nightwatch": false,
     "packages": [
-        "nativephp/mobile"
+        "nativephp/mobile",
+        "nativephp/mobile-browser"
     ],
     "sail": false,
     "skills": [
+        "infer-conventions",
         "laravel-best-practices",
-        "pest-testing",
+        "testing-best-practices",
         "inertia-vue-development",
         "tailwindcss-development",
-        "nativephp-mobile"
+        "nativephp-mobile",
+        "nativephp-v3-to-v4-upgrade",
+        "nativephp-webview-to-native"
     ]
 }

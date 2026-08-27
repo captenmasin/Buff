@@ -274,7 +274,7 @@ class AccountController extends Controller
         $this->credentials->clear();
         $localData->wipe();
 
-        return redirect()->route('account.login')->with('message', 'Signed out and removed local health data.');
+        return redirect()->route('account.login')->with('message', 'Signed out');
     }
 
     public function destroyLocalData(LocalAccountData $localData): RedirectResponse
