@@ -378,6 +378,24 @@ textarea {
         padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
     }
 
+    .bottom-drawer {
+        inset: 1rem 0 1rem 16rem;
+        width: calc(100% - 18rem);
+        height: fit-content;
+        max-height: calc(100dvh - 2rem);
+        margin: auto;
+        translate: none;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-xl);
+        padding-bottom: 1rem;
+        transition-duration: 200ms;
+        transition-timing-function: var(--ease-out);
+    }
+
+    .bottom-drawer[data-state='closed'] {
+        transform: scale(0.95);
+    }
+
     @supports (padding-top: max(0px)) {
         .app-main {
             padding-top: calc(max(env(safe-area-inset-top, 0px), 1.25rem) + 0.5rem);
