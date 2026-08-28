@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {Head, Link, router, useForm} from '@inertiajs/vue3';
 import axios from 'axios';
-import {computed, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import type {DateValue} from '@internationalized/date';
 import {parseDate} from '@internationalized/date';
 import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
@@ -175,6 +175,7 @@ const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));
+const openAddDrawer = inject<() => void>('openAddDrawer')!;
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
 const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
@@ -665,7 +666,7 @@ onBeforeUnmount(() => {
                 </div>
             </div>
             <div class="mt-4 grid grid-cols-2 gap-2">
-                <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" variant="default">Add food</Button>
+                <Button variant="default" @click="openAddDrawer()">Add food</Button>
                 <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" variant="outline">Add workout</Button>
             </div>
         </Card>

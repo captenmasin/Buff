@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, provide, ref } from 'vue';
 import { Home, Plus, Scale, Settings, Target, X } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import AddChooser from '../Components/Add/AddChooser.vue';
@@ -57,6 +57,8 @@ function openAddDrawer(pushHistory = true) {
 
     addDrawerOpen.value = true;
 }
+
+provide<() => void>('openAddDrawer', openAddDrawer);
 
 function closeDrawerImmediately() {
     addDrawerOpen.value = false;

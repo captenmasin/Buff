@@ -30,11 +30,14 @@ test('renders meal choices without a nested card', () => {
     assert.match(mealTypePickerSource, /modelValue === mealType \? 'default' : 'surface'/);
 });
 
-test('renders macro presets as one compact color-coded selector', () => {
-    assert.match(dailyTargetsEditorSource, /grid grid-cols-2 overflow-hidden rounded-xl border border-border/);
-    assert.match(dailyTargetsEditorSource, /text-protein">P \{\{ preset\.protein \}\}/);
+test('renders macro presets as proportional comparison rows', () => {
+    assert.match(dailyTargetsEditorSource, /class="space-y-2" role="radiogroup" aria-label="Macro split"/);
+    assert.match(dailyTargetsEditorSource, /text-protein">Protein \{\{ preset\.protein \}\}%/);
     assert.match(dailyTargetsEditorSource, /preset\.protein\}% protein/);
-    assert.doesNotMatch(dailyTargetsEditorSource, /width: `\$\{preset\.(protein|carbs|fat)\}%`/);
+    assert.match(dailyTargetsEditorSource, /width: `\$\{preset\.protein\}%`/);
+    assert.match(dailyTargetsEditorSource, /width: `\$\{preset\.carbs\}%`/);
+    assert.match(dailyTargetsEditorSource, /width: `\$\{preset\.fat\}%`/);
+    assert.doesNotMatch(dailyTargetsEditorSource, /grid grid-cols-2 overflow-hidden/);
 });
 
 test('closes the workout editor from the successful Inertia callback', () => {

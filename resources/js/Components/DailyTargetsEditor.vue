@@ -209,18 +209,14 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                 <p class="mt-1 text-sm text-muted-foreground">How calories divide across protein, carbs, and fat.</p>
             </div>
 
-            <div class="grid grid-cols-2 overflow-hidden rounded-xl border border-border" role="radiogroup" aria-label="Macro split">
+            <div class="space-y-2" role="radiogroup" aria-label="Macro split">
                 <button
                     v-for="(preset, index) in macroPresets"
                     :key="index"
                     type="button"
                     role="radio"
-                    class="min-h-16 px-3 py-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
-                    :class="[
-                        index % 2 === 0 ? 'border-r border-border' : '',
-                        index < 2 ? 'border-b border-border' : '',
-                        activePreset === index ? 'bg-primary/20' : 'bg-card hover:bg-muted/60',
-                    ]"
+                    class="w-full rounded-xl border px-3 py-3 text-left transition-[color,background-color,border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none disabled:opacity-40"
+                    :class="activePreset === index ? 'border-ring bg-primary/20 shadow-sm ring-1 ring-ring' : 'border-border bg-card hover:bg-muted/60'"
                     :aria-checked="activePreset === index"
                     :aria-label="`${presetLabels[index]}, ${preset.protein}% protein, ${preset.carbs}% carbs, ${preset.fat}% fat`"
                     :disabled="!splitWithinGramBounds(Number(calories), preset)"
@@ -235,17 +231,22 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                             class="shrink-0 rounded-full bg-primary p-0.5"
                         />
                     </span>
-                    <span class="mt-1.5 flex items-center gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
-                        <span class="text-protein">P {{ preset.protein }}</span>
-                        <span class="text-carbs">C {{ preset.carbs }}</span>
-                        <span class="text-fat">F {{ preset.fat }}</span>
+                    <span class="mt-2 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                        <span class="h-full bg-protein" :style="{ width: `${preset.protein}%` }" />
+                        <span class="h-full bg-carbs" :style="{ width: `${preset.carbs}%` }" />
+                        <span class="h-full bg-fat" :style="{ width: `${preset.fat}%` }" />
+                    </span>
+                    <span class="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums" aria-hidden="true">
+                        <span class="text-protein">Protein {{ preset.protein }}%</span>
+                        <span class="text-carbs">Carbs {{ preset.carbs }}%</span>
+                        <span class="text-fat">Fat {{ preset.fat }}%</span>
                     </span>
                 </button>
                 <button
                     type="button"
                     role="radio"
-                    class="min-h-16 px-3 py-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    :class="activePreset === null ? 'bg-primary/20' : 'bg-card hover:bg-muted/60'"
+                    class="w-full rounded-xl border px-3 py-3 text-left transition-[color,background-color,border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
+                    :class="activePreset === null ? 'border-ring bg-primary/20 shadow-sm ring-1 ring-ring' : 'border-border bg-card hover:bg-muted/60'"
                     :aria-checked="activePreset === null"
                     :aria-label="`Custom, ${customSplit.protein}% protein, ${customSplit.carbs}% carbs, ${customSplit.fat}% fat`"
                     @click="selectCustom"
@@ -259,10 +260,15 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                             class="shrink-0 rounded-full bg-primary p-0.5"
                         />
                     </span>
-                    <span class="mt-1.5 flex items-center gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
-                        <span class="text-protein">P {{ customSplit.protein }}</span>
-                        <span class="text-carbs">C {{ customSplit.carbs }}</span>
-                        <span class="text-fat">F {{ customSplit.fat }}</span>
+                    <span class="mt-2 flex h-2 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+                        <span class="h-full bg-protein" :style="{ width: `${customSplit.protein}%` }" />
+                        <span class="h-full bg-carbs" :style="{ width: `${customSplit.carbs}%` }" />
+                        <span class="h-full bg-fat" :style="{ width: `${customSplit.fat}%` }" />
+                    </span>
+                    <span class="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums" aria-hidden="true">
+                        <span class="text-protein">Protein {{ customSplit.protein }}%</span>
+                        <span class="text-carbs">Carbs {{ customSplit.carbs }}%</span>
+                        <span class="text-fat">Fat {{ customSplit.fat }}%</span>
                     </span>
                 </button>
             </div>

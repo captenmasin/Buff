@@ -21,3 +21,14 @@ it('shows the start today card only for the selected current day', function (): 
         ->toContain('const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));')
         ->toContain('<Card v-if="hasGoal && isEmptyDay && isToday">');
 });
+
+it('opens the add sheet from the start today food action', function (): void {
+    $appShell = file_get_contents(__DIR__.'/../../resources/js/Layouts/AppShell.vue');
+    $todayPage = file_get_contents(__DIR__.'/../../resources/js/Pages/Today.vue');
+
+    expect($appShell)->toContain("provide<() => void>('openAddDrawer', openAddDrawer);");
+    expect($todayPage)
+        ->toContain("const openAddDrawer = inject<() => void>('openAddDrawer')!;")
+        ->toContain('<Button variant="default" @click="openAddDrawer()">Add food</Button>')
+        ->not->toContain('<Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" variant="default">Add food</Button>');
+});
