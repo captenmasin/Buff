@@ -976,13 +976,21 @@ onUnmounted(() => {
         <Card v-if="mode === 'photo' && !analysisContext">
             <div class="flex items-center gap-2">
                 <Camera :size="21" class="text-food" />
-                <h2 class="card-title">Analyze meal photos</h2>
+                <h2 class="card-title font-heading text-2xl">Analyze meal photos</h2>
             </div>
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
             <div v-if="selectedPhotos.length || photoProcessing" class="mt-4 grid grid-cols-3 gap-2">
-                <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                <div
+                    v-for="(photo, index) in selectedPhotos"
+                    :key="photo.preview"
+                    class="relative overflow-hidden rounded-2xl border border-link/50 bg-muted"
+                    :class="selectedPhotos.length === 1 ? 'col-span-3 mx-auto aspect-[302/270] w-full max-w-sm' : 'aspect-square'"
+                >
                     <img :src="photo.preview" alt="Selected meal" class="h-full w-full object-cover">
+                    <span v-if="index === 0" class="absolute left-2.5 top-2.5 rounded-full bg-brand-night px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-acid">
+                        {{ selectedPhotos.length }} of 3 · ready
+                    </span>
                     <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removePhoto(index)">
                         <X :size="16" />
                     </Button>
@@ -1029,17 +1037,35 @@ onUnmounted(() => {
                 {{ photoAnalysisError }}
             </p>
 
-            <Button type="button" class="mt-4 w-full" :disabled="photoProcessing || photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
-                <LoaderCircle v-if="photoAnalysisLoading" :size="18" class="animate-spin" />
+            <Button type="button" class="mt-4 h-14 w-full rounded-xl" :disabled="photoProcessing || photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
+                <LoaderCircle v-if="photoAnalysisLoading" :size="18" class="motion-safe:animate-spin" />
                 {{ photoAnalysisLoading ? 'Analyzing meal…' : 'Analyze meal' }}
             </Button>
+
         </Card>
 
-        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 grid place-items-center bg-background/85 px-6 backdrop-blur" role="status" aria-live="polite">
-            <div class="text-center">
-                <LoaderCircle :size="36" class="mx-auto animate-spin text-link" />
-                <p class="mt-3 font-semibold">Analyzing your meal…</p>
-                <p class="mt-1 text-sm text-muted-foreground">Keep Buff open while the estimate is prepared.</p>
+        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Buff Vision is analyzing your meal">
+            <div class="mx-auto w-full max-w-sm">
+                <h2 class="font-heading text-3xl font-semibold leading-tight">See what Buff sees.</h2>
+                <p class="mt-1 text-sm text-muted-foreground">Your meal is becoming an editable macro estimate.</p>
+
+                <div class="mt-5 rounded-3xl bg-linear-to-br from-brand-night to-[#3e347f] p-5 text-brand-white shadow-[0_18px_36px_-4px_rgb(115_97_255_/_0.28)]">
+                    <p class="vision-status text-[11px] font-semibold uppercase tracking-wide">Buff Vision · analyzing</p>
+
+                    <div class="relative mt-4 aspect-[302/270] overflow-hidden rounded-2xl border border-brand-acid/70 bg-brand-night">
+                        <img v-if="selectedPhotos[0]" :src="selectedPhotos[0].preview" alt="" class="h-full w-full object-cover">
+                        <div class="vision-grid absolute inset-0" aria-hidden="true" />
+                        <div class="vision-scan-line absolute inset-x-0" aria-hidden="true" />
+                    </div>
+
+                    <p class="mt-4 text-base font-semibold">Reading ingredients and portions…</p>
+                    <p class="mt-2 text-xs leading-relaxed text-brand-white/65">Estimating the plate, then building an editable macro draft.</p>
+                    <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-brand-white/15" aria-hidden="true">
+                        <div class="vision-progress h-full rounded-full bg-brand-acid" />
+                    </div>
+                </div>
+
+                <p class="mt-4 text-xs font-medium text-muted-foreground">Nothing is logged until you review and save.</p>
             </div>
         </div>
 
@@ -1397,3 +1423,67 @@ onUnmounted(() => {
         </Card>
     </section>
 </template>
+
+<style scoped>
+.vision-status {
+    color: transparent;
+    background: linear-gradient(100deg, var(--brand-acid) 30%, var(--brand-white) 48%, var(--brand-acid) 66%);
+    background-size: 220% 100%;
+    background-clip: text;
+    animation: vision-sheen 2.4s linear infinite;
+}
+
+.vision-grid {
+    background-image:
+        linear-gradient(rgb(182 255 81 / 0.09) 1px, transparent 1px),
+        linear-gradient(90deg, rgb(182 255 81 / 0.09) 1px, transparent 1px);
+    background-size: 32px 32px;
+}
+
+.vision-scan-line {
+    top: 0;
+    height: 2px;
+    background: var(--brand-acid);
+    box-shadow: 0 0 16px 3px rgb(182 255 81 / 0.65);
+    animation: vision-scan 2.4s var(--ease-in-out) infinite alternate;
+}
+
+.vision-progress {
+    width: 42%;
+    animation: vision-progress 2.4s var(--ease-in-out) infinite alternate;
+}
+
+@keyframes vision-sheen {
+    to {
+        background-position: -220% 0;
+    }
+}
+
+@keyframes vision-scan {
+    to {
+        top: calc(100% - 2px);
+    }
+}
+
+@keyframes vision-progress {
+    to {
+        width: 76%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .vision-status,
+    .vision-scan-line,
+    .vision-progress {
+        animation: none;
+    }
+
+    .vision-scan-line {
+        top: 50%;
+    }
+
+    .vision-progress {
+        width: 70%;
+    }
+}
+</style>
