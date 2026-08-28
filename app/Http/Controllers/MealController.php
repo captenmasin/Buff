@@ -84,6 +84,7 @@ class MealController extends Controller
         }
 
         $localProducts = FoodProduct::query()
+            ->whereIn('id', MealEntry::query()->select('food_product_id'))
             ->where(function ($builder) use ($query): void {
                 $builder
                     ->where('name', 'like', "%{$query}%")
@@ -95,7 +96,7 @@ class MealController extends Controller
             ->get()
             ->all();
 
-        $remoteProducts = $openFoodFacts->search($query, 20);
+        $remoteProducts = $openFoodFacts->search($query, 20, $request->getPreferredLanguage() ?? 'en_GB');
 
         $products = collect([...$localProducts, ...$remoteProducts])
             ->unique('id')
@@ -216,19 +217,40 @@ class MealController extends Controller
 
     public function update(Request $request, MealEntry $mealEntry, NutritionCalculator $calculator): RedirectResponse
     {
+        $request->merge([
+            'edit_mode' => $request->input('edit_mode', 'macros'),
+        ]);
+
         $validated = $request->validate([
             'date' => ['required', 'date'],
             'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
             'name' => ['required', 'string', 'max:120'],
-            'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
+            'edit_mode' => ['required', Rule::in(['portion', 'macros'])],
+            'portion_quantity' => ['exclude_unless:edit_mode,portion', 'required', 'numeric', 'min:0.1', 'max:10000'],
+            'portion_unit' => ['exclude_unless:edit_mode,portion', 'nullable', Rule::in(['g', 'ml'])],
+            'protein_g' => ['exclude_unless:edit_mode,macros', 'required', 'numeric', 'min:0', 'max:1000'],
+            'carbs_g' => ['exclude_unless:edit_mode,macros', 'required', 'numeric', 'min:0', 'max:1000'],
+            'fat_g' => ['exclude_unless:edit_mode,macros', 'required', 'numeric', 'min:0', 'max:1000'],
         ]);
 
-        $mealEntry->update([
-            ...$validated,
-            'calories' => $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
+        $mealEntry->fill([
+            'date' => $validated['date'],
+            'meal_type' => $validated['meal_type'],
+            'name' => $validated['name'],
         ]);
+
+        if ($validated['edit_mode'] === 'portion') {
+            $this->applyPortion($mealEntry, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'], $calculator);
+        } else {
+            $mealEntry->fill([
+                'protein_g' => $validated['protein_g'],
+                'carbs_g' => $validated['carbs_g'],
+                'fat_g' => $validated['fat_g'],
+                'calories' => $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
+            ]);
+        }
+
+        $mealEntry->save();
 
         return redirect('/?date='.$validated['date'])->with('message', 'Meal updated.');
     }
@@ -254,7 +276,7 @@ class MealController extends Controller
         $copy->meal_type = $validated['meal_type'] ?? $mealEntry->meal_type;
 
         if (array_key_exists('portion_quantity', $validated) && array_key_exists('portion_unit', $validated)) {
-            $this->applyRepeatedPortion($copy, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'], $calculator);
+            $this->applyPortion($copy, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'], $calculator);
         }
 
         $copy->save();
@@ -288,36 +310,40 @@ class MealController extends Controller
         ];
     }
 
-    private function applyRepeatedPortion(MealEntry $copy, MealEntry $mealEntry, float|int|string $quantity, string $unit, NutritionCalculator $calculator): void
+    private function applyPortion(MealEntry $target, MealEntry $source, float|int|string $quantity, ?string $unit, NutritionCalculator $calculator): void
     {
-        if ($mealEntry->foodProduct) {
-            if ($unit !== $mealEntry->foodProduct->nutrition_unit) {
+        if ($source->foodProduct) {
+            if ($unit !== $source->foodProduct->nutrition_unit) {
                 throw ValidationException::withMessages([
-                    'portion_unit' => "Use {$mealEntry->foodProduct->nutrition_unit} for this product because its nutrition data is per 100{$mealEntry->foodProduct->nutrition_unit}.",
+                    'portion_unit' => "Use {$source->foodProduct->nutrition_unit} for this product because its nutrition data is per 100{$source->foodProduct->nutrition_unit}.",
                 ]);
             }
 
-            $copy->portion_quantity = $quantity;
-            $copy->portion_unit = $unit;
-            $copy->fill($calculator->macrosForPortion($mealEntry->foodProduct, $quantity));
+            $target->fill([
+                'portion_quantity' => $quantity,
+                'portion_unit' => $unit,
+                ...$calculator->macrosForPortion($source->foodProduct, $quantity),
+            ]);
 
             return;
         }
 
-        if ($mealEntry->portion_quantity === null || $mealEntry->portion_unit !== $unit) {
+        if ($source->portion_quantity === null || $source->portion_unit !== $unit) {
             throw ValidationException::withMessages([
                 'portion_unit' => 'Use the original portion unit for this saved meal.',
             ]);
         }
 
-        $factor = (float) $quantity / (float) $mealEntry->portion_quantity;
+        $factor = (float) $quantity / (float) $source->portion_quantity;
 
-        $copy->portion_quantity = $quantity;
-        $copy->portion_unit = $unit;
-        $copy->calories = (int) round((float) $mealEntry->calories * $factor);
-        $copy->protein_g = round((float) $mealEntry->protein_g * $factor, 2);
-        $copy->carbs_g = round((float) $mealEntry->carbs_g * $factor, 2);
-        $copy->fat_g = round((float) $mealEntry->fat_g * $factor, 2);
+        $target->fill([
+            'portion_quantity' => $quantity,
+            'portion_unit' => $unit,
+            'calories' => (int) round((float) $source->calories * $factor),
+            'protein_g' => round((float) $source->protein_g * $factor, 2),
+            'carbs_g' => round((float) $source->carbs_g * $factor, 2),
+            'fat_g' => round((float) $source->fat_g * $factor, 2),
+        ]);
     }
 
     private function previousMealsForSearch(string $query): Collection

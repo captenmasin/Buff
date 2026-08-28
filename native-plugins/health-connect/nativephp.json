@@ -19,6 +19,12 @@
             "android": "com.buff.healthconnect.HealthConnectFunctions.SyncNow",
             "android_params": ["context"],
             "description": "Queue an immediate Health Connect workout sync."
+        },
+        {
+            "name": "HealthConnect.Disconnect",
+            "android": "com.buff.healthconnect.HealthConnectFunctions.Disconnect",
+            "android_params": ["context"],
+            "description": "Revoke all Health Connect permissions."
         }
     ],
     "android": {

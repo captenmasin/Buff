@@ -56,7 +56,7 @@
     --success-soft-foreground: #1b4630;
     --warning: #e0a21b;
     --warning-foreground: #6b4a08;
-    --food: #9a5720;
+    --food: var(--brand-violet);
     --workout: #3d6b32;
     --protein: #2f8fbd;
     --carbs: #e07a2f;
@@ -116,7 +116,7 @@
     --danger-soft-foreground: #fecaca;
     --warning-soft: #342607;
     --warning-soft-foreground: #fde68a;
-    --food: #e0a06a;
+    --food: #a99fff;
     --workout: #8fbe76;
     --protein: #6eb8d8;
     --carbs: #f0a05a;
@@ -537,6 +537,10 @@ html[data-reduce-motion] .app-shell [role='status'] {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: none;
+    }
+  *::-webkit-scrollbar {
+    display: none;
     }
   body {
     @apply bg-background text-foreground;

@@ -40,7 +40,7 @@ class OpenFoodFactsService
     }
 
     /** @return array<int, FoodProduct> */
-    public function search(string $query, int $limit = 20): array
+    public function search(string $query, int $limit = 20, string $locale = 'en_GB'): array
     {
         $query = trim($query);
 
@@ -48,7 +48,7 @@ class OpenFoodFactsService
             return [];
         }
 
-        $result = $this->api->get('foods/search', ['q' => $query]);
+        $result = $this->api->get('foods/search', ['q' => $query, 'locale' => $locale]);
 
         if (! $result->successful() || ! is_array($result->data['products'] ?? null)) {
             return [];
@@ -69,8 +69,14 @@ class OpenFoodFactsService
             throw ValidationException::withMessages(['barcode' => 'Buff returned an invalid food product.']);
         }
 
-        $product = FoodProduct::query()->find($data['id']) ?? new FoodProduct;
-        $product->setAttribute('id', $data['id']);
+        $product = FoodProduct::query()->where('barcode', $data['barcode'])->first()
+            ?? FoodProduct::query()->find($data['id'])
+            ?? new FoodProduct;
+
+        if (! $product->exists) {
+            $product->setAttribute('id', $data['id']);
+        }
+
         $product->forceFill(collect($data)->only([
             'barcode',
             'name',

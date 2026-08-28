@@ -107,6 +107,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/health-connect/status', [HealthConnectController::class, 'status']);
     Route::post('/health-connect/connect', [HealthConnectController::class, 'connect']);
     Route::post('/health-connect/sync', [HealthConnectController::class, 'sync']);
+    Route::delete('/health-connect', [HealthConnectController::class, 'destroy']);
 
     Route::get('/apple-health/status', [AppleHealthController::class, 'status']);
     Route::post('/apple-health/connect', [AppleHealthController::class, 'connect']);

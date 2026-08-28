@@ -15,6 +15,9 @@ import androidx.work.WorkManager
 object HealthConnectPlugin {
     private const val IMMEDIATE_WORK_NAME = "buff-health-connect-sync-now"
 
+    @Volatile
+    private var permissionsRevokedUntilRestart = false
+
     val foregroundPermissions: Set<String> = setOf(
         HealthPermission.getReadPermission(ExerciseSessionRecord::class),
         HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
@@ -28,7 +31,7 @@ object HealthConnectPlugin {
     }
 
     suspend fun hasAllPermissions(context: Context): Boolean {
-        if (!isAvailable(context)) {
+        if (permissionsRevokedUntilRestart || !isAvailable(context)) {
             return false
         }
 
@@ -55,6 +58,10 @@ object HealthConnectPlugin {
             return emptySet()
         }
 
+        if (permissionsRevokedUntilRestart) {
+            return foregroundPermissions
+        }
+
         val granted = HealthConnectClient.getOrCreate(context)
             .permissionController
             .getGrantedPermissions()
@@ -75,7 +82,7 @@ object HealthConnectPlugin {
     suspend fun status(context: Context): Map<String, Any> {
         val sdkStatus = HealthConnectClient.getSdkStatus(context)
         val available = sdkStatus == HealthConnectClient.SDK_AVAILABLE
-        val granted = if (available) {
+        val granted = if (available && !permissionsRevokedUntilRestart) {
             HealthConnectClient.getOrCreate(context)
                 .permissionController
                 .getGrantedPermissions()
@@ -103,6 +110,14 @@ object HealthConnectPlugin {
                 else -> "connected"
             }
         )
+    }
+
+    fun markPermissionsGranted() {
+        permissionsRevokedUntilRestart = false
+    }
+
+    fun markPermissionsRevoked() {
+        permissionsRevokedUntilRestart = true
     }
 
     fun enqueueImmediateSync(context: Context) {

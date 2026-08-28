@@ -23,6 +23,7 @@ import Progress from '../Components/ui/progress/Progress.vue';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
+type MealEditMode = 'portion' | 'macros';
 
 interface DailyGoal {
     calories: number;
@@ -210,10 +211,23 @@ const macros = computed<MacroCard[]>(() => [
     {key: 'fat_g', slug: 'fat', label: 'Fat', consumed: props.summary.totals.fat_g, goal: props.summary.goal?.fat_g, remaining: props.summary.totals.fat_remaining, color: 'bg-fat'},
 ]);
 
-const editMealForm = useForm({
+const editMealForm = useForm<{
+    date: string;
+    meal_type: MealType | '';
+    name: string;
+    edit_mode: MealEditMode;
+    portion_quantity: number | null;
+    portion_unit: string | null;
+    protein_g: number;
+    carbs_g: number;
+    fat_g: number;
+}>({
     date: props.summary.date,
     meal_type: '',
     name: '',
+    edit_mode: 'macros',
+    portion_quantity: null,
+    portion_unit: null,
     protein_g: 0,
     carbs_g: 0,
     fat_g: 0,
@@ -488,6 +502,9 @@ function startEditingMeal() {
         date: props.summary.date,
         meal_type: selectedMeal.value.meal_type,
         name: selectedMeal.value.name,
+        edit_mode: selectedMeal.value.portion_quantity === null ? 'macros' : 'portion',
+        portion_quantity: selectedMeal.value.portion_quantity,
+        portion_unit: selectedMeal.value.portion_unit,
         protein_g: selectedMeal.value.protein_g,
         carbs_g: selectedMeal.value.carbs_g,
         fat_g: selectedMeal.value.fat_g,
@@ -738,13 +755,14 @@ onBeforeUnmount(() => {
                         <Button
                             v-if="canSyncHealthConnect"
                             variant="outline"
-                            size="icon"
+                            size="sm"
                             class="rounded-full"
                             :disabled="healthConnectLoading"
                             aria-label="Sync health workouts"
                             @click="syncHealthConnect"
                         >
                             <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
+                            Sync
                         </Button>
                         <Button
                             v-else
@@ -880,10 +898,35 @@ onBeforeUnmount(() => {
                         <Input v-model="editMealForm.name" type="text" class="mt-1" />
                     </label>
 
-                    <div class="grid grid-cols-3 gap-2">
+                    <div v-if="selectedMeal.portion_quantity !== null" class="grid grid-cols-2 gap-2" role="group" aria-label="Nutrition edit mode">
+                        <Button
+                            v-for="mode in (['portion', 'macros'] as MealEditMode[])"
+                            :key="mode"
+                            type="button"
+                            :variant="editMealForm.edit_mode === mode ? 'default' : 'surface'"
+                            :aria-pressed="editMealForm.edit_mode === mode"
+                            @click="editMealForm.edit_mode = mode"
+                        >
+                            {{ mode === 'portion' ? 'Portion' : 'Macros' }}
+                        </Button>
+                    </div>
+
+                    <label v-if="editMealForm.edit_mode === 'portion'" class="block">
+                        <span class="field-label">{{ editMealForm.portion_unit === null ? 'Servings' : 'Portion' }}</span>
+                        <div class="mt-1 flex items-center gap-3">
+                            <Input v-model.number="editMealForm.portion_quantity" type="number" min="0.1" step="0.1" class="text-right font-semibold" />
+                            <span v-if="editMealForm.portion_unit" class="w-8 text-sm text-muted-foreground">{{ editMealForm.portion_unit }}</span>
+                        </div>
+                        <span v-if="editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit" class="mt-1 block text-sm text-destructive" role="alert">
+                            {{ editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit }}
+                        </span>
+                    </label>
+
+                    <div v-else class="grid grid-cols-3 gap-2">
                         <label v-for="field in editMealMacroFields" :key="field[0]">
                             <span class="field-label">{{ field[1] }}</span>
                             <Input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 px-2 text-right font-semibold" />
+                            <span v-if="editMealForm.errors[field[0]]" class="mt-1 block text-sm text-destructive" role="alert">{{ editMealForm.errors[field[0]] }}</span>
                         </label>
                     </div>
 

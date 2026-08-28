@@ -209,78 +209,60 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                 <p class="mt-1 text-sm text-muted-foreground">How calories divide across protein, carbs, and fat.</p>
             </div>
 
-            <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Macro split">
+            <div class="grid grid-cols-2 overflow-hidden rounded-xl border border-border" role="radiogroup" aria-label="Macro split">
                 <button
                     v-for="(preset, index) in macroPresets"
                     :key="index"
                     type="button"
                     role="radio"
-                    class="flex flex-col rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card disabled:pointer-events-none disabled:opacity-40"
-                    :class="activePreset === index
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'"
+                    class="min-h-16 px-3 py-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40"
+                    :class="[
+                        index % 2 === 0 ? 'border-r border-border' : '',
+                        index < 2 ? 'border-b border-border' : '',
+                        activePreset === index ? 'bg-primary/20' : 'bg-card hover:bg-muted/60',
+                    ]"
                     :aria-checked="activePreset === index"
+                    :aria-label="`${presetLabels[index]}, ${preset.protein}% protein, ${preset.carbs}% carbs, ${preset.fat}% fat`"
                     :disabled="!splitWithinGramBounds(Number(calories), preset)"
                     @click="selectPreset(index)"
                 >
-                    <span class="flex items-start justify-between gap-2">
-                        <span class="min-w-0">
-                            <span class="block font-semibold">{{ presetLabels[index] }}</span>
-                            <span
-                                class="mt-0.5 block tabular-nums"
-                                :class="activePreset === index ? 'text-primary-foreground/70' : 'text-muted-foreground'"
-                            >{{ preset.protein }} / {{ preset.carbs }} / {{ preset.fat }}</span>
-                        </span>
+                    <span class="flex items-center justify-between gap-2">
+                        <span class="truncate font-semibold">{{ presetLabels[index] }}</span>
                         <Check
                             v-if="activePreset === index"
-                            :size="16"
-                            stroke-width="2.5"
-                            class="mt-0.5 shrink-0"
+                            :size="18"
+                            stroke-width="3"
+                            class="shrink-0 rounded-full bg-primary p-0.5"
                         />
                     </span>
-                    <span
-                        class="mt-2 flex h-1 overflow-hidden rounded-full"
-                        :class="activePreset === index ? 'bg-primary-foreground/20' : 'bg-background'"
-                        aria-hidden="true"
-                    >
-                        <span class="h-full bg-protein" :style="{ width: `${preset.protein}%` }" />
-                        <span class="h-full bg-carbs" :style="{ width: `${preset.carbs}%` }" />
-                        <span class="h-full bg-fat" :style="{ width: `${preset.fat}%` }" />
+                    <span class="mt-1.5 flex items-center gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
+                        <span class="text-protein">P {{ preset.protein }}</span>
+                        <span class="text-carbs">C {{ preset.carbs }}</span>
+                        <span class="text-fat">F {{ preset.fat }}</span>
                     </span>
                 </button>
                 <button
                     type="button"
                     role="radio"
-                    class="flex flex-col rounded-xl px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-card"
-                    :class="activePreset === null
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted text-foreground'"
+                    class="min-h-16 px-3 py-3 text-left transition-colors focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+                    :class="activePreset === null ? 'bg-primary/20' : 'bg-card hover:bg-muted/60'"
                     :aria-checked="activePreset === null"
+                    :aria-label="`Custom, ${customSplit.protein}% protein, ${customSplit.carbs}% carbs, ${customSplit.fat}% fat`"
                     @click="selectCustom"
                 >
-                    <span class="flex items-start justify-between gap-2">
-                        <span class="min-w-0">
-                            <span class="block font-semibold">Custom</span>
-                            <span
-                                class="mt-0.5 block tabular-nums"
-                                :class="activePreset === null ? 'text-primary-foreground/70' : 'text-muted-foreground'"
-                            >{{ customSplit.protein }} / {{ customSplit.carbs }} / {{ customSplit.fat }}</span>
-                        </span>
+                    <span class="flex items-center justify-between gap-2">
+                        <span class="truncate font-semibold">Custom</span>
                         <Check
                             v-if="activePreset === null"
-                            :size="16"
-                            stroke-width="2.5"
-                            class="mt-0.5 shrink-0"
+                            :size="18"
+                            stroke-width="3"
+                            class="shrink-0 rounded-full bg-primary p-0.5"
                         />
                     </span>
-                    <span
-                        class="mt-2 flex h-1 overflow-hidden rounded-full"
-                        :class="activePreset === null ? 'bg-primary-foreground/20' : 'bg-background'"
-                        aria-hidden="true"
-                    >
-                        <span class="h-full bg-protein" :style="{ width: `${customSplit.protein}%` }" />
-                        <span class="h-full bg-carbs" :style="{ width: `${customSplit.carbs}%` }" />
-                        <span class="h-full bg-fat" :style="{ width: `${customSplit.fat}%` }" />
+                    <span class="mt-1.5 flex items-center gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
+                        <span class="text-protein">P {{ customSplit.protein }}</span>
+                        <span class="text-carbs">C {{ customSplit.carbs }}</span>
+                        <span class="text-fat">F {{ customSplit.fat }}</span>
                     </span>
                 </button>
             </div>

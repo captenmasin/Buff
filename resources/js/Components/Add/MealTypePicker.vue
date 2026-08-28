@@ -21,7 +21,7 @@ const emit = defineEmits<{
 </script>
 
 <template>
-    <div class="rounded-xl border border-border bg-muted p-3">
+    <div>
         <p class="text-sm font-semibold">When did you have it?</p>
         <div class="mt-3 grid grid-cols-2 gap-2">
             <Button
@@ -29,7 +29,7 @@ const emit = defineEmits<{
                 :key="mealType"
                 type="button"
                 class="min-h-11 px-3 text-sm"
-                :variant="modelValue === mealType ? 'default' : 'inverse'"
+                :variant="modelValue === mealType ? 'default' : 'surface'"
                 @click="emit('update:modelValue', mealType)"
             >
                 {{ mealLabels[mealType] }}

@@ -202,8 +202,10 @@ const previousMealPortionQuantity = ref<number | null>(null);
 const previousMealPortionUnit = ref('g');
 let foodSearchRequestId = 0;
 let foodSearchTimer = 0;
-const photoInput = ref<HTMLInputElement | null>(null);
+const photoCameraInput = ref<HTMLInputElement | null>(null);
+const photoLibraryInput = ref<HTMLInputElement | null>(null);
 const selectedPhotos = ref<SelectedPhoto[]>([]);
+const photoProcessing = ref(false);
 const photoNote = ref('');
 const photoAnalysisLoading = ref(false);
 const photoAnalysisError = ref('');
@@ -682,13 +684,27 @@ async function selectPhotos(event: Event) {
     const input = event.target instanceof HTMLInputElement ? event.target : null;
     const files = Array.from(input?.files ?? []).slice(0, 3 - selectedPhotos.value.length);
 
-    for (const file of files) {
-        const resized = await resizePhoto(file);
-        selectedPhotos.value.push({file: resized, preview: URL.createObjectURL(resized)});
+    if (files.length === 0) {
+        if (input) {
+            input.value = '';
+        }
+
+        return;
     }
 
-    if (input) {
-        input.value = '';
+    photoProcessing.value = true;
+
+    try {
+        for (const file of files) {
+            const resized = await resizePhoto(file);
+            selectedPhotos.value.push({file: resized, preview: URL.createObjectURL(resized)});
+        }
+    } finally {
+        photoProcessing.value = false;
+
+        if (input) {
+            input.value = '';
+        }
     }
 }
 
@@ -863,24 +879,47 @@ onUnmounted(() => {
 
     <section class="space-y-5">
         <PageHeader :kicker="displayDate">
-            {{ mode === 'food' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Add workout' : mode === 'recipe' ? 'Recipes' : 'Add' }}
+            {{ mode === 'food' || mode === 'recipe' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Add workout' : 'Add' }}
             <span v-if="meal"> — {{ meal.charAt(0).toUpperCase() + meal.slice(1) }}</span>
         </PageHeader>
 
-        <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-primary-foreground">
+        <nav v-if="mode === 'food' || mode === 'recipe'" class="grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1" aria-label="Food source">
+            <Button
+                :as="Link"
+                :href="addModeUrl('food')"
+                variant="ghost"
+                class="h-11 w-full"
+                :class="mode === 'food' ? 'bg-card text-foreground shadow-sm hover:bg-card' : 'text-muted-foreground hover:bg-card/60'"
+                :aria-current="mode === 'food' ? 'page' : undefined"
+            >
+                All foods
+            </Button>
+            <Button
+                :as="Link"
+                :href="addModeUrl('recipe')"
+                variant="ghost"
+                class="h-11 w-full"
+                :class="mode === 'recipe' ? 'bg-card text-foreground shadow-sm hover:bg-card' : 'text-muted-foreground hover:bg-card/60'"
+                :aria-current="mode === 'recipe' ? 'page' : undefined"
+            >
+                Recipes
+            </Button>
+        </nav>
+
+        <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-background">
             <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
-                    <p class="text-sm text-primary-foreground/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
+                    <p class="text-sm text-background/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
                     <h2 class="truncate text-xl font-semibold">{{ scannerStarting ? 'Opening camera...' : manualBarcodeOpen ? 'Enter barcode' : 'Point camera at barcode' }}</h2>
                 </div>
-                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-primary-foreground/10 text-primary-foreground active:bg-primary-foreground/15" aria-label="Close scanner" @click="stopWebScan">
+                <Button variant="ghost" size="icon" class="h-11 w-11 shrink-0 bg-background/10 text-background active:bg-background/15" aria-label="Close scanner" @click="stopWebScan">
                     <X :size="22" />
                 </Button>
             </div>
 
             <div class="relative min-h-0 flex-1">
                 <div v-if="!manualBarcodeOpen && !webScannerReady" class="absolute inset-0 z-10 grid h-full w-full place-items-center bg-foreground">
-                    <LoaderCircle :size="34" class="animate-spin text-primary-foreground/70" />
+                    <LoaderCircle :size="34" class="animate-spin text-background/70" />
                 </div>
 
                 <video
@@ -941,33 +980,45 @@ onUnmounted(() => {
             </div>
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
-            <div v-if="selectedPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
+            <div v-if="selectedPhotos.length || photoProcessing" class="mt-4 grid grid-cols-3 gap-2">
                 <div v-for="(photo, index) in selectedPhotos" :key="photo.preview" class="relative aspect-square overflow-hidden rounded-xl bg-muted">
                     <img :src="photo.preview" alt="Selected meal" class="h-full w-full object-cover">
                     <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removePhoto(index)">
                         <X :size="16" />
                     </Button>
                 </div>
+                <div v-if="photoProcessing" class="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl bg-muted text-muted-foreground" role="status" aria-live="polite">
+                    <LoaderCircle :size="20" class="motion-safe:animate-spin" />
+                    <span class="text-xs font-medium">Preparing photo…</span>
+                </div>
             </div>
 
             <input
-                ref="photoInput"
+                ref="photoCameraInput"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="hidden"
+                @change="selectPhotos"
+            >
+            <input
+                ref="photoLibraryInput"
                 type="file"
                 accept="image/*"
                 multiple
                 class="hidden"
                 @change="selectPhotos"
             >
-            <Button
-                v-if="selectedPhotos.length < 3"
-                type="button"
-                variant="surface"
-                class="mt-4 w-full"
-                @click="photoInput?.click()"
-            >
-                <Camera :size="18" />
-                {{ selectedPhotos.length ? 'Add another' : 'Take or choose photo' }}
-            </Button>
+            <div v-if="selectedPhotos.length < 3" class="mt-4 grid grid-cols-2 gap-2">
+                <Button type="button" variant="surface" :disabled="photoProcessing" @click="photoCameraInput?.click()">
+                    <Camera :size="18" />
+                    Take photo
+                </Button>
+                <Button type="button" variant="surface" :disabled="photoProcessing" @click="photoLibraryInput?.click()">
+                    <Plus :size="18" />
+                    Choose photo
+                </Button>
+            </div>
 
             <label class="mt-4 block">
                 <span class="field-label">Context (optional)</span>
@@ -978,7 +1029,7 @@ onUnmounted(() => {
                 {{ photoAnalysisError }}
             </p>
 
-            <Button type="button" class="mt-4 w-full" :disabled="photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
+            <Button type="button" class="mt-4 w-full" :disabled="photoProcessing || photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
                 <LoaderCircle v-if="photoAnalysisLoading" :size="18" class="animate-spin" />
                 {{ photoAnalysisLoading ? 'Analyzing meal…' : 'Analyze meal' }}
             </Button>
@@ -993,40 +1044,39 @@ onUnmounted(() => {
         </div>
 
         <Card v-if="mode === 'food'">
-            <div class="flex items-center gap-2">
-                <Search :size="21" class="text-food" />
-                <h2 class="card-title">Search food</h2>
-            </div>
-
-            <form class="mt-4 flex gap-2" @submit.prevent="searchFoodProducts">
+            <form role="search" class="relative" @submit.prevent="searchFoodProducts">
+                <Search :size="18" class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     v-model="foodSearch"
                     type="search"
                     placeholder="Search foods..."
-                    class="min-w-0 flex-1"
+                    aria-label="Search foods"
+                    class="pl-10"
                     @input="queueFoodSearch"
                 />
-                <Button
-                    type="button"
-                    variant="outline"
-                    class="aspect-square h-[50px] shrink-0 px-0 py-0"
-                    :disabled="scannerStarting"
-                    aria-label="Scan barcode"
-                    @click="startScan"
-                >
-                    <ScanBarcode :size="21" />
-                </Button>
             </form>
 
-            <Button
-                :as="Link"
-                :href="addModeUrl('custom')"
-                variant="ghost"
-                class="mt-2 h-auto w-full justify-start px-1 py-2 text-left text-sm font-medium text-muted-foreground"
-            >
-                <Pencil :size="16" />
-                Add custom food
-            </Button>
+            <div class="mt-3 grid grid-cols-2 gap-2 max-[360px]:grid-cols-1">
+                <Button
+                    type="button"
+                    variant="surface"
+                    class="w-full"
+                    :disabled="scannerStarting"
+                    @click="startScan"
+                >
+                    <ScanBarcode :size="18" />
+                    Scan barcode
+                </Button>
+                <Button
+                    :as="Link"
+                    :href="addModeUrl('custom')"
+                    variant="surface"
+                    class="w-full"
+                >
+                    <Pencil :size="18" />
+                    Add custom food
+                </Button>
+            </div>
 
             <p v-if="nativeMessage" class="mt-3 rounded-xl bg-muted p-3 text-sm text-foreground/80">{{ nativeMessage }}</p>
             <p v-if="lookupError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground">{{ lookupError }}</p>

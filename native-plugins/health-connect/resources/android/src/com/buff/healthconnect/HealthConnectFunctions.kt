@@ -5,6 +5,7 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import androidx.fragment.app.FragmentActivity
+import androidx.health.connect.client.HealthConnectClient
 import com.nativephp.mobile.bridge.BridgeFunction
 import com.nativephp.mobile.bridge.BridgeResponse
 import kotlinx.coroutines.runBlocking
@@ -67,6 +68,24 @@ object HealthConnectFunctions {
                 "has_permissions" to true,
                 "status" to "sync_queued"
             ))
+        }
+    }
+
+    class Disconnect(private val context: Context) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> = runBlocking {
+            if (HealthConnectPlugin.isAvailable(context)) {
+                HealthConnectClient.getOrCreate(context)
+                    .permissionController
+                    .revokeAllPermissions()
+            }
+
+            HealthConnectPlugin.markPermissionsRevoked()
+
+            BridgeResponse.success(
+                HealthConnectPlugin.status(context) + mapOf(
+                    "message" to "Health Connect disconnected."
+                )
+            )
         }
     }
 

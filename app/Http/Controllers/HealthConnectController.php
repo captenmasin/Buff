@@ -32,6 +32,16 @@ class HealthConnectController extends Controller
         ]);
     }
 
+    public function destroy(HealthConnectBridge $bridge): JsonResponse
+    {
+        $native = $bridge->call('HealthConnect.Disconnect');
+
+        return response()->json([
+            ...$this->statusPayload($bridge),
+            'native' => $native,
+        ]);
+    }
+
     public static function sharedStatus(): array
     {
         return app(HealthConnectBridge::class)->sharedStatus();

@@ -81,18 +81,21 @@ const emit = defineEmits<{
                 v-for="choice in tiles"
                 :key="choice.label"
                 type="button"
-                variant="ghost"
-                class="h-auto min-h-28 w-full flex-col gap-2 rounded-2xl bg-secondary/70 px-3 py-4 hover:bg-secondary"
+                variant="outline"
+                class="h-auto min-h-20 w-full justify-start gap-3 whitespace-normal rounded-2xl px-3 py-3 text-left"
                 :aria-label="`${choice.label}. ${choice.description}`"
                 @click="emit('select', choice.mode, choice.extra)"
             >
                 <span
-                    class="grid h-12 w-12 place-items-center rounded-xl"
+                    class="grid size-10 shrink-0 place-items-center rounded-xl"
                     :class="toneClasses[choice.tone]"
                 >
-                    <component :is="choice.icon" :size="22" />
+                    <component :is="choice.icon" :size="20" />
                 </span>
-                <span class="text-sm font-semibold">{{ choice.label }}</span>
+                <span class="min-w-0">
+                    <span class="block text-sm font-semibold">{{ choice.label }}</span>
+                    <span class="block text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>
+                </span>
             </Button>
         </div>
 
@@ -100,20 +103,20 @@ const emit = defineEmits<{
             v-for="choice in rows"
             :key="choice.label"
             type="button"
-            variant="ghost"
-            class="h-auto min-h-20 w-full justify-start gap-3 rounded-2xl bg-secondary/70 px-3 py-3 text-left hover:bg-secondary"
+            variant="outline"
+            class="h-auto min-h-18 w-full justify-start gap-3 whitespace-normal rounded-2xl px-3 py-3 text-left"
             :aria-label="`${choice.label}. ${choice.description}`"
             @click="emit('select', choice.mode, choice.extra)"
         >
             <span
-                class="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+                class="grid size-10 shrink-0 place-items-center rounded-xl"
                 :class="toneClasses[choice.tone]"
             >
-                <component :is="choice.icon" :size="22" />
+                <component :is="choice.icon" :size="20" />
             </span>
             <span class="min-w-0">
                 <span class="block font-semibold">{{ choice.label }}</span>
-                <span class="block text-sm text-muted-foreground">{{ choice.description }}</span>
+                <span class="block text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>
             </span>
         </Button>
     </div>

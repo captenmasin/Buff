@@ -99,29 +99,195 @@ class InstallWebViewCameraAccessCommand extends NativePluginHookCommand
             );
         }
 
-        if (! str_contains($content, 'fileChooserRequestCode')) {
+        $legacyFileChooserFields = <<<'KOTLIN'
+    private val fileChooserRequestCode = 45871
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var cameraCaptureUri: Uri? = null
+KOTLIN;
+
+        $fileChooserFields = <<<'KOTLIN'
+    private val fileChooserRequestCode = 45871
+    private val fileChooserCameraPermissionRequestCode = 45872
+    private var filePathCallback: ValueCallback<Array<Uri>>? = null
+    private var cameraCaptureUri: Uri? = null
+    private var cameraCaptureFile: File? = null
+    private var pendingFileChooserIntent: Intent? = null
+KOTLIN;
+
+        if (str_contains($content, $legacyFileChooserFields)) {
+            $content = str_replace($legacyFileChooserFields, $fileChooserFields, $content);
+        } elseif (! str_contains($content, 'fileChooserRequestCode')) {
             $content = str_replace(
                 "    private var pendingCameraPermissionRequest: PermissionRequest? = null\n",
-                "    private var pendingCameraPermissionRequest: PermissionRequest? = null\n    private val fileChooserRequestCode = 45871\n    private var filePathCallback: ValueCallback<Array<Uri>>? = null\n    private var cameraCaptureUri: Uri? = null\n",
+                "    private var pendingCameraPermissionRequest: PermissionRequest? = null\n{$fileChooserFields}\n",
                 $content
             );
         }
 
-        if (! str_contains($content, 'fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean')) {
+        $legacyCameraPermissionResult = <<<'KOTLIN'
+    fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean {
+        if (requestCode != cameraPermissionRequestCode) {
+            return false
+        }
+
+        val request = pendingCameraPermissionRequest ?: return true
+        pendingCameraPermissionRequest = null
+
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            request.grant(request.resources ?: arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+            return true
+        }
+
+        request.deny()
+        return true
+    }
+KOTLIN;
+
+        $cameraPermissionResult = <<<'KOTLIN'
+    fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean {
+        if (requestCode == fileChooserCameraPermissionRequestCode) {
+            val intent = pendingFileChooserIntent
+            pendingFileChooserIntent = null
+            val activity = context as? Activity
+
+            if (
+                grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED &&
+                intent != null &&
+                activity != null
+            ) {
+                try {
+                    activity.startActivityForResult(intent, fileChooserRequestCode)
+                    return true
+                } catch (_: ActivityNotFoundException) {
+                }
+            }
+
+            filePathCallback?.onReceiveValue(null)
+            filePathCallback = null
+            cameraCaptureUri = null
+            cameraCaptureFile = null
+
+            return true
+        }
+
+        if (requestCode != cameraPermissionRequestCode) {
+            return false
+        }
+
+        val request = pendingCameraPermissionRequest ?: return true
+        pendingCameraPermissionRequest = null
+
+        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {
+            request.grant(request.resources ?: arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))
+            return true
+        }
+
+        request.deny()
+        return true
+    }
+KOTLIN;
+
+        if (str_contains($content, $legacyCameraPermissionResult)) {
+            $content = str_replace($legacyCameraPermissionResult, $cameraPermissionResult, $content);
+        } elseif (! str_contains($content, 'fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean')) {
             $content = str_replace(
                 "    private fun configureWebViewSettings() {\n",
-                "    fun handleCameraPermissionResult(requestCode: Int, grantResults: IntArray): Boolean {\n        if (requestCode != cameraPermissionRequestCode) {\n            return false\n        }\n\n        val request = pendingCameraPermissionRequest ?: return true\n        pendingCameraPermissionRequest = null\n\n        if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) {\n            request.grant(request.resources ?: arrayOf(PermissionRequest.RESOURCE_VIDEO_CAPTURE))\n            return true\n        }\n\n        request.deny()\n        return true\n    }\n\n    private fun configureWebViewSettings() {\n",
+                $cameraPermissionResult."\n\n    private fun configureWebViewSettings() {\n",
                 $content
             );
         }
 
-        if (! str_contains($content, 'fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean')) {
+        $legacyFileChooserResult = <<<'KOTLIN'
+    fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != fileChooserRequestCode) {
+            return false
+        }
+
+        val callback = filePathCallback ?: return true
+        val result = if (resultCode == Activity.RESULT_OK) {
+            WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                ?: cameraCaptureUri?.let { arrayOf(it) }
+        } else {
+            null
+        }
+
+        callback.onReceiveValue(result)
+        filePathCallback = null
+        cameraCaptureUri = null
+
+        return true
+    }
+KOTLIN;
+
+        $fileChooserResult = <<<'KOTLIN'
+    fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != fileChooserRequestCode) {
+            return false
+        }
+
+        val callback = filePathCallback ?: return true
+        val capturedPhoto = cameraCaptureUri
+            ?.takeIf { (cameraCaptureFile?.length() ?: 0L) > 0L }
+            ?.let { arrayOf(it) }
+        val selectedPhotos = data?.clipData?.let { clipData ->
+            (0 until clipData.itemCount)
+                .mapNotNull { index -> clipData.getItemAt(index).uri }
+                .toTypedArray()
+                .takeIf { it.isNotEmpty() }
+        }
+        val result = if (resultCode == Activity.RESULT_OK) {
+            selectedPhotos
+                ?: WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                ?: capturedPhoto
+        } else {
+            null
+        }
+
+        callback.onReceiveValue(result)
+        filePathCallback = null
+        cameraCaptureUri = null
+        cameraCaptureFile = null
+        pendingFileChooserIntent = null
+
+        return true
+    }
+KOTLIN;
+
+        if (str_contains($content, $legacyFileChooserResult)) {
+            $content = str_replace($legacyFileChooserResult, $fileChooserResult, $content);
+        } elseif (! str_contains($content, 'fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean')) {
             $content = str_replace(
                 "    private fun configureWebViewSettings() {\n",
-                "    fun handleFileChooserResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {\n        if (requestCode != fileChooserRequestCode) {\n            return false\n        }\n\n        val callback = filePathCallback ?: return true\n        val result = if (resultCode == Activity.RESULT_OK) {\n            WebChromeClient.FileChooserParams.parseResult(resultCode, data)\n                ?: cameraCaptureUri?.let { arrayOf(it) }\n        } else {\n            null\n        }\n\n        callback.onReceiveValue(result)\n        filePathCallback = null\n        cameraCaptureUri = null\n\n        return true\n    }\n\n    private fun configureWebViewSettings() {\n",
+                $fileChooserResult."\n\n    private fun configureWebViewSettings() {\n",
                 $content
             );
         }
+
+        $singleFileChooserResult = <<<'KOTLIN'
+        val result = if (resultCode == Activity.RESULT_OK) {
+            WebChromeClient.FileChooserParams.parseResult(resultCode, data) ?: capturedPhoto
+        } else {
+            null
+        }
+KOTLIN;
+
+        $multipleFileChooserResult = <<<'KOTLIN'
+        val selectedPhotos = data?.clipData?.let { clipData ->
+            (0 until clipData.itemCount)
+                .mapNotNull { index -> clipData.getItemAt(index).uri }
+                .toTypedArray()
+                .takeIf { it.isNotEmpty() }
+        }
+        val result = if (resultCode == Activity.RESULT_OK) {
+            selectedPhotos
+                ?: WebChromeClient.FileChooserParams.parseResult(resultCode, data)
+                ?: capturedPhoto
+        } else {
+            null
+        }
+KOTLIN;
+
+        $content = str_replace($singleFileChooserResult, $multipleFileChooserResult, $content);
 
         $legacyPermissionRequest = <<<'KOTLIN'
             override fun onPermissionRequest(request: PermissionRequest) {
@@ -188,7 +354,7 @@ KOTLIN;
             );
         }
 
-        $fileChooser = <<<'KOTLIN'
+        $legacyFileChooser = <<<'KOTLIN'
             override fun onShowFileChooser(
                 webView: WebView,
                 callback: ValueCallback<Array<Uri>>,
@@ -232,7 +398,88 @@ KOTLIN;
 
 KOTLIN;
 
-        if (! str_contains($content, 'override fun onShowFileChooser(')) {
+        $fileChooser = <<<'KOTLIN'
+            override fun onShowFileChooser(
+                webView: WebView,
+                callback: ValueCallback<Array<Uri>>,
+                params: FileChooserParams
+            ): Boolean {
+                val activity = context as? Activity ?: return false
+                filePathCallback?.onReceiveValue(null)
+                filePathCallback = callback
+                cameraCaptureUri = null
+                cameraCaptureFile = null
+                pendingFileChooserIntent = null
+
+                val pickerIntent = params.createIntent()
+                val acceptsImages = params.acceptTypes.any { it.isBlank() || it.startsWith("image/") }
+
+                if (!params.isCaptureEnabled || !acceptsImages) {
+                    return try {
+                        activity.startActivityForResult(pickerIntent, fileChooserRequestCode)
+                        true
+                    } catch (_: ActivityNotFoundException) {
+                        filePathCallback?.onReceiveValue(null)
+                        filePathCallback = null
+                        false
+                    }
+                }
+
+                val cameraIntent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).takeIf {
+                    it.resolveActivity(context.packageManager) != null
+                } ?: return try {
+                    activity.startActivityForResult(pickerIntent, fileChooserRequestCode)
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    filePathCallback?.onReceiveValue(null)
+                    filePathCallback = null
+                    false
+                }
+
+                val photoFile = File(context.cacheDir, "webview-upload.jpg").apply {
+                    writeBytes(byteArrayOf())
+                }
+                val photoUri = FileProvider.getUriForFile(
+                    context,
+                    "${context.packageName}.fileprovider",
+                    photoFile
+                )
+
+                cameraCaptureUri = photoUri
+                cameraCaptureFile = photoFile
+                cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+                cameraIntent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+
+                if (
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) !=
+                    PackageManager.PERMISSION_GRANTED
+                ) {
+                    pendingFileChooserIntent = cameraIntent
+                    activity.requestPermissions(
+                        arrayOf(Manifest.permission.CAMERA),
+                        fileChooserCameraPermissionRequestCode
+                    )
+
+                    return true
+                }
+
+                return try {
+                    activity.startActivityForResult(cameraIntent, fileChooserRequestCode)
+                    true
+                } catch (_: ActivityNotFoundException) {
+                    filePathCallback?.onReceiveValue(null)
+                    filePathCallback = null
+                    cameraCaptureUri = null
+                    cameraCaptureFile = null
+                    false
+                }
+            }
+
+KOTLIN;
+
+        if (str_contains($content, $legacyFileChooser)) {
+            $content = str_replace($legacyFileChooser, $fileChooser, $content);
+        } elseif (! str_contains($content, 'override fun onShowFileChooser(')) {
             $content = str_replace(
                 "            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {\n",
                 $fileChooser."            override fun onConsoleMessage(consoleMessage: ConsoleMessage): Boolean {\n",

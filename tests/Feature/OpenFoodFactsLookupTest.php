@@ -1,5 +1,7 @@
 <?php
 
+use App\Models\FoodProduct;
+use App\Models\MealEntry;
 use App\Services\BuffCredentialStore;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -72,14 +74,55 @@ it('keeps server-normalized millilitre portions', function (): void {
 it('searches through the buff-server proxy and stores returned products', function (): void {
     Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
 
-    $this->getJson('/food-products/search?q=example')
+    $this->withHeader('Accept-Language', 'fr-FR,fr;q=0.9')
+        ->getJson('/food-products/search?q=example')
         ->assertOk()
         ->assertJsonPath('products.0.name', 'Example Bar');
 
     $this->assertDatabaseHas('food_products', ['barcode' => '737628064502']);
+    Http::assertSent(fn (ClientRequest $request): bool => $request['locale'] === 'fr_FR');
+});
+
+it('reuses a stored product when the server returns a new id for its barcode', function (): void {
+    $storedProduct = FoodProduct::query()->create(productPayload([
+        'id' => '10000000-0000-4000-8000-000000000001',
+        'name' => 'Old product name',
+    ]));
+    Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
+
+    $this->getJson('/food-products/search?q=example')
+        ->assertOk()
+        ->assertJsonPath('products.0.id', $storedProduct->id)
+        ->assertJsonPath('products.0.name', 'Example Bar');
+
+    expect(FoodProduct::query()->count())->toBe(1);
+    $this->assertDatabaseMissing('food_products', ['id' => '20000000-0000-4000-8000-000000000002']);
 });
 
 it('uses stored products when the remote search is unavailable', function (): void {
+    Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
+    $this->getJson('/food-products/search?q=example')->assertOk();
+    $product = FoodProduct::query()->where('barcode', '737628064502')->firstOrFail();
+    MealEntry::query()->create([
+        'date' => '2026-08-27',
+        'meal_type' => 'snacks',
+        'source_type' => MealEntry::SOURCE_BARCODE,
+        'food_product_id' => $product->id,
+        'name' => $product->name,
+        'calories' => 420,
+        'protein_g' => 20,
+        'carbs_g' => 48,
+        'fat_g' => 12,
+    ]);
+
+    Http::fake(['*/foods/search*' => Http::failedConnection()]);
+
+    $this->getJson('/food-products/search?q=example')
+        ->assertOk()
+        ->assertJsonPath('products.0.name', 'Example Bar');
+});
+
+it('does not reuse unselected search results when the remote search is unavailable', function (): void {
     Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
     $this->getJson('/food-products/search?q=example')->assertOk();
 
@@ -87,7 +130,7 @@ it('uses stored products when the remote search is unavailable', function (): vo
 
     $this->getJson('/food-products/search?q=example')
         ->assertOk()
-        ->assertJsonPath('products.0.name', 'Example Bar');
+        ->assertJsonCount(0, 'products');
 });
 
 /** @param array<string, mixed> $overrides */

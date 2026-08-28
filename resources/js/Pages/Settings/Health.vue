@@ -47,6 +47,7 @@ const props = defineProps<{
 const healthConnectState = ref({...props.healthConnect});
 const appleHealthState = ref({...props.appleHealth});
 const healthConnectLoading = ref(false);
+const healthConnectDisconnecting = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
 
 const healthImport = computed(() => {
@@ -61,6 +62,11 @@ const healthImport = computed(() => {
     return null;
 });
 const canSyncHealthConnect = computed(() => ['connected', 'sync_queued'].includes(healthImport.value?.state.status ?? ''));
+const canDisconnectHealthConnect = computed(() => (
+    healthImport.value?.prefix === '/health-connect' && (
+        healthImport.value.state.foreground_granted === true || healthImport.value.state.background_granted === true
+    )
+));
 const healthConnectLabel = computed(() => {
     const state = healthImport.value?.state;
 
@@ -95,7 +101,7 @@ const healthConnectButtonLabel = computed(() => {
 });
 
 function applyHealthImportState(data: {native?: Record<string, unknown>} & Record<string, unknown>) {
-    const nextState = {...data, ...(data.native || {})};
+    const nextState = {message: null, ...data, ...(data.native || {})};
 
     if (healthImport.value?.prefix === '/apple-health') {
         appleHealthState.value = {...appleHealthState.value, ...nextState};
@@ -139,6 +145,21 @@ async function connectHealthConnect() {
         }
     } finally {
         healthConnectLoading.value = false;
+    }
+}
+
+async function disconnectHealthConnect() {
+    if (!canDisconnectHealthConnect.value) {
+        return;
+    }
+
+    healthConnectDisconnecting.value = true;
+
+    try {
+        const {data} = await axios.delete('/health-connect');
+        applyHealthImportState(data);
+    } finally {
+        healthConnectDisconnecting.value = false;
     }
 }
 
@@ -202,18 +223,27 @@ onBeforeUnmount(() => {
                     <Link2 :size="18"/>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h2 class="card-title">{{ healthImport?.name }}</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectLabel }}</p>
+                    <p class="text-sm text-muted-foreground">{{ healthConnectLabel }}</p>
                     <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
                 </div>
             </div>
             <Button
                 type="button"
                 class="mt-4 w-full"
-                :disabled="healthConnectLoading || healthImport?.state.available === false"
+                :disabled="healthConnectLoading || healthConnectDisconnecting || healthImport?.state.available === false"
                 @click="connectHealthConnect"
             >
                 {{ healthConnectButtonLabel }}
+            </Button>
+            <Button
+                v-if="canDisconnectHealthConnect"
+                type="button"
+                variant="destructive"
+                class="mt-2 w-full"
+                :disabled="healthConnectLoading || healthConnectDisconnecting"
+                @click="disconnectHealthConnect"
+            >
+                {{ healthConnectDisconnecting ? 'Disconnecting...' : 'Disconnect Health Connect' }}
             </Button>
         </Card>
     </section>

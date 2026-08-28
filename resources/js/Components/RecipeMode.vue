@@ -334,26 +334,26 @@ function confirmRecipeDelete(): void {
         </Card>
 
         <Card v-else>
-            <div class="flex items-center gap-2">
-                <UtensilsCrossed :size="21" class="text-food" />
-                <h2 class="card-title">Recipes</h2>
+            <div class="flex items-start gap-4">
+                <span class="grid size-12 shrink-0 place-items-center rounded-xl bg-food/10 text-food">
+                    <UtensilsCrossed :size="23" />
+                </span>
+                <div class="min-w-0">
+                    <h2 class="card-title">{{ recipes.length ? 'Saved recipes' : 'Save meals you repeat' }}</h2>
+                    <p class="mt-1 text-sm text-muted-foreground">
+                        {{ recipes.length ? 'Choose a recipe to log it.' : 'Group ingredients once, then log the whole meal in a tap.' }}
+                    </p>
+                </div>
             </div>
 
-            <Button variant="outline" class="mt-4 h-auto w-full justify-start rounded-2xl p-4 text-left" @click="startCreate">
-                <span class="grid h-11 w-11 place-items-center rounded-xl bg-food text-primary-foreground">
-                    <Plus :size="22" />
-                </span>
-                <span>
-                    <span class="block font-semibold">New recipe</span>
-                    <span class="block text-sm font-medium text-muted-foreground">Save a multi-ingredient meal</span>
-                </span>
+            <Button class="mt-5 w-full" @click="startCreate">
+                <Plus :size="19" />
+                {{ recipes.length ? 'New recipe' : 'Create your first recipe' }}
             </Button>
 
-            <p v-if="recipes.length === 0" class="mt-4 text-sm text-muted-foreground">No saved recipes yet.</p>
-
-            <div v-else class="mt-4 grid gap-2">
+            <div v-if="recipes.length" class="mt-4 divide-y divide-border/60">
                 <div v-for="recipe in recipes" :key="recipe.id" class="flex items-center gap-1">
-                    <Button type="button" variant="surface" class="h-auto min-w-0 flex-1 justify-start overflow-hidden p-3 text-left" @click="startLog(recipe)">
+                    <Button type="button" variant="ghost" class="h-auto min-w-0 flex-1 justify-start overflow-hidden rounded-xl px-3 py-3 text-left" @click="startLog(recipe)">
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ recipe.name }}</span>
                             <span class="block truncate text-sm text-muted-foreground">{{ recipe.calories }} kcal · {{ recipe.items.length }} ingredients</span>

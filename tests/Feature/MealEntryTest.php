@@ -309,7 +309,7 @@ it('searches saved food products', function (): void {
         'world.openfoodfacts.org/cgi/search.pl*' => Http::response(['products' => []]),
     ]);
 
-    FoodProduct::query()->create([
+    $product = FoodProduct::query()->create([
         'barcode' => '1234567890123',
         'name' => 'Greek yoghurt',
         'brand' => 'Dairy Co',
@@ -318,6 +318,17 @@ it('searches saved food products', function (): void {
         'protein_per_100' => 8,
         'carbs_per_100' => 12,
         'fat_per_100' => 4,
+    ]);
+    MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'breakfast',
+        'source_type' => MealEntry::SOURCE_BARCODE,
+        'food_product_id' => $product->id,
+        'name' => $product->name,
+        'calories' => 120,
+        'protein_g' => 8,
+        'carbs_g' => 12,
+        'fat_g' => 4,
     ]);
 
     $this->getJson('/food-products/search?q=yoghurt')
@@ -330,7 +341,7 @@ it('keeps saved food product search working when open food facts fails', functio
         'world.openfoodfacts.org/cgi/search.pl*' => Http::failedConnection('Open Food Facts timed out.'),
     ]);
 
-    FoodProduct::query()->create([
+    $product = FoodProduct::query()->create([
         'barcode' => '1234567890123',
         'name' => 'Greek yoghurt',
         'brand' => 'Dairy Co',
@@ -339,6 +350,17 @@ it('keeps saved food product search working when open food facts fails', functio
         'protein_per_100' => 8,
         'carbs_per_100' => 12,
         'fat_per_100' => 4,
+    ]);
+    MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'breakfast',
+        'source_type' => MealEntry::SOURCE_BARCODE,
+        'food_product_id' => $product->id,
+        'name' => $product->name,
+        'calories' => 120,
+        'protein_g' => 8,
+        'carbs_g' => 12,
+        'fat_g' => 4,
     ]);
 
     $this->getJson('/food-products/search?q=yoghurt')
@@ -369,12 +391,14 @@ it('searches previous custom meals before remote products', function (): void {
         ->assertJsonPath('products.0.calories', 488);
 });
 
-it('updates a meal entry', function (): void {
+it('updates meal macros without changing its portion', function (): void {
     $entry = MealEntry::query()->create([
         'date' => '2026-05-19',
         'meal_type' => 'lunch',
         'source_type' => MealEntry::SOURCE_CUSTOM,
         'name' => 'Chicken bowl',
+        'portion_quantity' => 350,
+        'portion_unit' => 'g',
         'calories' => 488,
         'protein_g' => 45,
         'carbs_g' => 50,
@@ -385,6 +409,7 @@ it('updates a meal entry', function (): void {
         'date' => '2026-05-19',
         'meal_type' => 'dinner',
         'name' => 'Bigger chicken bowl',
+        'edit_mode' => 'macros',
         'protein_g' => 50,
         'carbs_g' => 55,
         'fat_g' => 12,
@@ -394,5 +419,74 @@ it('updates a meal entry', function (): void {
 
     expect($entry->meal_type)->toBe('dinner')
         ->and($entry->name)->toBe('Bigger chicken bowl')
-        ->and($entry->calories)->toBe(528);
+        ->and((float) $entry->portion_quantity)->toBe(350.0)
+        ->and($entry->portion_unit)->toBe('g')
+        ->and($entry->calories)->toBe(528)
+        ->and((float) $entry->protein_g)->toBe(50.0)
+        ->and((float) $entry->carbs_g)->toBe(55.0)
+        ->and((float) $entry->fat_g)->toBe(12.0);
+});
+
+it('updates a meal portion without requiring macros', function (): void {
+    $entry = MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'lunch',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Chicken bowl',
+        'portion_quantity' => 350,
+        'portion_unit' => 'g',
+        'calories' => 488,
+        'protein_g' => 45,
+        'carbs_g' => 50,
+        'fat_g' => 12,
+    ]);
+
+    $this->put("/meals/{$entry->id}", [
+        'date' => '2026-05-19',
+        'meal_type' => 'lunch',
+        'name' => 'Chicken bowl',
+        'edit_mode' => 'portion',
+        'portion_quantity' => 700,
+        'portion_unit' => 'g',
+    ])->assertRedirect('/?date=2026-05-19');
+
+    $entry->refresh();
+
+    expect((float) $entry->portion_quantity)->toBe(700.0)
+        ->and($entry->calories)->toBe(976)
+        ->and((float) $entry->protein_g)->toBe(90.0)
+        ->and((float) $entry->carbs_g)->toBe(100.0)
+        ->and((float) $entry->fat_g)->toBe(24.0);
+});
+
+it('updates recipe servings as a portion', function (): void {
+    $entry = MealEntry::query()->create([
+        'date' => '2026-05-19',
+        'meal_type' => 'dinner',
+        'source_type' => MealEntry::SOURCE_RECIPE,
+        'name' => 'Pasta bake',
+        'portion_quantity' => 2,
+        'portion_unit' => null,
+        'calories' => 800,
+        'protein_g' => 40,
+        'carbs_g' => 100,
+        'fat_g' => 20,
+    ]);
+
+    $this->put("/meals/{$entry->id}", [
+        'date' => '2026-05-19',
+        'meal_type' => 'dinner',
+        'name' => 'Pasta bake',
+        'edit_mode' => 'portion',
+        'portion_quantity' => 1,
+        'portion_unit' => null,
+    ])->assertRedirect('/?date=2026-05-19');
+
+    $entry->refresh();
+
+    expect((float) $entry->portion_quantity)->toBe(1.0)
+        ->and($entry->calories)->toBe(400)
+        ->and((float) $entry->protein_g)->toBe(20.0)
+        ->and((float) $entry->carbs_g)->toBe(50.0)
+        ->and((float) $entry->fat_g)->toBe(10.0);
 });
