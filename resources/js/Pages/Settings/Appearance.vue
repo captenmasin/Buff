@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import {Head} from '@inertiajs/vue3';
-import {Moon, Smartphone, Sun} from '@lucide/vue';
 import {ref} from 'vue';
 import {
     saveAppearance,
@@ -16,10 +15,10 @@ import Switch from '../../Components/ui/switch/Switch.vue';
 
 const appearance = ref<Appearance>(storedAppearance());
 const reduceMotion = ref(storedReducedMotion());
-const appearanceOptions: Array<{ value: Appearance; label: string; icon: typeof Sun }> = [
-    {value: 'system', label: 'System', icon: Smartphone},
-    {value: 'light', label: 'Light', icon: Sun},
-    {value: 'dark', label: 'Dark', icon: Moon},
+const appearanceOptions: Array<{ value: Appearance; label: string }> = [
+    {value: 'system', label: 'System'},
+    {value: 'light', label: 'Light'},
+    {value: 'dark', label: 'Dark'},
 ];
 
 function selectAppearance(value: Appearance) {
@@ -44,25 +43,22 @@ function updateReducedMotion() {
                 <p class="mt-1 text-sm text-muted-foreground">Choose how Buff looks on this device.</p>
             </div>
 
-            <div class="mt-1 rounded-xl bg-muted p-1 dark:bg-secondary">
-                <div class="grid grid-cols-3 gap-1" role="group" aria-label="Appearance">
-                    <Button
-                        v-for="option in appearanceOptions"
-                        :key="option.value"
-                        type="button"
-                        size="sm"
-                        class="h-10 w-full gap-1.5 rounded-lg px-2"
-                        :class="appearance === option.value
-                            ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
-                            : 'text-foreground hover:bg-foreground/8'"
-                        :variant="appearance === option.value ? 'default' : 'ghost'"
-                        :aria-pressed="appearance === option.value"
-                        @click="selectAppearance(option.value)"
-                    >
-                        <component :is="option.icon" :size="16" stroke-width="2.2" />
-                        <span>{{ option.label }}</span>
-                    </Button>
-                </div>
+            <div class="mt-1 grid grid-cols-3 gap-1 rounded-xl bg-muted p-1 dark:bg-secondary" role="group" aria-label="Appearance">
+                <Button
+                    v-for="option in appearanceOptions"
+                    :key="option.value"
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    class="h-10 w-full"
+                    :class="appearance === option.value
+                        ? 'bg-card text-foreground shadow-sm hover:bg-card'
+                        : 'text-muted-foreground'"
+                    :aria-pressed="appearance === option.value"
+                    @click="selectAppearance(option.value)"
+                >
+                    {{ option.label }}
+                </Button>
             </div>
 
             <div class="border-t border-border/70 pt-4" aria-label="Appearance preview">

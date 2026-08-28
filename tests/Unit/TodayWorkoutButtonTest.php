@@ -33,3 +33,9 @@ it('opens the add sheet from the start today food action', function (): void {
         ->toContain('<Button variant="default" @click="openAddDrawer()">Add food</Button>')
         ->not->toContain('<Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" variant="default">Add food</Button>');
 });
+
+it('shows the food logging streak at the bottom of today', function (): void {
+    $todayPage = file_get_contents(__DIR__.'/../../resources/js/Pages/Today.vue');
+
+    expect($todayPage)->toContain('<p class="text-center text-xs text-muted-foreground">🔥 {{ summary.streak }} day streak</p>');
+});

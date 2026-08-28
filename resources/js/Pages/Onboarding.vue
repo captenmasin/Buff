@@ -526,13 +526,23 @@ onMounted(() => {
                             <h1 class="page-title">{{ plan?.personalized ? 'Here’s your starting plan' : 'Start with a simple plan' }}</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">You can change this at any time in Goals.</p>
                         </header>
-                        <div v-if="planLoading" class="animate-pulse space-y-3" aria-label="Building your plan">
-                            <div class="h-32 rounded-xl bg-muted" />
-                            <div class="h-20 rounded-xl bg-muted" />
-                        </div>
-                        <template v-else>
-                            <DailyTargetsEditor v-if="customizingPlan" v-model:calories="form.calories" v-model:protein_g="form.protein_g" v-model:carbs_g="form.carbs_g" v-model:fat_g="form.fat_g" :errors="form.errors" @valid="targetsValid = $event" />
-                            <template v-else>
+                        <Transition
+                            mode="out-in"
+                            enter-active-class="transition-[opacity,transform] duration-200 ease-out motion-reduce:duration-150 motion-reduce:transition-opacity"
+                            enter-from-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+                            enter-to-class="scale-100 opacity-100"
+                            leave-active-class="transition-[opacity,transform] duration-150 ease-in-out motion-reduce:transition-opacity"
+                            leave-from-class="scale-100 opacity-100"
+                            leave-to-class="scale-[0.98] opacity-0 motion-reduce:scale-100"
+                        >
+                            <div v-if="planLoading" key="loading" data-motion-transform class="animate-pulse space-y-3" aria-label="Building your plan">
+                                <div class="h-32 rounded-xl bg-muted" />
+                                <div class="h-20 rounded-xl bg-muted" />
+                            </div>
+                            <div v-else-if="customizingPlan" key="customizing" data-motion-transform>
+                                <DailyTargetsEditor v-model:calories="form.calories" v-model:protein_g="form.protein_g" v-model:carbs_g="form.carbs_g" v-model:fat_g="form.fat_g" :errors="form.errors" @valid="targetsValid = $event" />
+                            </div>
+                            <div v-else key="summary" data-motion-transform class="space-y-8">
                                 <Card class="text-center">
                                     <p class="field-label">Daily target</p>
                                     <p class="mt-2 text-5xl font-bold tracking-tight tabular-nums">{{ form.calories.toLocaleString() }}</p>
@@ -545,8 +555,8 @@ onMounted(() => {
                                 </Card>
                                 <p class="rounded-xl bg-secondary px-4 py-3 text-sm" role="status">{{ plan?.notice || planError }}</p>
                                 <Button type="button" variant="surface" class="w-full" @click="customizingPlan = true">Customize calories and macros</Button>
-                            </template>
-                        </template>
+                            </div>
+                        </Transition>
                     </template>
                 </div>
             </Transition>

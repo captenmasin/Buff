@@ -911,7 +911,15 @@ onUnmounted(() => {
             </Button>
         </nav>
 
-        <div v-if="webScannerOpen" class="fixed inset-0 z-50 flex flex-col bg-foreground text-background">
+        <Transition
+            enter-active-class="transition-[opacity,transform] duration-sheet ease-drawer motion-reduce:duration-150 motion-reduce:transition-opacity"
+            enter-from-class="translate-y-full opacity-0 motion-reduce:translate-y-0"
+            enter-to-class="translate-y-0 opacity-100"
+            leave-active-class="transition-[opacity,transform] duration-sheet ease-drawer motion-reduce:duration-150 motion-reduce:transition-opacity"
+            leave-from-class="translate-y-0 opacity-100"
+            leave-to-class="translate-y-full opacity-0 motion-reduce:translate-y-0"
+        >
+            <div v-if="webScannerOpen" data-motion-transform class="fixed inset-0 z-50 flex flex-col bg-foreground text-background">
             <div class="flex items-center justify-between gap-3 px-4 py-3 pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
                     <p class="text-sm text-background/70">{{ manualBarcodeOpen ? 'Manual barcode' : 'Scan barcode' }}</p>
@@ -966,7 +974,8 @@ onUnmounted(() => {
                     Enter barcode manually
                 </Button>
             </div>
-        </div>
+            </div>
+        </Transition>
 
         <AddChooser v-if="mode === 'choose'" @select="openAddMode" />
 
@@ -985,10 +994,22 @@ onUnmounted(() => {
             </div>
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
-            <div v-if="selectedPhotos.length || photoProcessing" class="mt-4 grid grid-cols-3 gap-2">
+            <TransitionGroup
+                v-if="selectedPhotos.length || photoProcessing"
+                tag="div"
+                appear
+                class="mt-4 grid grid-cols-3 gap-2"
+                enter-active-class="transition-[opacity,transform] duration-200 ease-out motion-reduce:duration-100 motion-reduce:transition-opacity"
+                enter-from-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+                enter-to-class="scale-100 opacity-100"
+                leave-active-class="transition-[opacity,transform] duration-150 ease-in-out motion-reduce:duration-100 motion-reduce:transition-opacity"
+                leave-from-class="scale-100 opacity-100"
+                leave-to-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+            >
                 <div
                     v-for="(photo, index) in selectedPhotos"
                     :key="photo.preview"
+                    data-motion-transform
                     class="relative overflow-hidden rounded-2xl border border-link/50 bg-muted"
                     :class="selectedPhotos.length === 1 ? 'col-span-3 mx-auto aspect-[302/270] w-full max-w-sm' : 'aspect-square'"
                 >
@@ -1000,11 +1021,11 @@ onUnmounted(() => {
                         <X :size="16" />
                     </Button>
                 </div>
-                <div v-if="photoProcessing" class="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl bg-muted text-muted-foreground" role="status" aria-live="polite">
+                <div v-if="photoProcessing" key="processing" data-motion-transform class="flex aspect-square flex-col items-center justify-center gap-2 rounded-xl bg-muted text-muted-foreground" role="status" aria-live="polite">
                     <LoaderCircle :size="20" class="motion-safe:animate-spin" />
                     <span class="text-xs font-medium">Preparing photo…</span>
                 </div>
-            </div>
+            </TransitionGroup>
 
             <input
                 ref="photoCameraInput"
@@ -1049,13 +1070,12 @@ onUnmounted(() => {
 
         </Card>
 
-        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Buff Vision is analyzing your meal">
+        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Analyzing your meal">
             <div class="mx-auto w-full max-w-sm">
                 <h2 class="page-title">See what Buff sees.</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Your meal is becoming an editable macro estimate.</p>
 
                 <div class="mt-5 rounded-3xl bg-brand-night p-5 text-brand-white">
-                    <p class="vision-status text-xs font-semibold uppercase tracking-wide">Buff Vision · analyzing</p>
 
                     <div class="relative mt-4 aspect-[302/270] overflow-hidden rounded-2xl border border-brand-acid/70 bg-brand-night">
                         <img v-if="selectedPhotos[0]" :src="selectedPhotos[0].preview" alt="" class="h-full w-full object-cover">
@@ -1064,7 +1084,7 @@ onUnmounted(() => {
                     </div>
 
                     <p class="mt-4 text-base font-semibold">Reading ingredients and portions…</p>
-                    <p class="mt-2 text-xs leading-relaxed text-brand-white/65">Estimating the plate, then building an editable macro draft.</p>
+                    <p class="mt-2 text-xs leading-relaxed text-pretty text-brand-white/65">Estimating the plate, then building an editable macro draft.</p>
                     <div class="mt-4 h-1.5 overflow-hidden rounded-full bg-brand-white/15" aria-hidden="true">
                         <div class="vision-progress h-full rounded-full bg-brand-acid" />
                     </div>

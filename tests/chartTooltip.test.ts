@@ -1,6 +1,13 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { tooltipLabelDate, tooltipSeriesEntries, unwrapTooltipDatum } from '../resources/js/chartTooltip.ts';
+
+test('hides chart tooltips as soon as the pointer leaves', () => {
+    const source = readFileSync(new URL('../resources/js/Components/ProgressTrendChart.vue', import.meta.url), 'utf8');
+
+    assert.doesNotMatch(source, /hide-delay/);
+});
 
 test('unwraps a nested Unovis datum without dropping the weigh-in', () => {
     const payload = unwrapTooltipDatum({

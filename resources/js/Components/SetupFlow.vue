@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { ArrowLeft } from '@lucide/vue';
+import { publicAssetUrl } from '../publicAssetUrl';
 import Button from './ui/button/Button.vue';
 
 const props = withDefaults(defineProps<{
@@ -29,8 +30,12 @@ const progressWidth = computed(() => `${Math.min(100, Math.max(0, props.progress
 
 <template>
     <main class="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-        <header class="mx-auto w-full max-w-md px-5 pb-4 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] sm:max-w-lg">
-            <p class="text-center text-sm font-semibold">{{ phase }}</p>
+        <header class="mx-auto w-full max-w-md pb-4 pt-[calc(env(safe-area-inset-top,0px)+1.25rem)] sm:max-w-lg">
+            <div class="flex items-center justify-between gap-4">
+                <img :src="publicAssetUrl('/logo.svg')" alt="Buff" class="h-auto w-24 dark:hidden" />
+                <img :src="publicAssetUrl('/logo-dark.svg')" alt="Buff" class="hidden h-auto w-24 dark:block" />
+                <p class="text-sm font-semibold">{{ phase }}</p>
+            </div>
             <div
                 class="mt-5 h-1.5 overflow-hidden rounded-full bg-secondary"
                 role="progressbar"

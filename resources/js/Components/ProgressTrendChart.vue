@@ -142,7 +142,7 @@ function formatYTick(value: number | Date): string {
                 :tick-text-font-size="'11px'"
                 :tick-format="formatYTick"
             />
-            <ChartTooltip :container="tooltipRoot" :hide-delay="2000" />
+            <ChartTooltip :container="tooltipRoot" />
             <ChartCrosshair
                 :x="x"
                 :y="crosshairY"

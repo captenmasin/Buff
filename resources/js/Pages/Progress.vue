@@ -96,6 +96,8 @@ const props = withDefaults(defineProps<{
 
 const pendingDelete = ref<BodyMetric | null>(null);
 const pendingPhotoDelete = ref<ProgressPhoto | null>(null);
+const chartCarousel = ref<HTMLElement | null>(null);
+const activeChart = ref(0);
 const photoInput = ref<HTMLInputElement | null>(null);
 const sheetPhotoInput = ref<HTMLInputElement | null>(null);
 const selectedPhotos = ref<Partial<Record<ProgressPhotoPose, SelectedPhoto>>>({});
@@ -571,6 +573,23 @@ function visitRange(range: string): void {
     router.visit(`/progress?range=${range}`, { preserveScroll: true });
 }
 
+function showChart(index: number): void {
+    activeChart.value = index;
+    const carousel = chartCarousel.value;
+    const firstSlide = carousel?.firstElementChild;
+    const slide = carousel?.children[index];
+
+    if (carousel && firstSlide instanceof HTMLElement && slide instanceof HTMLElement) {
+        carousel.scrollTo({ left: slide.offsetLeft - firstSlide.offsetLeft });
+    }
+}
+
+function syncChartSlide(event: Event): void {
+    const carousel = event.currentTarget as HTMLElement;
+
+    activeChart.value = Math.round(carousel.scrollLeft / carousel.clientWidth);
+}
+
 function deltaLabel(value: number | null | undefined, suffix: string): string { return value === null || value === undefined ? 'No change' : `${value > 0 ? '+' : ''}${value}${suffix}`; }
 function requestDelete(metric: BodyMetric): void { pendingDelete.value = metric; }
 function cancelDelete(): void { pendingDelete.value = null; }
@@ -821,8 +840,28 @@ onUnmounted(() => {
                         </Button>
                     </div>
                 </div>
-                <div class="mt-4 grid gap-5">
-                    <div>
+                <div v-if="hasBodyFatChart" class="mt-4 flex rounded-xl bg-muted p-1 dark:bg-secondary" role="group" aria-label="Trend chart">
+                    <Button
+                        v-for="(label, index) in ['Weight', 'Body fat']"
+                        :key="label"
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        class="h-8 flex-1 rounded-lg"
+                        :class="activeChart === index ? 'bg-card text-foreground shadow-sm hover:bg-card' : 'text-muted-foreground'"
+                        :aria-pressed="activeChart === index"
+                        @click="showChart(index)"
+                    >
+                        {{ label }}
+                    </Button>
+                </div>
+                <div
+                    ref="chartCarousel"
+                    data-chart-carousel
+                    class="mt-4 flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain scroll-smooth touch-pan-x motion-reduce:scroll-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                    @scroll.passive="syncChartSlide"
+                >
+                    <div class="w-full shrink-0 snap-start" role="group" aria-label="Weight chart">
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Weight</span>
                             <span v-if="displayTargetWeight" class="text-xs text-muted-foreground">Goal {{ formatBodyValue(displayTargetWeight) }} {{ preferences.weight_unit }}</span>
@@ -839,7 +878,7 @@ onUnmounted(() => {
                         />
                         <p v-if="weightChartSummary" class="mt-3 rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground">{{ weightChartSummary }}</p>
                     </div>
-                    <div v-if="hasBodyFatChart">
+                    <div v-if="hasBodyFatChart" class="w-full shrink-0 snap-start" role="group" aria-label="Body fat chart">
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Body fat</span>
                             <span v-if="goals?.target_body_fat_percent" class="text-xs text-muted-foreground">Goal {{ goals.target_body_fat_percent }}%</span>
@@ -929,10 +968,6 @@ onUnmounted(() => {
                         </label>
                     </div>
                 </details>
-                <label class="block">
-                    <span class="field-label">Notes</span>
-                    <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
-                </label>
                 <div class="space-y-2">
                     <p class="text-sm font-semibold text-foreground">Progress photos</p>
                     <div class="grid grid-cols-3 gap-2">
@@ -993,6 +1028,10 @@ onUnmounted(() => {
                     <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
                     <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
                 </div>
+                <label class="block">
+                    <span class="field-label">Notes</span>
+                    <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
+                </label>
                 <Button class="w-full" :disabled="metricForm.processing || photoUploading">
                     <LoaderCircle v-if="metricForm.processing || photoUploading" :size="18" class="animate-spin" />
                     {{ photoUploading ? 'Uploading photos…' : 'Save progress' }}
@@ -1097,7 +1136,15 @@ onUnmounted(() => {
         />
 
         <Teleport to="body">
-        <div v-if="cameraOpen" class="fixed inset-0 z-[80] flex flex-col bg-foreground text-background">
+            <Transition
+                enter-active-class="transition-[opacity,transform] duration-sheet ease-drawer motion-reduce:duration-150 motion-reduce:transition-opacity"
+                enter-from-class="translate-y-full opacity-0 motion-reduce:translate-y-0"
+                enter-to-class="translate-y-0 opacity-100"
+                leave-active-class="transition-[opacity,transform] duration-sheet ease-drawer motion-reduce:duration-150 motion-reduce:transition-opacity"
+                leave-from-class="translate-y-0 opacity-100"
+                leave-to-class="translate-y-full opacity-0 motion-reduce:translate-y-0"
+            >
+                <div v-if="cameraOpen" data-motion-transform class="fixed inset-0 z-[80] flex flex-col bg-foreground text-background">
             <div class="flex items-center justify-between gap-3 bg-background px-4 py-3 text-foreground pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
                     <p class="text-sm text-muted-foreground">{{ progressPhotoLabels[capturingPose] }} photo</p>
@@ -1190,7 +1237,8 @@ onUnmounted(() => {
                     </Button>
                 </div>
             </div>
-        </div>
+                </div>
+            </Transition>
         </Teleport>
     </section>
 </template>

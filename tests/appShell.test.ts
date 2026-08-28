@@ -16,6 +16,13 @@ test('keeps the settings back control separate from the page title', () => {
     assert.doesNotMatch(source, /absolute left-0/);
 });
 
+test('shows the Buff logo in setup flow headers', () => {
+    const source = readFileSync(new URL('../resources/js/Components/SetupFlow.vue', import.meta.url), 'utf8');
+
+    assert.match(source, /publicAssetUrl\('\/logo\.svg'\)/);
+    assert.match(source, /publicAssetUrl\('\/logo-dark\.svg'\)/);
+});
+
 test('shows the health provider name only in the settings page header', () => {
     const source = readFileSync(new URL('../resources/js/Pages/Settings/Health.vue', import.meta.url), 'utf8');
 

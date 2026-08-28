@@ -78,7 +78,37 @@ class DailySummaryService
                     'external_source' => $workout->external_source,
                 ])
                 ->all(),
+            'streak' => $this->currentStreak(),
         ];
+    }
+
+    private function currentStreak(): int
+    {
+        $expectedDate = today();
+        $streak = 0;
+
+        $loggedDays = MealEntry::query()
+            ->select('date')
+            ->whereDate('date', '<=', $expectedDate->toDateString())
+            ->groupBy('date')
+            ->havingRaw('sum(calories) > 0')
+            ->latest('date')
+            ->cursor();
+
+        foreach ($loggedDays as $loggedDay) {
+            if ($streak === 0 && ! $loggedDay->date->isToday()) {
+                $expectedDate->subDay();
+            }
+
+            if (! $loggedDay->date->isSameDay($expectedDate)) {
+                break;
+            }
+
+            $streak++;
+            $expectedDate->subDay();
+        }
+
+        return $streak;
     }
 
     private function totals(Collection $entries): array

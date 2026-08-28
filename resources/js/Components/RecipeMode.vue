@@ -60,6 +60,7 @@ const props = withDefaults(defineProps<{
 
 const creating = ref(false);
 const selectedRecipe = ref<Recipe | null>(null);
+const transitionDirection = ref<'forward' | 'back'>('forward');
 const pendingRecipeDelete = ref<Recipe | null>(null);
 const searchQuery = ref('');
 const searchResults = ref<FoodProduct[]>([]);
@@ -116,6 +117,7 @@ function customCalories(): number {
 }
 
 function startCreate(): void {
+    transitionDirection.value = 'forward';
     creating.value = true;
     selectedRecipe.value = null;
     recipeForm.name = '';
@@ -124,11 +126,18 @@ function startCreate(): void {
 }
 
 function startLog(recipe: Recipe): void {
+    transitionDirection.value = 'forward';
     selectedRecipe.value = recipe;
     creating.value = false;
     logForm.recipe_id = recipe.id;
     logForm.servings = recipe.servings;
     logForm.meal_type = props.meal || 'breakfast';
+}
+
+function returnToRecipes(): void {
+    transitionDirection.value = 'back';
+    creating.value = false;
+    selectedRecipe.value = null;
 }
 
 function addCustomItem(): void {
@@ -199,7 +208,7 @@ function saveRecipe(): void {
     recipeForm.post('/recipes', {
         onSuccess: () => {
             recipeForm.reset();
-            creating.value = false;
+            returnToRecipes();
         },
     });
 }
@@ -224,7 +233,20 @@ function confirmRecipeDelete(): void {
 
 <template>
     <div class="space-y-4">
-        <Card v-if="creating">
+        <Transition
+            mode="out-in"
+            enter-active-class="transition-[opacity,transform] duration-200 ease-out motion-reduce:duration-150 motion-reduce:transition-opacity"
+            :enter-from-class="transitionDirection === 'forward'
+                ? 'translate-x-3 opacity-0 motion-reduce:translate-x-0'
+                : '-translate-x-3 opacity-0 motion-reduce:translate-x-0'"
+            enter-to-class="translate-x-0 opacity-100"
+            leave-active-class="transition-[opacity,transform] duration-150 ease-in-out motion-reduce:transition-opacity"
+            leave-from-class="translate-x-0 opacity-100"
+            :leave-to-class="transitionDirection === 'forward'
+                ? '-translate-x-3 opacity-0 motion-reduce:translate-x-0'
+                : 'translate-x-3 opacity-0 motion-reduce:translate-x-0'"
+        >
+        <Card v-if="creating" key="create" data-motion-transform>
             <div class="flex items-center gap-2">
                 <UtensilsCrossed :size="21" class="text-food" />
                 <h2 class="card-title">New recipe</h2>
@@ -306,13 +328,13 @@ function confirmRecipeDelete(): void {
 
                 <p class="text-sm text-muted-foreground">{{ recipeTotals.calories }} kcal · P {{ recipeTotals.protein_g }}g · C {{ recipeTotals.carbs_g }}g · F {{ recipeTotals.fat_g }}g</p>
                 <div class="grid grid-cols-2 gap-2">
-                    <Button type="button" variant="surface" @click="creating = false">Cancel</Button>
+                    <Button type="button" variant="surface" @click="returnToRecipes">Cancel</Button>
                     <Button :disabled="recipeForm.processing || recipeForm.items.length === 0">Save recipe</Button>
                 </div>
             </form>
         </Card>
 
-        <Card v-else-if="selectedRecipe">
+        <Card v-else-if="selectedRecipe" key="log" data-motion-transform>
             <div class="flex items-center gap-2">
                 <UtensilsCrossed :size="21" class="text-food" />
                 <h2 class="card-title">{{ selectedRecipe.name }}</h2>
@@ -327,13 +349,13 @@ function confirmRecipeDelete(): void {
                     <span v-if="logForm.errors.servings" class="mt-1 block text-sm text-destructive" role="alert">{{ logForm.errors.servings }}</span>
                 </label>
                 <div class="grid grid-cols-2 gap-2">
-                    <Button type="button" variant="surface" @click="selectedRecipe = null">Back</Button>
+                    <Button type="button" variant="surface" @click="returnToRecipes">Back</Button>
                     <Button :disabled="logForm.processing">Log recipe</Button>
                 </div>
             </form>
         </Card>
 
-        <Card v-else>
+        <Card v-else key="list" data-motion-transform>
             <div class="flex items-start gap-4">
                 <span class="grid size-12 shrink-0 place-items-center rounded-xl bg-food/10 text-food">
                     <UtensilsCrossed :size="23" />
@@ -365,6 +387,7 @@ function confirmRecipeDelete(): void {
                 </div>
             </div>
         </Card>
+        </Transition>
         <ConfirmSheet
             :open="Boolean(pendingRecipeDelete)"
             title="Delete recipe"

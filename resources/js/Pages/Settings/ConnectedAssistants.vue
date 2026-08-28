@@ -102,20 +102,29 @@ function revoke(connection: Connection) {
 <!--                </p>-->
 <!--            </div>-->
 
-            <Card v-if="authorizedConnections.length === 0" class="border border-dashed border-border bg-transparent shadow-none">
-                <div class="flex items-start gap-3">
-                    <div class="grid size-10 flex-none place-items-center rounded-xl bg-muted text-muted-foreground" aria-hidden="true">
-                        <Bot :size="19"/>
+            <TransitionGroup
+                tag="div"
+                class="grid gap-3 md:grid-cols-2"
+                enter-active-class="transition-[opacity,transform] duration-200 ease-out motion-reduce:duration-150 motion-reduce:transition-opacity"
+                enter-from-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+                enter-to-class="scale-100 opacity-100"
+                leave-active-class="transition-[opacity,transform] duration-150 ease-in-out motion-reduce:transition-opacity"
+                leave-from-class="scale-100 opacity-100"
+                leave-to-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+            >
+                <Card v-if="authorizedConnections.length === 0" key="empty" data-motion-transform class="border border-dashed border-border bg-transparent shadow-none md:col-span-2">
+                    <div class="flex items-start gap-3">
+                        <div class="grid size-10 flex-none place-items-center rounded-xl bg-muted text-muted-foreground" aria-hidden="true">
+                            <Bot :size="19"/>
+                        </div>
+                        <div>
+                            <h3 class="card-title">No assistants have access</h3>
+                            <p class="mt-1 text-sm text-muted-foreground">Add one below when you're ready.</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 class="card-title">No assistants have access</h3>
-                        <p class="mt-1 text-sm text-muted-foreground">Add one below when you're ready.</p>
-                    </div>
-                </div>
-            </Card>
+                </Card>
 
-            <div v-else class="grid gap-3 md:grid-cols-2">
-                <Card v-for="connection in authorizedConnections" :key="connection.id">
+                <Card v-for="connection in authorizedConnections" :key="connection.id" data-motion-transform>
                     <div class="flex items-start gap-3">
                         <div class="grid size-10 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground" aria-hidden="true">
                             <Bot :size="19"/>
@@ -155,7 +164,7 @@ function revoke(connection: Connection) {
                         {{ revokingId === connection.id ? 'Revoking…' : 'Revoke access' }}
                     </Button>
                 </Card>
-            </div>
+            </TransitionGroup>
         </section>
 
         <Card v-if="mcpEndpoint">
@@ -266,27 +275,36 @@ function revoke(connection: Connection) {
             </div>
         </Card>
 
-        <Card v-if="revokedConnections.length">
-            <details class="group">
-                <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
-                    <span>
-                        <span class="block text-sm font-semibold text-foreground">Connection history</span>
-                        <span class="mt-1 block text-sm text-muted-foreground">{{ revokedConnections.length }} revoked</span>
-                    </span>
-                    <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
-                </summary>
+        <Transition
+            enter-active-class="transition-[opacity,transform] duration-200 ease-out motion-reduce:duration-150 motion-reduce:transition-opacity"
+            enter-from-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+            enter-to-class="scale-100 opacity-100"
+            leave-active-class="transition-[opacity,transform] duration-150 ease-in-out motion-reduce:transition-opacity"
+            leave-from-class="scale-100 opacity-100"
+            leave-to-class="scale-[0.97] opacity-0 motion-reduce:scale-100"
+        >
+            <Card v-if="revokedConnections.length" data-motion-transform>
+                <details class="group">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3">
+                        <span>
+                            <span class="block text-sm font-semibold text-foreground">Connection history</span>
+                            <span class="mt-1 block text-sm text-muted-foreground">{{ revokedConnections.length }} revoked</span>
+                        </span>
+                        <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
+                    </summary>
 
-                <div class="mt-4 divide-y divide-border border-t border-border">
-                    <div
-                        v-for="connection in revokedConnections"
-                        :key="connection.id"
-                        class="flex items-center justify-between gap-4 py-3 text-sm"
-                    >
-                        <span class="min-w-0 truncate font-medium text-foreground">{{ connection.clientName }}</span>
-                        <span class="flex-none text-right text-muted-foreground">Revoked {{ formatTimestamp(connection.revokedAt) }}</span>
+                    <div class="mt-4 divide-y divide-border border-t border-border">
+                        <div
+                            v-for="connection in revokedConnections"
+                            :key="connection.id"
+                            class="flex items-center justify-between gap-4 py-3 text-sm"
+                        >
+                            <span class="min-w-0 truncate font-medium text-foreground">{{ connection.clientName }}</span>
+                            <span class="flex-none text-right text-muted-foreground">Revoked {{ formatTimestamp(connection.revokedAt) }}</span>
+                        </div>
                     </div>
-                </div>
-            </details>
-        </Card>
+                </details>
+            </Card>
+        </Transition>
     </section>
 </template>

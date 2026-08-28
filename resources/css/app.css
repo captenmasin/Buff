@@ -240,6 +240,10 @@ textarea {
     letter-spacing: inherit;
 }
 
+[data-slot='input']::-webkit-calendar-picker-indicator {
+    margin-right: 0.375rem;
+}
+
 [data-slot='button'] {
     transition:
         color 150ms ease,
@@ -488,6 +492,15 @@ textarea {
 
 html[data-reduce-motion] {
     scroll-behavior: auto;
+}
+
+html[data-reduce-motion] [data-motion-transform] {
+    transform: none !important;
+    translate: none !important;
+    scale: none !important;
+    transition-duration: 150ms !important;
+    transition-property: opacity !important;
+    transition-timing-function: var(--ease-out) !important;
 }
 
 html[data-reduce-motion]::view-transition-old(root),

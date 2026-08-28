@@ -200,6 +200,41 @@ it('returns an empty goal-backed summary without meal or workout groups', functi
         );
 });
 
+it('reports the current food logging streak', function (array $dates, int $streak): void {
+    $this->travelTo('2026-05-22 12:00:00');
+
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    foreach ($dates as $date) {
+        MealEntry::query()->create([
+            'date' => $date,
+            'meal_type' => 'breakfast',
+            'source_type' => MealEntry::SOURCE_CUSTOM,
+            'name' => 'Breakfast',
+            'calories' => 500,
+            'protein_g' => 30,
+            'carbs_g' => 50,
+            'fat_g' => 15,
+        ]);
+    }
+
+    $this->get('/')
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('summary.streak', $streak)
+        );
+})->with([
+    'including today' => [['2026-05-22', '2026-05-21', '2026-05-19'], 2],
+    'through yesterday' => [['2026-05-21', '2026-05-20', '2026-05-18'], 2],
+    'expired' => [['2026-05-20'], 0],
+    'future entries ignored' => [['2026-05-23', '2026-05-20'], 0],
+]);
+
 it('redirects legacy add shortcuts to the canonical add page', function (): void {
     DailyGoal::query()->create([
         'calories' => 2000,

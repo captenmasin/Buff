@@ -73,6 +73,7 @@ interface WorkoutEntry {
 
 interface DailySummary {
     date: string;
+    streak: number;
     goal: DailyGoal | null;
     log: {
         burned_calories: number;
@@ -828,6 +829,8 @@ onBeforeUnmount(() => {
             </span>
             <span class="text-sm font-medium text-muted-foreground">Calories & macros</span>
         </Button>
+
+        <p class="text-center text-xs text-muted-foreground">🔥 {{ summary.streak }} day streak</p>
 
         <AppSheet :open="Boolean(mealSheetMode && selectedMeal)" labelled-by="meal-sheet-title" @close="closeMeal">
             <Transition

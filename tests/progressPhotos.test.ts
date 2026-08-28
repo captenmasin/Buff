@@ -89,11 +89,12 @@ test('prefers another day over the current day when retaking photos', () => {
     assert.equal(overlays.front?.date, '2026-08-10');
 });
 
-test('distinguishes the progress photo heading from pose labels', () => {
+test('shows progress photos before notes and distinguishes the heading from pose labels', () => {
     const progressSource = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
 
     assert.match(progressSource, /class="text-sm font-semibold text-foreground">Progress photos/);
     assert.match(progressSource, /class="field-label">\{\{ progressPhotoLabels\[pose\] \}\}/);
+    assert.ok(progressSource.indexOf('>Progress photos<') < progressSource.indexOf('>Notes<'));
 });
 
 test('keeps native camera controls visible and lets Android Back close the camera', () => {

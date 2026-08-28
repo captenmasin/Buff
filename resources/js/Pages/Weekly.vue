@@ -127,11 +127,11 @@ function applySelection() {
                 <Button
                     type="button"
                     size="sm"
+                    variant="ghost"
                     class="h-10 w-full"
                     :class="selectedMode === 'week'
-                        ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
-                        : 'text-foreground hover:bg-foreground/8'"
-                    :variant="selectedMode === 'week' ? 'default' : 'ghost'"
+                        ? 'bg-card text-foreground shadow-sm hover:bg-card'
+                        : 'text-muted-foreground'"
                     :aria-pressed="selectedMode === 'week'"
                     @click="selectedMode = 'week'"
                 >
@@ -140,11 +140,11 @@ function applySelection() {
                 <Button
                     type="button"
                     size="sm"
+                    variant="ghost"
                     class="h-10 w-full"
                     :class="selectedMode === 'range'
-                        ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
-                        : 'text-foreground hover:bg-foreground/8'"
-                    :variant="selectedMode === 'range' ? 'default' : 'ghost'"
+                        ? 'bg-card text-foreground shadow-sm hover:bg-card'
+                        : 'text-muted-foreground'"
                     :aria-pressed="selectedMode === 'range'"
                     @click="selectedMode = 'range'"
                 >

@@ -23,13 +23,16 @@ const emit = defineEmits<{
 <template>
     <div>
         <p class="text-sm font-semibold">When did you have it?</p>
-        <div class="mt-3 grid grid-cols-2 gap-2">
+        <div class="mt-3 grid grid-cols-2 gap-2" role="radiogroup" aria-label="Meal type">
             <Button
                 v-for="mealType in mealTypes"
                 :key="mealType"
                 type="button"
+                role="radio"
+                variant="surface"
                 class="min-h-11 px-3 text-sm"
-                :variant="modelValue === mealType ? 'default' : 'surface'"
+                :class="modelValue === mealType ? 'border-brand-violet bg-brand-violet/10 ring-1 ring-brand-violet' : ''"
+                :aria-checked="modelValue === mealType"
                 @click="emit('update:modelValue', mealType)"
             >
                 {{ mealLabels[mealType] }}

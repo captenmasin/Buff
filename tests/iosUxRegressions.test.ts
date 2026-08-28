@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 
 const appSource = readFileSync(new URL('../resources/js/app.ts', import.meta.url), 'utf8');
+const appStyles = readFileSync(new URL('../resources/css/app.css', import.meta.url), 'utf8');
 const packageJson = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 const dailyTargetsEditorSource = readFileSync(new URL('../resources/js/Components/DailyTargetsEditor.vue', import.meta.url), 'utf8');
 const mealTypePickerSource = readFileSync(new URL('../resources/js/Components/Add/MealTypePicker.vue', import.meta.url), 'utf8');
@@ -18,6 +19,10 @@ test('builds and launches iOS through the NativePHP asset and request pipeline',
     assert.match(appSource, /http\.setClient\(axiosAdapter\(axios\)\)/);
 });
 
+test('insets native date and time picker indicators', () => {
+    assert.match(appStyles, /\[data-slot='input'\]::-webkit-calendar-picker-indicator \{\s+margin-right: 0\.375rem;/);
+});
+
 test('defaults recipe logs to breakfast when the optional meal query is empty', () => {
     assert.equal(recipeModeSource.match(/meal_type: props\.meal \|\| 'breakfast'/g)?.length, 1);
     assert.equal(recipeModeSource.match(/logForm\.meal_type = props\.meal \|\| 'breakfast'/g)?.length, 1);
@@ -25,9 +30,12 @@ test('defaults recipe logs to breakfast when the optional meal query is empty', 
     assert.match(recipeModeSource, /logForm\.errors\.servings/);
 });
 
-test('renders meal choices without a nested card', () => {
+test('renders meal choices as a distinct selection control', () => {
     assert.doesNotMatch(mealTypePickerSource, /rounded-xl border border-border bg-muted p-3/);
-    assert.match(mealTypePickerSource, /modelValue === mealType \? 'default' : 'surface'/);
+    assert.match(mealTypePickerSource, /role="radiogroup" aria-label="Meal type"/);
+    assert.match(mealTypePickerSource, /variant="surface"/);
+    assert.match(mealTypePickerSource, /modelValue === mealType \? 'border-brand-violet bg-brand-violet\/10 ring-1 ring-brand-violet' : ''/);
+    assert.match(mealTypePickerSource, /:aria-checked="modelValue === mealType"/);
 });
 
 test('renders macro presets as proportional comparison rows', () => {

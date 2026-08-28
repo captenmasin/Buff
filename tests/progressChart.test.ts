@@ -156,6 +156,16 @@ test('renders chart summaries as a readable callout under the chart', () => {
     assert.doesNotMatch(source, /text-sm text-muted-foreground">\{\{ weightChartSummary \}\}/);
 });
 
+test('renders weight and body-fat trends as a swipeable carousel', () => {
+    const source = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
+
+    assert.match(source, /data-chart-carousel/);
+    assert.match(source, /snap-x snap-mandatory gap-5 overflow-x-auto/);
+    assert.match(source, /slide\.offsetLeft - firstSlide\.offsetLeft/);
+    assert.match(source, /aria-label="Weight chart"/);
+    assert.match(source, /aria-label="Body fat chart"/);
+});
+
 test('colours a weight change by whether it moves toward the target', () => {
     assert.equal(deltaTone(-0.6, 82.4, 80), 'text-success-foreground');
     assert.equal(deltaTone(0.4, 82.4, 80), 'text-destructive');
