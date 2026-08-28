@@ -75,6 +75,8 @@ class WeekSummaryService
             })
             ->values();
 
+        $logged = $days->filter(fn (array $day): bool => $day['consumed_calories'] > 0);
+
         return [
             'days' => $days->all(),
             'roundup' => [
@@ -83,6 +85,8 @@ class WeekSummaryService
                 'calories' => (int) $days->sum('consumed_calories'),
                 'burned_calories' => (int) $days->sum('burned_calories'),
                 'effective_target' => $goal ? (int) $days->sum('effective_target') : null,
+                'average_calories' => $logged->isNotEmpty() ? (int) round($logged->avg('consumed_calories')) : null,
+                'average_target' => $goal && $logged->isNotEmpty() ? (int) round($logged->avg('effective_target')) : null,
                 'protein_g' => round((float) $days->sum('protein_g'), 2),
                 'carbs_g' => round((float) $days->sum('carbs_g'), 2),
                 'fat_g' => round((float) $days->sum('fat_g'), 2),

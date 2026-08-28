@@ -175,6 +175,7 @@ const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
 const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));
+const showDayLists = computed(() => !isEmptyDay.value || !isToday.value);
 const openAddDrawer = inject<() => void>('openAddDrawer')!;
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
 const selectedDate = computed(() => parseDate(props.summary.date));
@@ -657,7 +658,7 @@ onBeforeUnmount(() => {
 
         <Card v-if="hasGoal && isEmptyDay && isToday">
             <div class="flex items-start gap-3">
-                <div class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-primary text-primary-foreground">
+                <div class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground">
                     <Plus :size="20" />
                 </div>
                 <div class="min-w-0 flex-1">
@@ -695,7 +696,7 @@ onBeforeUnmount(() => {
             </div>
         </Card>
 
-        <section class="space-y-3">
+        <section v-if="showDayLists" class="space-y-3">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">Meals</h2>
                 <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" size="sm"><Plus class="w-4" />Add food</Button>
@@ -738,7 +739,7 @@ onBeforeUnmount(() => {
                                     </span>
                                     <span class="shrink-0 text-right">
                                         <span class="block text-sm font-semibold tabular-nums text-foreground">{{ entry.calories }}</span>
-                                        <span class="text-[10px] font-medium text-muted-foreground">kcal</span>
+                                        <span class="text-xs font-medium text-muted-foreground">kcal</span>
                                     </span>
                                 </Button>
                             </div>
@@ -748,7 +749,7 @@ onBeforeUnmount(() => {
             </Card>
         </section>
 
-        <section class="space-y-3">
+        <section v-if="showDayLists" class="space-y-3">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">Workouts</h2>
                 <div class="flex items-center gap-2">
@@ -792,7 +793,7 @@ onBeforeUnmount(() => {
                         </div>
                         <p class="min-w-10 shrink-0 text-center leading-none">
                             <span class="block text-sm font-semibold tabular-nums">{{ workout.calories_burned }}</span>
-                            <span class="mt-1 block text-[10px] font-medium leading-none text-muted-foreground">kcal</span>
+                            <span class="mt-1 block text-xs font-medium leading-none text-muted-foreground">kcal</span>
                         </p>
                         <Popover v-slot="{ close }">
                             <PopoverTrigger as-child>

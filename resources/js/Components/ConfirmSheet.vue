@@ -40,7 +40,7 @@ function onOpenChange(open: boolean) {
             </AlertDialogHeader>
             <AlertDialogFooter>
                 <AlertDialogCancel variant="surface" @click="emit('cancel')">Cancel</AlertDialogCancel>
-                <Button type="button" variant="destructive" @click="emit('confirm')">{{ confirmLabel }}</Button>
+                <Button type="button" variant="destructive-solid" @click="emit('confirm')">{{ confirmLabel }}</Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

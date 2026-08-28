@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
 
         <Card>
             <div class="flex items-start gap-3">
-                <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-primary text-primary-foreground">
+                <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground">
                     <Link2 :size="18"/>
                 </div>
                 <div class="min-w-0 flex-1">

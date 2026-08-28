@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { Check } from '@lucide/vue';
+import { Check, Minus, Plus } from '@lucide/vue';
 import { computed } from 'vue';
-import { dayStatusClass, dayStatusHasTick, type DayStatus } from '../dayStatus';
+import { dayStatusClass, dayStatusIcon, type DayStatus } from '../dayStatus';
 
 const props = withDefaults(defineProps<{
     status: DayStatus;
@@ -10,7 +10,8 @@ const props = withDefaults(defineProps<{
     size: 16,
 });
 
-const tickSize = computed(() => Math.round(props.size * 0.62));
+const glyph = computed(() => dayStatusIcon(props.status));
+const glyphSize = computed(() => Math.round(props.size * 0.62));
 </script>
 
 <template>
@@ -21,8 +22,18 @@ const tickSize = computed(() => Math.round(props.size * 0.62));
         aria-hidden="true"
     >
         <Check
-            v-if="dayStatusHasTick(status)"
-            :size="tickSize"
+            v-if="glyph === 'check'"
+            :size="glyphSize"
+            stroke-width="3"
+        />
+        <Minus
+            v-else-if="glyph === 'minus'"
+            :size="glyphSize"
+            stroke-width="3"
+        />
+        <Plus
+            v-else-if="glyph === 'plus'"
+            :size="glyphSize"
             stroke-width="3"
         />
     </span>

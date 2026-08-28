@@ -6,6 +6,7 @@ test('uses dark text for active bottom navigation links in dark mode', () => {
     const source = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
 
     assert.equal(source.match(/bg-primary dark:text-primary-foreground/g)?.length, 4);
+    assert.equal(source.match(/isActive\(navItems\[\d\]\.match\) \? 'default' : 'ghost'/g)?.length, 4);
 });
 
 test('keeps the settings back control separate from the page title', () => {

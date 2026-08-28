@@ -46,7 +46,7 @@ const dashOffset = computed(() => circumference * (1 - progress.value));
                 />
             </svg>
             <div class="absolute inset-0 grid place-items-center text-center">
-                <p class="text-[1.65rem] font-bold leading-none tracking-tight tabular-nums">{{ consumed }}</p>
+                <p class="text-display font-bold leading-none tracking-tight tabular-nums">{{ consumed }}</p>
             </div>
         </div>
         <div class="min-w-0 flex-1">

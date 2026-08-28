@@ -26,7 +26,7 @@ import {
 import { hapticImpact } from '../haptics';
 import { photoDataUrl } from '../photoDataUrl';
 import { resizePhoto } from '../photoResize';
-import { buildBodyFatChartData, buildWeightChartData, chartXDomain } from '../progressChart';
+import { buildBodyFatChartData, buildWeightChartData, chartSummary, chartXDomain, deltaTone } from '../progressChart';
 import {
     isProgressPhotoPose,
     progressPhotoCaptureLabels,
@@ -185,6 +185,28 @@ const hasBodyFatChart = computed(() => bodyFatChartData.value.some((row) => row.
 const hasMeasurements = computed(() => measurementFields.some(({ key }) => props.measurements[key] !== null));
 const weightChartLines = computed(() => displayTargetWeight.value === null ? ['weight'] : ['weight', 'goal']);
 const bodyFatChartLines = computed(() => props.goals?.target_body_fat_percent == null ? ['bodyFat'] : ['bodyFat', 'goal']);
+const weightChartSummary = computed(() => chartSummary(
+    weightChartData.value,
+    'weight',
+    ` ${props.preferences.weight_unit}`,
+    displayTargetWeight.value,
+));
+const bodyFatChartSummary = computed(() => chartSummary(
+    bodyFatChartData.value,
+    'bodyFat',
+    '%',
+    props.goals?.target_body_fat_percent ?? null,
+));
+const weightDeltaClass = computed(() => deltaTone(
+    props.trend?.delta_kg,
+    props.latest?.weight_kg,
+    props.goals?.target_weight_kg,
+));
+const bodyFatDeltaClass = computed(() => deltaTone(
+    props.delta?.body_fat_percent,
+    props.latest?.body_fat_percent,
+    props.goals?.target_body_fat_percent,
+));
 const weightChartConfig: ChartConfig = {
     weight: { label: 'Weight', color: 'var(--chart-1)' },
     goal: { label: 'Goal', color: 'var(--food)' },
@@ -754,7 +776,7 @@ onUnmounted(() => {
                 <Card class="px-3">
                     <p class="field-label">Weight</p>
                     <p class="mt-2 text-2xl font-semibold tracking-tight">{{ formatBodyValue(latestWeight) }}<span class="text-sm font-medium text-muted-foreground"> {{ preferences.weight_unit }}</span></p>
-                    <p class="mt-1 flex items-center gap-1 text-sm" :class="(trend?.delta_kg ?? 0) > 0 ? 'text-destructive' : 'text-success-foreground'">
+                    <p class="mt-1 flex items-center gap-1 text-sm" :class="weightDeltaClass">
                         <component :is="(trend?.delta_kg ?? 0) > 0 ? TrendingUp : TrendingDown" v-if="hasTrendDelta" :size="15" />
                         {{ hasTrendDelta ? deltaLabel(displayTrendDelta, ` ${preferences.weight_unit}`) : 'First entry' }}
                     </p>
@@ -762,7 +784,7 @@ onUnmounted(() => {
                 <Card class="px-3">
                     <p class="field-label">Body fat</p>
                     <p class="mt-2 text-2xl font-semibold tracking-tight">{{ latest?.body_fat_percent ?? '--' }}<span v-if="latest?.body_fat_percent !== null" class="text-sm font-medium text-muted-foreground">%</span></p>
-                    <p class="mt-1 text-sm">{{ hasDelta ? deltaLabel(delta?.body_fat_percent, '%') : 'First entry' }}</p>
+                    <p class="mt-1 text-sm" :class="bodyFatDeltaClass">{{ hasDelta ? deltaLabel(delta?.body_fat_percent, '%') : 'First entry' }}</p>
                 </Card>
                 <Card class="px-3">
                     <p class="field-label">BMI</p>
@@ -780,14 +802,16 @@ onUnmounted(() => {
             <Card>
                 <div class="flex items-center justify-between gap-3">
                     <h2 class="card-title">Trends</h2>
-                    <div class="flex rounded-xl bg-brand-night p-1" role="group" aria-label="Trend date range">
+                    <div class="flex rounded-xl bg-muted p-1 dark:bg-secondary" role="group" aria-label="Trend date range">
                         <Button
                             v-for="option in rangeOptions"
                             :key="option.key"
                             type="button"
                             size="sm"
-                            class="h-8 min-w-10 rounded-lg px-2.5 focus-visible:border-brand-white focus-visible:ring-brand-white"
-                            :class="range === option.key ? '' : 'text-brand-white hover:bg-brand-white/10 hover:text-brand-white'"
+                            class="h-8 min-w-10 rounded-lg px-2.5"
+                            :class="range === option.key
+                                ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
+                                : 'text-foreground hover:bg-foreground/8'"
                             :variant="range === option.key ? 'default' : 'ghost'"
                             :aria-label="option.accessibleLabel"
                             :aria-pressed="range === option.key"
@@ -813,6 +837,7 @@ onUnmounted(() => {
                             :dots="['weight']"
                             :value-suffix="` ${preferences.weight_unit}`"
                         />
+                        <p v-if="weightChartSummary" class="mt-3 rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground">{{ weightChartSummary }}</p>
                     </div>
                     <div v-if="hasBodyFatChart">
                         <div class="mb-2 flex justify-between">
@@ -829,6 +854,7 @@ onUnmounted(() => {
                             :dots="['bodyFat']"
                             value-suffix="%"
                         />
+                        <p v-if="bodyFatChartSummary" class="mt-3 rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground">{{ bodyFatChartSummary }}</p>
                     </div>
                 </div>
             </Card>

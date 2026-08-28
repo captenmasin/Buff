@@ -236,7 +236,7 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                         <span class="h-full bg-carbs" :style="{ width: `${preset.carbs}%` }" />
                         <span class="h-full bg-fat" :style="{ width: `${preset.fat}%` }" />
                     </span>
-                    <span class="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums" aria-hidden="true">
+                    <span class="mt-1.5 flex items-center justify-between gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
                         <span class="text-protein">Protein {{ preset.protein }}%</span>
                         <span class="text-carbs">Carbs {{ preset.carbs }}%</span>
                         <span class="text-fat">Fat {{ preset.fat }}%</span>
@@ -265,7 +265,7 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                         <span class="h-full bg-carbs" :style="{ width: `${customSplit.carbs}%` }" />
                         <span class="h-full bg-fat" :style="{ width: `${customSplit.fat}%` }" />
                     </span>
-                    <span class="mt-1.5 flex items-center justify-between gap-2 text-[11px] font-medium tabular-nums" aria-hidden="true">
+                    <span class="mt-1.5 flex items-center justify-between gap-2 text-xs font-medium tabular-nums" aria-hidden="true">
                         <span class="text-protein">Protein {{ customSplit.protein }}%</span>
                         <span class="text-carbs">Carbs {{ customSplit.carbs }}%</span>
                         <span class="text-fat">Fat {{ customSplit.fat }}%</span>

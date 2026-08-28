@@ -306,7 +306,7 @@ async function signInWith(provider: SocialProvider) {
                 <div :key="registerStep" class="space-y-8">
                     <template v-if="registerStep === 'name'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">First, what can we call you?</h1>
+                            <h1 class="page-title">First, what can we call you?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">We’d like to get to know you</p>
                         </header>
                         <label class="block">
@@ -326,7 +326,7 @@ async function signInWith(provider: SocialProvider) {
 
                     <template v-else-if="registerStep === 'method'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">How would you like to sign up?</h1>
+                            <h1 class="page-title">How would you like to sign up?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Choose the account you’ll use with Buff.</p>
                         </header>
                         <div class="space-y-3">
@@ -343,7 +343,7 @@ async function signInWith(provider: SocialProvider) {
 
                     <template v-else-if="registerStep === 'email'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">What’s your email?</h1>
+                            <h1 class="page-title">What’s your email?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">You’ll use this to sign in and recover your account.</p>
                         </header>
                         <label class="block">
@@ -364,7 +364,7 @@ async function signInWith(provider: SocialProvider) {
 
                     <template v-else>
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">Create a password</h1>
+                            <h1 class="page-title">Create a password</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Use at least 8 characters. You can reveal it to check for typos.</p>
                         </header>
                         <label class="block">

@@ -69,7 +69,7 @@ function deny() {
 
                 <template v-else-if="approval">
                     <div class="flex items-center gap-3">
-                        <div class="grid size-12 flex-none place-items-center rounded-full bg-primary text-primary-foreground" aria-hidden="true">
+                        <div class="grid size-12 flex-none place-items-center rounded-full bg-primary-container text-primary-container-foreground" aria-hidden="true">
                             <ShieldCheck :size="26" />
                         </div>
                         <p class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">Connection request</p>

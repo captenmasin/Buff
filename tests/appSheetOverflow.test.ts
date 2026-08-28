@@ -15,9 +15,14 @@ test('centers drawers as dialogs on desktop', () => {
     assert.match(appStyles, /@media \(width >= 40rem\)[\s\S]*?\.bottom-drawer \{[\s\S]*?inset: 1rem 0 1rem 16rem;[\s\S]*?height: fit-content;[\s\S]*?margin: auto;[\s\S]*?border-radius: var\(--radius-xl\);/);
 });
 
-test('hides scrollbars without disabling scrolling', () => {
-    assert.match(appStyles, /\* \{[\s\S]*?scrollbar-width: none;/);
-    assert.match(appStyles, /\*::-webkit-scrollbar \{[\s\S]*?display: none;/);
+test('hides scrollbars on coarse pointers without disabling scrolling', () => {
+    assert.match(appStyles, /@media \(hover: none\), \(pointer: coarse\) \{[\s\S]*?scrollbar-width: none;/);
+    assert.match(appStyles, /@media \(hover: none\), \(pointer: coarse\) \{[\s\S]*?\*::-webkit-scrollbar \{[\s\S]*?display: none;/);
+});
+
+test('hides the drawer grabber on desktop', () => {
+    assert.match(appSheetSource, /active:cursor-grabbing sm:hidden/);
+    assert.match(appSheetSource, /isDesktopDrawer\(\)/);
 });
 
 test('transitions the translate property used to slide sheets', () => {

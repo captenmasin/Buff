@@ -303,9 +303,8 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[0].href"
                     size="nav"
-                    :variant="isActive(navItems[0].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[0].match) ? 'bg-primary dark:text-primary-foreground' : ''"
-                    class="flex rounded-xl font-normal"
+                    :variant="isActive(navItems[0].match) ? 'default' : 'ghost'"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[0].match) ? 'bg-primary dark:text-primary-foreground' : '']"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[0].label }}</span>
@@ -315,9 +314,8 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[1].href"
                     size="nav"
-                    :variant="isActive(navItems[1].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[1].match) ? 'bg-primary dark:text-primary-foreground' : ''"
-                    class="flex rounded-xl font-normal"
+                    :variant="isActive(navItems[1].match) ? 'default' : 'ghost'"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[1].match) ? 'bg-primary dark:text-primary-foreground' : '']"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[1].label }}</span>
@@ -337,9 +335,8 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[2].href"
                     size="nav"
-                    :variant="isActive(navItems[2].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[2].match) ? 'bg-primary dark:text-primary-foreground' : ''"
-                    class="flex rounded-xl font-normal"
+                    :variant="isActive(navItems[2].match) ? 'default' : 'ghost'"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[2].match) ? 'bg-primary dark:text-primary-foreground' : '']"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[2].label }}</span>
@@ -349,9 +346,8 @@ onUnmounted(() => {
                     :as="Link"
                     :href="navItems[3].href"
                     size="nav"
-                    :variant="isActive(navItems[3].match) ? 'secondary' : 'ghost'"
-                    :class="isActive(navItems[3].match) ? 'bg-primary dark:text-primary-foreground' : ''"
-                    class="flex rounded-xl font-normal"
+                    :variant="isActive(navItems[3].match) ? 'default' : 'ghost'"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[3].match) ? 'bg-primary dark:text-primary-foreground' : '']"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[3].label }}</span>

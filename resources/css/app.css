@@ -27,6 +27,7 @@
     --vis-tooltip-padding: 0px !important;
     --vis-tooltip-box-shadow: none !important;
     --brand-night: #0f1125;
+    --brand-charcoal: #151616;
     --brand-white: #ffffff;
     --brand-acid: #b6ff51;
     --brand-violet: #7361ff;
@@ -44,6 +45,8 @@
     --muted-foreground: rgb(15 17 37 / 0.58);
     --accent: var(--brand-acid);
     --accent-foreground: var(--brand-night);
+    --primary-container: var(--brand-night);
+    --primary-container-foreground: var(--brand-acid);
     --link: #5b47f0;
     --destructive: #b42318;
     --destructive-foreground: #ffffff;
@@ -86,20 +89,22 @@
 }
 
 .dark {
-    --background: var(--brand-night);
+    --background: var(--brand-charcoal);
     --foreground: var(--brand-white);
-    --card: #191b30;
+    --card: #1c1d1d;
     --card-foreground: var(--brand-white);
-    --popover: #191b30;
+    --popover: #1c1d1d;
     --popover-foreground: var(--brand-white);
     --primary: var(--brand-acid);
     --primary-foreground: var(--brand-night);
-    --secondary: #25283d;
+    --secondary: #252626;
     --secondary-foreground: var(--brand-white);
-    --muted: #25283d;
+    --muted: #252626;
     --muted-foreground: rgb(255 255 255 / 0.68);
     --accent: var(--brand-acid);
     --accent-foreground: var(--brand-night);
+    --primary-container: var(--brand-acid);
+    --primary-container-foreground: var(--brand-night);
     --link: #8f82ff;
     --destructive: #f87171;
     --destructive-foreground: #2f0909;
@@ -127,11 +132,11 @@
     --chart-3: #ee7a72;
     --chart-4: #4ade80;
     --chart-5: var(--brand-white);
-    --sidebar: #191b30;
+    --sidebar: #1c1d1d;
     --sidebar-foreground: var(--brand-white);
     --sidebar-primary: var(--brand-acid);
     --sidebar-primary-foreground: var(--brand-night);
-    --sidebar-accent: #25283d;
+    --sidebar-accent: #252626;
     --sidebar-accent-foreground: var(--brand-white);
     --sidebar-border: rgb(255 255 255 / 0.12);
     --sidebar-ring: var(--brand-violet);
@@ -142,9 +147,17 @@
         'Segoe UI Symbol', 'Noto Color Emoji';
     --font-heading: 'Fraunces', ui-serif, Georgia, serif;
     --color-brand-night: var(--brand-night);
+    --color-brand-charcoal: var(--brand-charcoal);
     --color-brand-white: var(--brand-white);
     --color-brand-acid: var(--brand-acid);
     --color-brand-violet: var(--brand-violet);
+    --color-primary-container: var(--primary-container);
+    --color-primary-container-foreground: var(--primary-container-foreground);
+    --text-page-title: 2rem;
+    --text-page-title-compact: 1.75rem;
+    --text-display: 1.65rem;
+    --text-kicker: 0.75rem;
+    --duration-sheet: 320ms;
     --color-background: var(--background);
     --color-foreground: var(--foreground);
     --color-card: var(--card);
@@ -277,7 +290,7 @@ textarea {
 }
 
 .page-kicker {
-    font-size: 0.75rem;
+    font-size: var(--text-kicker);
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -286,7 +299,7 @@ textarea {
 
 .page-title {
     font-family: var(--font-heading);
-    font-size: 2rem;
+    font-size: var(--text-page-title, 2rem);
     font-optical-sizing: auto;
     font-style: italic;
     font-weight: 900;
@@ -297,7 +310,7 @@ textarea {
 }
 
 .page-title-compact {
-    font-size: 1.75rem;
+    font-size: var(--text-page-title-compact, 1.75rem);
 }
 
 .card-title {
@@ -537,10 +550,14 @@ html[data-reduce-motion] .app-shell [role='status'] {
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    scrollbar-width: none;
     }
-  *::-webkit-scrollbar {
-    display: none;
+  @media (hover: none), (pointer: coarse) {
+    * {
+        scrollbar-width: none;
+    }
+    *::-webkit-scrollbar {
+        display: none;
+    }
     }
   body {
     @apply bg-background text-foreground;

@@ -90,3 +90,45 @@ export function buildBodyFatChartData(
 
     return attachGoal(rows, targetBodyFat);
 }
+
+export function chartSummary(
+    rows: TrendChartRow[],
+    key: 'weight' | 'bodyFat',
+    unit: string,
+    goal: number | null,
+): string {
+    const values = rows
+        .map((row) => row[key])
+        .filter((value): value is number => typeof value === 'number');
+
+    if (values.length === 0) {
+        return '';
+    }
+
+    const start = values[0];
+    const end = values[values.length - 1];
+
+    if (goal === null) {
+        return `Started at ${start}${unit}, now ${end}${unit}.`;
+    }
+
+    return `Started at ${start}${unit}, now ${end}${unit}, vs ${goal}${unit} goal.`;
+}
+
+export function deltaTone(
+    delta: number | null | undefined,
+    current: number | null | undefined,
+    target: number | null | undefined,
+): string {
+    if (delta === null || delta === undefined || Math.abs(delta) < 0.05 || current === null || current === undefined || target === null || target === undefined) {
+        return 'text-foreground';
+    }
+
+    if (Math.abs(target - current) < 0.05) {
+        return 'text-foreground';
+    }
+
+    const towardsTarget = (target < current && delta < 0) || (target > current && delta > 0);
+
+    return towardsTarget ? 'text-success-foreground' : 'text-destructive';
+}

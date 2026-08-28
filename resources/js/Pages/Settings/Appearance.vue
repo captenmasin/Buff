@@ -44,15 +44,17 @@ function updateReducedMotion() {
                 <p class="mt-1 text-sm text-muted-foreground">Choose how Buff looks on this device.</p>
             </div>
 
-            <div class="mt-1 rounded-xl bg-brand-night p-1">
+            <div class="mt-1 rounded-xl bg-muted p-1 dark:bg-secondary">
                 <div class="grid grid-cols-3 gap-1" role="group" aria-label="Appearance">
                     <Button
                         v-for="option in appearanceOptions"
                         :key="option.value"
                         type="button"
                         size="sm"
-                        class="h-10 w-full gap-1.5 rounded-lg px-2 focus-visible:border-brand-white focus-visible:ring-brand-white"
-                        :class="appearance === option.value ? '' : 'text-brand-white hover:bg-brand-white/10 hover:text-brand-white'"
+                        class="h-10 w-full gap-1.5 rounded-lg px-2"
+                        :class="appearance === option.value
+                            ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
+                            : 'text-foreground hover:bg-foreground/8'"
                         :variant="appearance === option.value ? 'default' : 'ghost'"
                         :aria-pressed="appearance === option.value"
                         @click="selectAppearance(option.value)"
@@ -67,7 +69,7 @@ function updateReducedMotion() {
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <p class="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
-                        <p class="mt-0.5 font-heading text-lg font-semibold">Today</p>
+                        <p class="mt-0.5 page-title-compact page-title">Today</p>
                     </div>
                     <span class="rounded-full bg-success-soft px-2.5 py-1 text-xs font-semibold text-success-soft-foreground">On track</span>
                 </div>
@@ -81,7 +83,7 @@ function updateReducedMotion() {
                         <p class="text-xs font-medium text-muted-foreground">of 2,100 kcal</p>
                     </div>
                     <div class="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                        <div class="h-full w-2/3 rounded-full bg-primary transition-[width] duration-500"></div>
+                        <div class="h-full w-2/3 rounded-full bg-success transition-[width] duration-500"></div>
                     </div>
                 </div>
             </div>

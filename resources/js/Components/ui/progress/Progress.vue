@@ -31,7 +31,7 @@ const delegatedProps = reactiveOmit(props, 'class', 'indicatorClass')
   >
     <ProgressIndicator
       data-slot="progress-indicator"
-      :class="cn('size-full flex-1 bg-primary transition-transform duration-200 ease-out', props.indicatorClass)"
+      :class="cn('size-full flex-1 bg-success transition-transform duration-200 ease-out', props.indicatorClass)"
       :style="`transform: translateX(-${100 - (props.modelValue ?? 0)}%);`"
     />
   </ProgressRoot>

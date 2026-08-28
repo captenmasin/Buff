@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { formatDisplayDate, parseLocalDate } from '../resources/js/dateFormat.ts';
-import { buildBodyFatChartData, buildGoalLine, buildWeightChartData, chartXDomain, chartYDomain } from '../resources/js/progressChart.ts';
+import { buildBodyFatChartData, buildGoalLine, buildWeightChartData, chartSummary, chartXDomain, chartYDomain, deltaTone } from '../resources/js/progressChart.ts';
 
 const metrics = [
     { date: '2026-08-20', weight: 82.4, bodyFat: 18.2 },
@@ -130,4 +131,36 @@ test('omits missing body-fat days instead of drawing zeros', () => {
     assert.equal(rows[0].date.getTime(), parseLocalDate('2026-07-01').getTime());
     assert.equal(rows[0].bodyFat, 19);
     assert.equal(rows[0].goal, 15);
+});
+
+test('summarises a chart from first reading to last, including the goal', () => {
+    const rows = buildWeightChartData(
+        metrics.map(({ date, weight }) => ({ date, weight })),
+        '2026-05-22',
+        '2026-08-20',
+        80,
+    );
+
+    assert.equal(chartSummary(rows, 'weight', ' kg', 80), 'Started at 84.2 kg, now 82.4 kg, vs 80 kg goal.');
+    assert.equal(chartSummary(rows, 'weight', ' kg', null), 'Started at 84.2 kg, now 82.4 kg.');
+});
+
+test('omits a chart summary when there are no readings', () => {
+    assert.equal(chartSummary([], 'bodyFat', '%', 15), '');
+});
+
+test('renders chart summaries as a readable callout under the chart', () => {
+    const source = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
+
+    assert.equal(source.match(/rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground/g)?.length, 2);
+    assert.doesNotMatch(source, /text-sm text-muted-foreground">\{\{ weightChartSummary \}\}/);
+});
+
+test('colours a weight change by whether it moves toward the target', () => {
+    assert.equal(deltaTone(-0.6, 82.4, 80), 'text-success-foreground');
+    assert.equal(deltaTone(0.4, 82.4, 80), 'text-destructive');
+    assert.equal(deltaTone(0.5, 70, 80), 'text-success-foreground');
+    assert.equal(deltaTone(-0.4, 70, 80), 'text-destructive');
+    assert.equal(deltaTone(0.4, 80, 80), 'text-foreground');
+    assert.equal(deltaTone(null, 82.4, 80), 'text-foreground');
 });

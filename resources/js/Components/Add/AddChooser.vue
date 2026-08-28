@@ -11,13 +11,14 @@ interface AddChoice {
     label: string;
     description: string;
     icon: Component;
-    tone: 'acid' | 'violet' | 'night';
+    tone: 'acid' | 'violet' | 'night' | 'muted';
 }
 
 const toneClasses: Record<AddChoice['tone'], string> = {
     acid: 'bg-brand-acid text-brand-night',
     violet: 'bg-brand-violet text-brand-white',
-    night: 'bg-brand-night text-brand-white',
+    night: 'bg-primary-container text-primary-container-foreground',
+    muted: 'bg-muted text-foreground',
 };
 
 const tiles: AddChoice[] = [
@@ -34,21 +35,21 @@ const tiles: AddChoice[] = [
         label: 'Scan',
         description: 'Look up a barcode',
         icon: ScanBarcode,
-        tone: 'acid',
+        tone: 'violet',
     },
     {
         mode: 'photo',
         label: 'Photo',
         description: 'Estimate editable macros',
         icon: Camera,
-        tone: 'acid',
+        tone: 'night',
     },
     {
         mode: 'custom',
         label: 'Custom',
         description: 'Enter name and macros',
         icon: Pencil,
-        tone: 'acid',
+        tone: 'muted',
     },
 ];
 

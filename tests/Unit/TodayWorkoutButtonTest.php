@@ -19,7 +19,8 @@ it('shows the start today card only for the selected current day', function (): 
 
     expect($todayPage)
         ->toContain('const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));')
-        ->toContain('<Card v-if="hasGoal && isEmptyDay && isToday">');
+        ->toContain('<Card v-if="hasGoal && isEmptyDay && isToday">')
+        ->toContain('const showDayLists = computed(() => !isEmptyDay.value || !isToday.value);');
 });
 
 it('opens the add sheet from the start today food action', function (): void {

@@ -2,7 +2,7 @@
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
-import { Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X } from '@lucide/vue';
+import { Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X, ChevronLeft } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
 import { hapticImpact } from '../haptics';
 import { resizePhoto } from '../photoResize';
@@ -881,6 +881,11 @@ onUnmounted(() => {
         <PageHeader :kicker="displayDate">
             {{ mode === 'food' || mode === 'recipe' ? 'Add food' : mode === 'custom' ? 'Custom food' : mode === 'photo' ? 'Photo meal' : mode === 'workout' ? 'Add workout' : 'Add' }}
             <span v-if="meal"> — {{ meal.charAt(0).toUpperCase() + meal.slice(1) }}</span>
+            <template #leading>
+                <Button :as="Link" :href="`/?date=${date}`" variant="ghost" size="icon" class="-ml-2 rounded-full" aria-label="Back to today">
+                    <ChevronLeft :size="26" stroke-width="2.2" />
+                </Button>
+            </template>
         </PageHeader>
 
         <nav v-if="mode === 'food' || mode === 'recipe'" class="grid grid-cols-2 gap-1 rounded-xl bg-secondary/70 p-1" aria-label="Food source">
@@ -976,7 +981,7 @@ onUnmounted(() => {
         <Card v-if="mode === 'photo' && !analysisContext">
             <div class="flex items-center gap-2">
                 <Camera :size="21" class="text-food" />
-                <h2 class="card-title font-heading text-2xl">Analyze meal photos</h2>
+                <h2 class="card-title">Analyze meal photos</h2>
             </div>
             <p class="mt-2 text-sm text-muted-foreground">Add up to three clear angles. Nothing is logged until you review and save.</p>
 
@@ -988,7 +993,7 @@ onUnmounted(() => {
                     :class="selectedPhotos.length === 1 ? 'col-span-3 mx-auto aspect-[302/270] w-full max-w-sm' : 'aspect-square'"
                 >
                     <img :src="photo.preview" alt="Selected meal" class="h-full w-full object-cover">
-                    <span v-if="index === 0" class="absolute left-2.5 top-2.5 rounded-full bg-brand-night px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-brand-acid">
+                    <span v-if="index === 0" class="absolute left-2.5 top-2.5 rounded-full bg-primary-container px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-primary-container-foreground">
                         {{ selectedPhotos.length }} of 3 · ready
                     </span>
                     <Button type="button" size="icon" variant="inverse" class="absolute right-1 top-1 h-8 w-8" aria-label="Remove photo" @click="removePhoto(index)">
@@ -1046,11 +1051,11 @@ onUnmounted(() => {
 
         <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Buff Vision is analyzing your meal">
             <div class="mx-auto w-full max-w-sm">
-                <h2 class="font-heading text-3xl font-semibold leading-tight">See what Buff sees.</h2>
+                <h2 class="page-title">See what Buff sees.</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Your meal is becoming an editable macro estimate.</p>
 
-                <div class="mt-5 rounded-3xl bg-linear-to-br from-brand-night to-[#3e347f] p-5 text-brand-white shadow-[0_18px_36px_-4px_rgb(115_97_255_/_0.28)]">
-                    <p class="vision-status text-[11px] font-semibold uppercase tracking-wide">Buff Vision · analyzing</p>
+                <div class="mt-5 rounded-3xl bg-brand-night p-5 text-brand-white">
+                    <p class="vision-status text-xs font-semibold uppercase tracking-wide">Buff Vision · analyzing</p>
 
                     <div class="relative mt-4 aspect-[302/270] overflow-hidden rounded-2xl border border-brand-acid/70 bg-brand-night">
                         <img v-if="selectedPhotos[0]" :src="selectedPhotos[0].preview" alt="" class="h-full w-full object-cover">

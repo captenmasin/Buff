@@ -117,7 +117,7 @@ function revoke(connection: Connection) {
             <div v-else class="grid gap-3 md:grid-cols-2">
                 <Card v-for="connection in authorizedConnections" :key="connection.id">
                     <div class="flex items-start gap-3">
-                        <div class="grid size-10 flex-none place-items-center rounded-xl bg-primary text-primary-foreground" aria-hidden="true">
+                        <div class="grid size-10 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground" aria-hidden="true">
                             <Bot :size="19"/>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -160,7 +160,7 @@ function revoke(connection: Connection) {
 
         <Card v-if="mcpEndpoint">
             <div class="flex items-start gap-3">
-                <div class="grid size-10 flex-none place-items-center rounded-xl bg-primary text-primary-foreground" aria-hidden="true">
+                <div class="grid size-10 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground" aria-hidden="true">
                     <Bot :size="19"/>
                 </div>
                 <div class="min-w-0 flex-1">

@@ -25,7 +25,7 @@ const forwardedProps = useForwardProps(delegatedProps)
     v-bind="forwardedProps"
     :class="
       cn(
-        'focus:bg-accent focus:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground gap-0.5 rounded-md py-2 pr-8 pl-2.5 text-sm [&_svg:not([class*=size-])]:size-4 relative flex w-full cursor-default outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
+        'focus:bg-muted focus:text-foreground not-data-[variant=destructive]:focus:**:text-foreground gap-0.5 rounded-md py-2 pr-8 pl-2.5 text-sm [&_svg:not([class*=size-])]:size-4 relative flex w-full cursor-default outline-hidden select-none data-[disabled]:pointer-events-none data-[disabled]:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0',
         $slots.description ? 'flex-col items-start' : 'items-center',
         props.class,
       )

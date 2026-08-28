@@ -212,7 +212,7 @@ onMounted(() => {
                     <Button type="button" variant="surface" :disabled="deleteAccountForm.processing" @click="closeDeleteAccountModal">
                         Cancel
                     </Button>
-                    <Button variant="destructive" :disabled="deleteAccountForm.processing">
+                    <Button variant="destructive-solid" :disabled="deleteAccountForm.processing">
                         Delete account
                     </Button>
                 </div>

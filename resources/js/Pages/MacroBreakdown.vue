@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, Link } from '@inertiajs/vue3';
-import { ArrowLeft } from '@lucide/vue';
+import { ChevronLeft } from '@lucide/vue';
 import { computed } from 'vue';
 import Card from '../Components/Card.vue';
 import FoodThumbnail from '../Components/FoodThumbnail.vue';
@@ -69,9 +69,9 @@ function grams(value: number | string | null | undefined) {
     <section class="space-y-5">
         <PageHeader :kicker="displayDate">
             {{ macro.label }}
-            <template #actions>
-                <Button :as="Link" :href="`/?date=${date}`" variant="outline" size="icon" class="rounded-full" aria-label="Back to today">
-                    <ArrowLeft :size="20" />
+            <template #leading>
+                <Button :as="Link" :href="`/?date=${date}`" variant="ghost" size="icon" class="-ml-2 rounded-full" aria-label="Back to today">
+                    <ChevronLeft :size="26" stroke-width="2.2" />
                 </Button>
             </template>
         </PageHeader>

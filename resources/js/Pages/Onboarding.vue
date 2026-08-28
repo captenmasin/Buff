@@ -394,7 +394,7 @@ onMounted(() => {
                 <div :key="currentStep" class="space-y-8">
                     <template v-if="currentStep === 'age'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">How old are you?</h1>
+                            <h1 class="page-title">How old are you?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">This helps estimate your daily energy needs. You can leave it blank.</p>
                         </header>
                         <label class="block">
@@ -406,7 +406,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'sex'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">Which sex should Buff use for your estimate?</h1>
+                            <h1 class="page-title">Which sex should Buff use for your estimate?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">This changes the energy equation. You can leave it unanswered.</p>
                         </header>
                         <div class="grid gap-3" role="radiogroup" aria-label="Sex used for energy estimate">
@@ -418,7 +418,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'height'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">How tall are you?</h1>
+                            <h1 class="page-title">How tall are you?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">This is optional, but it improves your estimate.</p>
                         </header>
                         <div class="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Height unit">
@@ -444,7 +444,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'current_weight'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">What’s your current weight?</h1>
+                            <h1 class="page-title">What’s your current weight?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Buff uses this as the starting point for progress.</p>
                         </header>
                         <div class="grid grid-cols-2 gap-2 rounded-xl bg-muted p-1" role="radiogroup" aria-label="Weight unit">
@@ -460,7 +460,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'activity'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">How active is a typical week?</h1>
+                            <h1 class="page-title">How active is a typical week?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Choose the closest match, or leave it unanswered.</p>
                         </header>
                         <div class="grid gap-3" role="radiogroup" aria-label="Typical activity">
@@ -473,7 +473,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'goal'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">What would you like to do?</h1>
+                            <h1 class="page-title">What would you like to do?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">{{ isTeen ? 'Buff will keep your recommendation at maintenance while you’re still growing.' : 'This sets the direction of your starting plan.' }}</p>
                         </header>
                         <div class="grid gap-3" role="radiogroup" aria-label="Weight goal">
@@ -485,7 +485,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'target_weight'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">What’s your target weight?</h1>
+                            <h1 class="page-title">What’s your target weight?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Choose a {{ form.goal === 'lose' ? 'lower' : 'higher' }} weight than your current {{ currentWeightDisplay }} {{ form.weight_unit }}.</p>
                         </header>
                         <label class="block">
@@ -498,7 +498,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'pace'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">How quickly would you like to move?</h1>
+                            <h1 class="page-title">How quickly would you like to move?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Buff caps the calorie adjustment at 20% of estimated maintenance.</p>
                         </header>
                         <div class="grid gap-3" role="radiogroup" aria-label="Weekly goal pace">
@@ -511,7 +511,7 @@ onMounted(() => {
 
                     <template v-else-if="currentStep === 'body_fat'">
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">Do you have a body-fat target?</h1>
+                            <h1 class="page-title">Do you have a body-fat target?</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">This is optional and does not change the calorie estimate.</p>
                         </header>
                         <label class="block">
@@ -523,7 +523,7 @@ onMounted(() => {
 
                     <template v-else>
                         <header>
-                            <h1 class="text-3xl font-bold tracking-tight">{{ plan?.personalized ? 'Here’s your starting plan' : 'Start with a simple plan' }}</h1>
+                            <h1 class="page-title">{{ plan?.personalized ? 'Here’s your starting plan' : 'Start with a simple plan' }}</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">You can change this at any time in Goals.</p>
                         </header>
                         <div v-if="planLoading" class="animate-pulse space-y-3" aria-label="Building your plan">

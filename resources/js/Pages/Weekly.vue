@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
-import { ArrowLeft } from '@lucide/vue';
+import type { DateValue } from '@internationalized/date';
+import { parseDate } from '@internationalized/date';
+import { ChevronLeft } from '@lucide/vue';
 import { ref } from 'vue';
 import Card from '../Components/Card.vue';
 import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
+import { Calendar } from '../Components/ui/calendar';
 import Input from '../Components/ui/input/Input.vue';
+import { Popover, PopoverContent, PopoverTrigger } from '../Components/ui/popover';
 import Progress from '../Components/ui/progress/Progress.vue';
 import { formatDisplayDate } from '../dateFormat';
 import { dayStatusLabel, type DayStatus } from '../dayStatus';
@@ -31,6 +35,8 @@ interface WeekRoundup {
     calories: number;
     burned_calories: number;
     effective_target: number | null;
+    average_calories: number | null;
+    average_target: number | null;
     protein_g: number;
     carbs_g: number;
     fat_g: number;
@@ -68,10 +74,26 @@ const macroCards = [
     { label: 'Fat', consumed: props.roundup.fat_g, goal: props.roundup.fat_goal_g, color: 'bg-fat' },
 ];
 
+const heroCalories = props.roundup.average_calories ?? props.roundup.calories;
+const heroTarget = props.roundup.average_target ?? props.roundup.effective_target;
+
 function progress(consumed: number, goal?: number | null) {
     if (!goal) return 0;
 
     return Math.min(100, Math.round((consumed / goal) * 100));
+}
+
+function visitWeek(date: string) {
+    router.visit(`/weekly?date=${date}`, {
+        preserveScroll: true,
+    });
+}
+
+function selectWeekDate(value: DateValue, close: () => void) {
+    const next = value.toString();
+    weekDate.value = next;
+    close();
+    visitWeek(next);
 }
 
 function applySelection() {
@@ -83,9 +105,7 @@ function applySelection() {
         return;
     }
 
-    router.visit(`/weekly?date=${weekDate.value}`, {
-        preserveScroll: true,
-    });
+    visitWeek(weekDate.value);
 }
 </script>
 
@@ -95,25 +115,37 @@ function applySelection() {
     <section class="space-y-5">
         <PageHeader>
             Weekly roundup
-            <template #actions>
-                <Button :as="Link" :href="`/?date=${selectedDate}`" variant="outline" size="icon" class="rounded-full" aria-label="Back to today">
-                    <ArrowLeft :size="20" />
+            <template #leading>
+                <Button :as="Link" :href="`/?date=${selectedDate}`" variant="ghost" size="icon" class="-ml-2 rounded-full" aria-label="Back to today">
+                    <ChevronLeft :size="26" stroke-width="2.2" />
                 </Button>
             </template>
         </PageHeader>
 
         <Card>
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1 dark:bg-secondary">
                 <Button
                     type="button"
-                    :variant="selectedMode === 'week' ? 'default' : 'surface'"
+                    size="sm"
+                    class="h-10 w-full"
+                    :class="selectedMode === 'week'
+                        ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
+                        : 'text-foreground hover:bg-foreground/8'"
+                    :variant="selectedMode === 'week' ? 'default' : 'ghost'"
+                    :aria-pressed="selectedMode === 'week'"
                     @click="selectedMode = 'week'"
                 >
                     Week
                 </Button>
                 <Button
                     type="button"
-                    :variant="selectedMode === 'range' ? 'default' : 'surface'"
+                    size="sm"
+                    class="h-10 w-full"
+                    :class="selectedMode === 'range'
+                        ? 'bg-primary-container text-primary-container-foreground hover:bg-primary-container dark:bg-primary dark:text-primary-foreground dark:hover:bg-primary'
+                        : 'text-foreground hover:bg-foreground/8'"
+                    :variant="selectedMode === 'range' ? 'default' : 'ghost'"
+                    :aria-pressed="selectedMode === 'range'"
                     @click="selectedMode = 'range'"
                 >
                     Range
@@ -121,10 +153,25 @@ function applySelection() {
             </div>
 
             <form class="mt-4 space-y-3" @submit.prevent="applySelection">
-                <label v-if="selectedMode === 'week'" class="block">
+                <div v-if="selectedMode === 'week'">
                     <span class="field-label">Week containing</span>
-                    <Input v-model="weekDate" type="date" class="mt-1" />
-                </label>
+                    <Popover v-slot="{ close }" class="mt-1 block">
+                        <PopoverTrigger as-child>
+                            <Button variant="outline" class="mt-1 w-full justify-start font-normal">
+                                {{ formatDisplayDate(weekDate, { weekday: 'short' }) }}
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent class="w-auto p-0" align="start">
+                            <Calendar
+                                :model-value="parseDate(weekDate)"
+                                locale="en-GB"
+                                layout="month-and-year"
+                                initial-focus
+                                @update:model-value="(value) => value && selectWeekDate(value, close)"
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
 
                 <div v-else class="grid grid-cols-2 gap-3">
                     <label>
@@ -137,7 +184,7 @@ function applySelection() {
                     </label>
                 </div>
 
-                <Button class="w-full">
+                <Button v-if="selectedMode === 'range'" class="w-full">
                     Apply
                 </Button>
             </form>
@@ -146,16 +193,17 @@ function applySelection() {
         <Card>
             <div class="flex items-start justify-between gap-4">
                 <div>
-                    <p class="text-sm text-muted-foreground">Calories</p>
-                    <p class="mt-1 text-4xl font-bold tracking-tight">{{ roundup.calories }}<span class="text-sm font-medium text-muted-foreground"> kcal</span></p>
+                    <p class="text-sm text-muted-foreground">{{ roundup.average_calories !== null ? 'Daily average' : 'Calories' }}</p>
+                    <p class="mt-1 text-4xl font-bold tracking-tight">{{ heroCalories }}<span class="text-sm font-medium text-muted-foreground"> kcal</span></p>
                 </div>
                 <div class="text-right text-sm text-muted-foreground">
-                    <p v-if="roundup.effective_target">{{ roundup.effective_target }} kcal target</p>
+                    <p v-if="heroTarget">{{ heroTarget }} kcal daily target</p>
+                    <p v-if="roundup.calories">{{ roundup.calories }} kcal this period</p>
                     <p v-if="roundup.burned_calories">{{ roundup.burned_calories }} burned</p>
                 </div>
             </div>
 
-            <Progress class="mt-3 h-2.5" :model-value="progress(roundup.calories, roundup.effective_target)" indicator-class="bg-success" />
+            <Progress class="mt-3 h-2.5" :model-value="progress(heroCalories, heroTarget)" indicator-class="bg-success" />
 
             <div class="mt-5 grid grid-cols-3 gap-3">
                 <div v-for="macro in macroCards" :key="macro.label" class="min-w-0">
@@ -182,7 +230,7 @@ function applySelection() {
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
             <Card class="divide-y divide-border/60 px-0 py-0">
                 <div v-for="day in week" :key="day.date" class="flex items-center gap-3 px-4 py-3.5">
-                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-primary text-primary-foreground font-semibold">
+                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground font-semibold">
                         {{ day.label }}
                     </span>
                     <div class="min-w-0 flex-1">
@@ -195,7 +243,7 @@ function applySelection() {
                     </div>
                     <div class="flex shrink-0 flex-col items-end gap-1.5">
                         <DayStatusIndicator :status="day.status" :size="18" />
-<!--                        <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>-->
+                        <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>
                     </div>
                 </div>
             </Card>
