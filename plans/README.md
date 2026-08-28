@@ -27,8 +27,12 @@ abandoned)
   grace-period, refund, transfer, and notification handling across two stores.
 - A generic plans/permissions framework: rejected because the requested product
   has one paid entitlement, `ai_meal_analysis`.
-- Stripe/web checkout: rejected because this plan is specifically for App Store
-  and Google Play subscriptions in the native apps.
+- Stripe/web checkout, NativePHP Wallet, Apple Pay, or Google Pay: rejected
+  because this plan is specifically for App Store and Google Play auto-renewable
+  subscriptions in the native apps. Guideline 3.1.1 requires IAP for this
+  digital good.
+- SuperNative / EDGE subscription screens: rejected because this client is still
+  an Inertia Vue web-view app; new billing UI stays on that stack.
 - A permanent webhook event ledger: rejected because the webhook only queues an
   idempotent authoritative status refresh; Laravel's unique jobs suppress the
   common duplicate-delivery case. Add a ledger only for a demonstrated audit or

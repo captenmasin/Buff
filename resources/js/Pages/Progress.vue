@@ -908,7 +908,7 @@ onUnmounted(() => {
                     <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
                 </label>
                 <div class="space-y-2">
-                    <span class="field-label">Progress photos</span>
+                    <p class="text-sm font-semibold text-foreground">Progress photos</p>
                     <div class="grid grid-cols-3 gap-2">
                         <div v-for="pose in progressPhotoPoses" :key="pose" class="space-y-1.5">
                             <span class="field-label">{{ progressPhotoLabels[pose] }}</span>

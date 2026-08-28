@@ -13,6 +13,14 @@
 > if they are available. Search the installed Laravel/Inertia documentation
 > before each corresponding code phase.
 >
+> This client is an Inertia Vue web-view NativePHP app. Keep new subscription
+> UI on Inertia Vue pages. Do not create SuperNative `NativeComponent` / EDGE
+> screens for this work, and do not use NativePHP Wallet, Stripe, Apple Pay, or
+> Google Pay — those are the wrong payment rail for this digital good. Custom
+> plugin calls use the plugin JS stub (`POST /_native/api/call`) plus
+> `#nativephp` `On`/`Off` for events; do not assume `#nativephp.Subscriptions`
+> exists.
+>
 > **Drift check (run first)**:
 >
 > ```sh
@@ -32,6 +40,8 @@
 - **Depends on**: none
 - **Category**: direction
 - **Planned at**: client commit `9b8de32`, server commit `519ce32`, 2026-08-26
+- **Amended at**: 2026-08-28 — review must-fix items and launch pricing folded
+  into the contract and steps below. Do not skip them.
 
 ## Why this matters
 
@@ -51,31 +61,64 @@ that is a different plan.
 ## Product contract and fixed decisions
 
 - The only entitlement is `ai_meal_analysis`.
-- App Store Connect and Play Console each provide monthly and annual recurring
-  products. Product IDs, prices, trials, display names, and legal URLs are
-  operator decisions; do not invent or hard-code them.
-- The existing daily quota remains in force for subscribers. A subscription
-  grants access; it does not make analysis unlimited.
+- The paid tier is **Buff+**. The UK launch products are **£4.99 monthly** with
+  no trial and **£24.99 annually** with a seven-day introductory trial. Other
+  storefronts use the stores' localized equivalents; Vue always renders the
+  localized product data returned by the native SDK.
+- Do not add weekly, lifetime, or additional paid tiers. There are no permanent
+  free AI analyses: the annual store trial is the evaluation path.
+- Product IDs, localized display names, and legal URLs remain operator
+  decisions; do not invent or hard-code them.
+- Manual and barcode food logging, calories and macros, recipes, goals,
+  progress, health sync, and existing user data remain free. Buff+ unlocks AI
+  meal analysis and follow-up only.
+- The existing quota of 10 new AI meal analyses per day remains in force for
+  subscribers. A subscription grants access; it does not make analysis
+  unlimited.
 - The API is authoritative. A native purchase/restore result never unlocks the
   feature by itself. After native success, the client asks the API to refresh
   RevenueCat state and unlocks only from that response.
 - `MealAnalysisService::analyze()` and `followUp()` require the entitlement.
   `show`, `confirm`, `destroy`, meal-photo retrieval, history, and ordinary food
   logging remain available after expiry so users can access and clean up data.
-- Non-subscribers receive HTTP 403 with `code: subscription_required`.
+- Non-subscribers receive HTTP 403 with `code: subscription_required` and a
+  stable message that works for both the app and MCP: access requires an
+  `ai_meal_analysis` subscription purchased in the iOS or Android app; restore
+  from Settings. MCP clients never see the Vue paywall.
 - Users must be signed into Buff before purchase. RevenueCat is configured only
   with a server-generated, non-guessable custom App User ID. Never configure an
   anonymous RevenueCat user and never call RevenueCat `logOut()`; switch Buff
   accounts with RevenueCat `logIn(newAppUserId)`.
+- Call `Subscriptions.Configure(platformPublicKey, revenuecat_app_user_id)` as
+  soon as a signed-in Buff account with that UUID is available: after login,
+  resume, and token rotation. The subscription page loads offerings and
+  purchases; it is not the first configure. Delayed configure-until-that-page
+  misses interrupted StoreKit/Play transactions.
 - Use RevenueCat's **Transfer to new App User ID** restore behavior. This is the
   vendor-recommended behavior for account-based apps that want reliable restore.
   A transfer removes the entitlement from the previous Buff account, and the
   webhook refresh must update both sides.
 - Deleting a Buff account does not cancel an App Store or Google Play
   subscription. Show the management link and this warning before deletion.
+- Manage Subscription uses RevenueCat's `management_url` when present; otherwise
+  Apple's subscriptions page or Play's subscriptions page. Do not render a dead
+  control. App Review will tap this button.
+- Client cached `subscription.entitled` is derived, not a sticky boolean.
+  Compute active as `expires_at` in the future, matching
+  `hasAiMealAnalysisEntitlement()`.
+- Production enforcement writes `ai_meal_analysis_entitled_until` from
+  production entitlements only. TestFlight/sandbox builds may use sandbox
+  entitlements. A production webhook integration subscribes to production
+  events; staging/local uses a sandbox webhook URL.
 - Keep the RevenueCat secret API key, webhook authorization value, and webhook
   signing secret only on `buff-server`. The iOS and Android SDK keys are public
-  build configuration and must be platform-specific.
+  build configuration and must be platform-specific. The HMAC signing secret is
+  shown once in RevenueCat; rotation invalidates it immediately, so cut over
+  the server env before rotating.
+- Do not add billing columns to `User`'s Fillable list. Set the UUID in a
+  `creating` hook by direct assignment. `RevenueCatService` updates the
+  projection with `forceFill()`/`save()` so HTTP account updates cannot write
+  those fields.
 - Keep `SUBSCRIPTIONS_ENFORCE_AI_MEAL_ANALYSIS=false` until both production app
   versions are approved and available. It is also the emergency kill switch for
   a billing incident; entitlement status itself must never fail open.
@@ -105,7 +148,11 @@ that is a different plan.
   codes. Extend this existing map for `subscription_required`.
 - `resources/js/Pages/Settings.vue:145-168` is the settings hub. Its existing
   `SettingsGroup` and `SettingsRow` components are the subscription entry-point
-  pattern to reuse.
+  pattern to reuse. Nested settings pages are rendered by `SettingsController`;
+  put `GET /settings/subscription` there. Keep `POST /subscription/refresh` on
+  the new `SubscriptionController`.
+- `resources/js/Components/AppSheet.vue` may already be dirty in the working
+  tree and is out of scope. Do not include it in a commit.
 - `composer.json` already registers local NativePHP plugins as Composer path
   repositories. `native-plugins/apple-health/nativephp.json` and
   `native-plugins/health-connect/nativephp.json` are the iOS and Android manifest
@@ -113,9 +160,12 @@ that is a different plan.
   registers native plugins.
 - `tests/Unit/AppleHealthPluginTest.php` is the existing lightweight manifest
   and native-source contract-test pattern.
-- The project already uses `#nativephp` and its event API in
-  `resources/js/Pages/Add.vue`; extend `resources/js/vite-env.d.ts` rather than
-  introducing an untyped global.
+- The project already uses `#nativephp` `On`/`Off`/`Events` in
+  `resources/js/Pages/Add.vue` for **core** APIs such as Scanner. Custom plugin
+  bridge functions are not exported on that module. Health plugins call native
+  through PHP (`nativephp_call`); purchases are Vue-driven, so the plugin must
+  ship a JS stub that POSTs to `/_native/api/call`. Extend
+  `resources/js/vite-env.d.ts` rather than introducing an untyped global.
 
 ### API: `/Users/mason/Sites/buff-server`
 
@@ -150,7 +200,11 @@ that is a different plan.
   be reused for subscriptions.
 - `.env.example:58` uses the database queue, and `README.md:38-48` already makes
   a queue worker and shared cache production requirements. Use those rather
-  than adding another worker system.
+  than adding another worker system. `ShouldBeUnique` jobs require that shared
+  cache; do not switch the refresh job to `sync`.
+- `app/Providers/AppServiceProvider.php:38-67` already registers named rate
+  limiters. `throttle:api` is keyed by authenticated user id. A public webhook
+  has no user, so it must not use `throttle:api`.
 - `tests/Feature/MealAnalysisTest.php` and the MCP feature tests are the existing
   API and shared-service regression patterns. Use Laravel `Http::fake()` and
   `Queue::fake()` for provider and webhook tests.
@@ -216,6 +270,8 @@ layout is generated by an existing Artisan/NativePHP command.
 - `app/Http/Controllers/Api/V1/SubscriptionController.php` (create)
 - `app/Http/Controllers/Api/V1/RevenueCatWebhookController.php` (create)
 - `app/Jobs/RefreshRevenueCatEntitlement.php` (create)
+- `app/Providers/AppServiceProvider.php` (named `subscription-refresh` and
+  `revenuecat-webhook` limiters)
 - `database/migrations/*_add_revenuecat_subscription_fields_to_users_table.php` (create via Artisan)
 - `database/factories/UserFactory.php`
 - `tests/Feature/SubscriptionTest.php` (create via Artisan/Pest)
@@ -233,6 +289,9 @@ layout is generated by an existing Artisan/NativePHP command.
 - `app/Services/BuffCredentialStore.php`
 - `app/Http/Controllers/SubscriptionController.php` (create)
 - `app/Http/Controllers/AccountController.php`
+- `app/Http/Controllers/SettingsController.php`
+- `resources/js/Pages/Account.vue` (login/resume success must call Configure)
+- `resources/js/Layouts/AppShell.vue` (signed-in rotation/resume must call Configure)
 - `routes/web.php`
 - `resources/js/vite-env.d.ts`
 - `resources/js/subscriptions.ts` (create)
@@ -249,7 +308,8 @@ layout is generated by an existing Artisan/NativePHP command.
 
 **Out of scope**:
 
-- Stripe, Paddle, RevenueCat Web Billing, or browser checkout.
+- Stripe, Paddle, RevenueCat Web Billing, browser checkout, NativePHP Wallet,
+  Apple Pay, or Google Pay.
 - A generic role, plan, feature-flag, or entitlement package.
 - Paywalling barcode search, custom meals, recipes, workouts, body metrics, or
   already-created meal-analysis media.
@@ -258,8 +318,9 @@ layout is generated by an existing Artisan/NativePHP command.
 - RevenueCat Paywalls/Targeting/A/B tests. Render the existing Vue design system.
 - New analytics, attribution, coupon, family-plan, promo-code, or lifetime-purchase
   systems.
-- Changing subscription price or product identifiers after the operator has
-  approved them.
+- Changing the initial subscription price or product identifiers after the
+  operator has approved them. A later price review follows the maintenance
+  guardrail in this plan.
 - Modifying generated Xcode/Gradle projects by hand; native dependencies and
   capabilities belong in the NativePHP plugin manifest.
 
@@ -269,7 +330,8 @@ layout is generated by an existing Artisan/NativePHP command.
 - Both repositories currently use short `WIP` commit subjects. Keep commits
   small and descriptive instead: one server commit, one native-plugin commit,
   one client UX commit, and one verification/rollout-doc commit.
-- Do not include unrelated working-tree changes in a commit.
+- Do not include unrelated working-tree changes in a commit. In particular,
+  `resources/js/Components/AppSheet.vue` is out of scope if it is already dirty.
 - Do not push or open a PR unless the operator explicitly asks.
 
 ## Steps
@@ -283,28 +345,42 @@ new planning documentation:
 1. RevenueCat Pro is approved because webhooks are a Pro integration.
 2. App Store Connect agreements, banking, and tax setup are active. One
    subscription group contains approved monthly and annual products, complete
-   localization, review notes/screenshots, and sandbox testers.
+   localization, review notes/screenshots, and sandbox testers. The UK monthly
+   product is £4.99 with no trial; the UK annual product is £24.99 with a
+   seven-day introductory trial.
 3. Play Console payments setup is active. Monthly and annual subscriptions have
-   active base plans, required regions, license testers, and an internal test
-   track.
+   active base plans, matching UK prices and annual-only trial, required
+   regions, license testers, and an internal test track.
 4. One RevenueCat project contains the iOS and Android apps. One entitlement is
    named exactly `ai_meal_analysis`; one current offering maps monthly and annual
    packages to both stores.
 5. Production restore behavior is `Transfer to new App User ID`. Use a sandbox
    override only when explicitly testing another behavior.
-6. The canonical HTTPS API origin, privacy policy, terms, support URL, recurring
-   billing copy, product IDs/prices/trials, iOS public SDK key, Android public
-   SDK key, secret API key, webhook authorization value, and HMAC signing secret
-   are available to the appropriate deployment/build owners.
-7. The privacy disclosure covers RevenueCat's pseudonymous customer ID and
+6. The canonical HTTPS API origin, privacy policy, terms, EULA, support URL,
+   Apple Guideline 3.1.2 auto-renewal copy, product IDs, confirmed fixed
+   price/trial configuration, iOS public SDK key, Android public SDK key,
+   secret API key, webhook authorization value, and HMAC signing secret are
+   available to the appropriate deployment/build owners. The HMAC secret is
+   shown once; confirm it is stored before leaving the RevenueCat UI.
+7. Production webhook integration is subscribed to production events only.
+   Staging/local uses a separate sandbox webhook URL. Do not point production
+   at sandbox events.
+8. The privacy disclosure covers RevenueCat's pseudonymous customer ID and
    purchase metadata. The account-deletion policy explicitly says deleting Buff
    does not cancel a store subscription.
 
-**Verify**: with non-empty sandbox/test values exported locally, run the command
-below. It prints key names only, never values, and must exit 0:
+**Verify**: with non-empty sandbox/test values exported locally, run the
+commands below from the named repository. They print key names only, never
+values, and must exit 0:
 
 ```sh
-php -r '$names=["REVENUECAT_SECRET_API_KEY","REVENUECAT_WEBHOOK_AUTHORIZATION","REVENUECAT_WEBHOOK_SIGNING_SECRET","VITE_REVENUECAT_IOS_PUBLIC_SDK_KEY","VITE_REVENUECAT_ANDROID_PUBLIC_SDK_KEY"]; foreach($names as $name){if(!is_string(getenv($name))||getenv($name)===""){fwrite(STDERR,"missing $name\n");exit(1);} echo "$name set\n";}'
+# from /Users/mason/Sites/buff-server
+php -r '$names=["REVENUECAT_SECRET_API_KEY","REVENUECAT_WEBHOOK_AUTHORIZATION","REVENUECAT_WEBHOOK_SIGNING_SECRET"]; foreach($names as $name){if(!is_string(getenv($name))||getenv($name)===""){fwrite(STDERR,"missing $name\n");exit(1);} echo "$name set\n";}'
+```
+
+```sh
+# from /Users/mason/Sites/Buff
+php -r '$names=["VITE_REVENUECAT_IOS_PUBLIC_SDK_KEY","VITE_REVENUECAT_ANDROID_PUBLIC_SDK_KEY"]; foreach($names as $name){if(!is_string(getenv($name))||getenv($name)===""){fwrite(STDERR,"missing $name\n");exit(1);} echo "$name set\n";}'
 ```
 
 ### Step 2: Add the server-owned customer identity and entitlement projection
@@ -338,6 +414,10 @@ is in the future. This product has only recurring subscriptions; a non-expiring
 entitlement is a STOP condition because the data model would need an explicit
 lifetime state.
 
+Do not add these columns to `User`'s `#[Fillable]` list. The `creating` hook
+assigns `revenuecat_app_user_id` on the model instance. Entitlement projection
+updates happen only in `RevenueCatService` via `forceFill()`/`save()`.
+
 Extend `UserResource` with:
 
 ```text
@@ -351,7 +431,9 @@ subscription.management_url
 
 Do not expose `subscription_checked_at` or any provider secret. Because all auth
 responses already use `UserResource`, do not edit every auth controller action.
-Update `UserFactory` only as required to keep its defaults explicit and stable.
+This is an additive API change; the NativePHP client stores the whole account
+object. Update `UserFactory` only as required to keep its defaults explicit and
+stable. Extra keys must not break existing account-cache restore.
 
 **Verify**:
 
@@ -379,19 +461,23 @@ Its `refresh(User $user): User` method must:
 
 1. request the RevenueCat subscriber for the user's UUID;
 2. read only the `ai_meal_analysis` entitlement;
-3. compare its expiry with the server clock and treat active trials/grace periods
+3. when writing `ai_meal_analysis_entitled_until` for production enforcement,
+   use production entitlements only; sandbox entitlements are valid only for
+   sandbox/TestFlight environments;
+4. compare its expiry with the server clock and treat active trials/grace periods
    exactly as RevenueCat represents them;
-4. atomically update the entitlement expiry, product ID, store, management URL,
+5. atomically update the entitlement expiry, product ID, store, management URL,
    and `subscription_checked_at`;
-5. clear stale entitlement fields when the entitlement is expired, revoked,
+6. clear stale entitlement fields when the entitlement is expired, revoked,
    refunded, transferred away, or absent;
-6. leave the last known projection untouched on transport/malformed-response
+7. leave the last known projection untouched on transport/malformed-response
    failure and throw a sanitized service-unavailable error.
 
 Add authenticated `POST /api/v1/subscription/refresh`, returning a fresh
-`UserResource`. Rate-limit it. This endpoint is called after purchase/restore
-and when the subscription settings page opens; it does not accept status,
-expiry, product, store, or receipt data from the client.
+`UserResource`. Register a named limiter `subscription-refresh` (around 10/min
+per user — not `meal-analysis`'s 2/min) and apply it here. This endpoint is
+called after purchase/restore and when the subscription settings page opens; it
+does not accept status, expiry, product, store, or receipt data from the client.
 
 Generate the new Laravel classes/tests rather than hand-creating framework
 boilerplate:
@@ -404,8 +490,16 @@ php artisan make:job RefreshRevenueCatEntitlement --no-interaction
 php artisan make:test --pest RevenueCatWebhookTest --no-interaction
 ```
 
-Add public `POST /api/v1/webhooks/revenuecat`, outside Sanctum and under a
-reasonable IP rate limit. The invokable controller must, before JSON parsing:
+Add public `POST /api/v1/webhooks/revenuecat`, outside Sanctum. Register a named
+limiter `revenuecat-webhook` with a high per-IP ceiling (around 120/min). Never
+use `throttle:api` here: that limiter is keyed by user id, which is null on this
+route, so every RevenueCat POST would share one bucket. After a valid signature,
+always return HTTP 200. A 429 is a failed RevenueCat delivery.
+
+`ShouldBeUnique` on the refresh job requires the existing shared cache. Do not
+change the queue connection to `sync`.
+
+The invokable controller must, before JSON parsing:
 
 - compare the configured Authorization header using `hash_equals`;
 - parse `X-RevenueCat-Webhook-Signature` as `t=...,v1=...`;
@@ -419,10 +513,11 @@ Candidate identities come from `app_user_id`, `original_app_user_id`, `aliases`,
 `RefreshRevenueCatEntitlement` job with the event ID, event type, environment,
 and deduplicated UUID list, then return HTTP 200 immediately. The job must
 implement Laravel `ShouldBeUnique`, use the event ID as `uniqueId()`, and refresh
-every matching Buff user by that user's own stored UUID. The only side effect is
-the idempotent authoritative refresh; unknown users are a sanitized log line,
-not a failure. Set bounded job attempts/backoff and rely on the existing failed
-jobs/worker operations.
+every matching Buff user by that user's own stored UUID. Ignore identities that
+are not RFC 4122 UUIDs (including `$RCAnonymousID:` prefixes). The only side
+effect is the idempotent authoritative refresh; unknown users are a sanitized
+log line, not a failure. Set bounded job attempts/backoff and rely on the
+existing failed jobs/worker operations.
 
 This deliberately follows RevenueCat's recommendation to fetch current customer
 state after a webhook instead of encoding every event transition. It makes
@@ -435,17 +530,22 @@ php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php t
 ```
 
 Expected: `Http::fake()` covers active, grace/trial, expired, absent,
-transferred/revoked, malformed, timeout, and provider-error responses;
-`Queue::fake()` proves missing/bad authorization, bad HMAC, stale timestamps,
-and malformed payloads are rejected, while valid/duplicate/transfer/test events
-queue the correct unique refresh work without logging payloads or secrets.
+transferred/revoked, sandbox-vs-production filtering, malformed, timeout, and
+provider-error responses; `Queue::fake()` proves missing/bad authorization, bad
+HMAC, stale timestamps, and malformed payloads are rejected, while
+valid/duplicate/transfer/test events queue the correct unique refresh work
+without logging payloads or secrets. Valid signed webhooks return 200 even when
+the named limiter would otherwise be tight; they never use `throttle:api`.
 
 ### Step 4: Enforce the entitlement at the shared AI boundary
 
 Add one private entitlement guard in `MealAnalysisService`. It returns when the
 rollout switch is false or the user has the active entitlement. Otherwise it
-throws an `HttpResponseException` with HTTP 403, a stable user-facing message,
-and `code: subscription_required`.
+throws an `HttpResponseException` with HTTP 403, a stable user-facing message
+that tells MCP and the app that access requires an `ai_meal_analysis`
+subscription purchased in the iOS or Android app (restore from Settings), and
+`code: subscription_required`. `McpToolRunner` already maps that `code` into
+MCP `error_code`.
 
 Call it at the very start of both `analyze()` and `followUp()`, before acquiring
 a cache lock, storing photos, or calling the AI provider. Do not place the guard
@@ -461,7 +561,7 @@ Extend existing tests to prove:
 - follow-up is also rejected before the AI agent runs;
 - show, confirm, delete, and existing photo access still work after expiry;
 - MCP `analyze-meal` receives an actionable subscription-required failure from
-  the same service guard;
+  the same service guard, including the native-app purchase/restore instruction;
 - the subscriber's existing daily quota still applies.
 
 **Verify**:
@@ -480,21 +580,37 @@ Dependency/vendor approval from Step 1 authorizes the following change. Create
 `native-plugins/in-app-purchases` as a local Composer package named
 `buff/in-app-purchases`, matching `native-plugins/apple-health` and
 `native-plugins/health-connect`. Add the path repository and package requirement
-to client `composer.json`, update `composer.lock`, and register its service
-provider in `NativeServiceProvider::plugins()`.
-
-Start with NativePHP's generator, then trim its output to the five operations and
-events required below:
+to client `composer.json`, update `composer.lock`, then register it:
 
 ```sh
+php artisan native:plugin:create --help
 php artisan native:plugin:create buff/in-app-purchases --namespace='Buff\InAppPurchases' --path=native-plugins/in-app-purchases --no-interaction
+php artisan native:plugin:register buff/in-app-purchases --no-interaction
+```
+
+Run `--help` first. If the generator does not accept `--namespace` or `--path`,
+stop and report; do not improvise a different scaffold. `native:plugin:register`
+must add the provider to `NativeServiceProvider::plugins()`; also confirm the
+path repository is present.
+
+Start with the generator, then trim its output to the operations and events
+below.
+
+Name mapping (keep this exact):
+
+```text
+Composer package:     buff/in-app-purchases
+PHP namespace:        Buff\InAppPurchases
+nativephp.json namespace: InAppPurchases
+Bridge functions:     Subscriptions.Configure | LoadOffering | Purchase | Restore | CustomerInfo
 ```
 
 The plugin manifest must support iOS and Android, retain the app's current
-minimums (iOS 18 and Android API 33), declare Apple's In-App Purchase capability,
-and declare RevenueCat through Swift Package Manager on iOS and the official
-Gradle dependency on Android. Pin current mutually compatible SDK versions from
-the official installation docs; do not copy an old version from this plan.
+minimums (iOS 18 and Android API 33), declare `"ios": { "capabilities": ["in-app-purchase"] }`,
+declare `"android": { "permissions": ["com.android.vending.BILLING"] }`, and
+declare RevenueCat through Swift Package Manager on iOS and the official Gradle
+dependency on Android. Pin current mutually compatible SDK versions from the
+official installation docs; do not copy an old version from this plan.
 
 Expose only these native operations:
 
@@ -518,20 +634,32 @@ dispatch typed NativePHP events on the main/UI thread for:
 
 ```text
 OfferingLoaded | OfferingFailed
-PurchaseCompleted | PurchaseCancelled | PurchaseFailed
+PurchaseCompleted | PurchaseCancelled | PurchasePending | PurchaseFailed
 RestoreCompleted | RestoreFailed
 ```
 
-Keep event payloads minimal: package/product ID, cancellation/error category,
-and whether RevenueCat CustomerInfo reports `ai_meal_analysis` active. Never
-include store receipts, transaction tokens, RevenueCat secret keys, or full
-provider objects. RevenueCat owns StoreKit transaction finishing and Google Play
-acknowledgement; do not reimplement either.
+`PurchasePending` is required for Play pending transactions (cash, etc.). Do not
+map pending onto `PurchaseFailed`.
+
+Keep event payloads minimal: package/product ID, cancellation/error/pending
+category, and whether RevenueCat CustomerInfo reports `ai_meal_analysis` active.
+Never include store receipts, transaction tokens, RevenueCat secret keys, or
+full provider objects. RevenueCat owns StoreKit transaction finishing and Google
+Play acknowledgement; do not reimplement either.
 
 Add TypeScript declarations in `resources/js/vite-env.d.ts` and a small
-`resources/js/subscriptions.ts` wrapper around `#nativephp`. It owns bridge/event
-names, normalizes native error categories, registers/unregisters listeners, and
-returns an unsupported state in a browser. Do not add a state-management store.
+`resources/js/subscriptions.ts` wrapper. It calls the plugin JS stub
+(`POST /_native/api/call` with the `Subscriptions.*` method names), uses
+`#nativephp` `On`/`Off` for events, normalizes native error categories,
+registers/unregisters listeners, and returns an unsupported state in a browser.
+Do not assume `#nativephp.Subscriptions` exists. Do not add a state-management
+store.
+
+`tests/Unit/SubscriptionsPluginTest.php` is a source/manifest contract test like
+`AppleHealthPluginTest`: assert `nativephp.json`, capability/permission strings,
+SPM/Gradle declarations, UUID validation, `DispatchQueue.main` /
+`Dispatchers.Main` in native sources, and absence of receipt/secret fields. Do
+not try to run Swift/Kotlin on a device from this test.
 
 **Verify**:
 
@@ -544,9 +672,10 @@ pnpm type-check
 ```
 
 Expected: all commands exit 0; the plugin list shows both platforms, five bridge
-functions, and the declared events; tests assert the manifest, capabilities,
-dependency declarations, parameter validation, main-thread event dispatch, and
-absence of receipt/secret fields.
+functions, `PurchasePending`, and the declared events; tests assert the
+manifest, `in-app-purchase` capability, `com.android.vending.BILLING`,
+dependency declarations, parameter validation, main-thread dispatch in native
+sources, and absence of receipt/secret fields.
 
 ### Step 6: Add the server-refreshed subscription page and paywall UX
 
@@ -557,7 +686,8 @@ GET  /settings/subscription
 POST /subscription/refresh
 ```
 
-Generate the controller and Pest test with the framework commands:
+`GET /settings/subscription` belongs on `SettingsController`, matching the other
+nested settings pages. Generate only the refresh controller and Pest test with:
 
 ```sh
 php artisan make:controller SubscriptionController --no-interaction
@@ -570,26 +700,43 @@ user resource only on success, and returns the existing normalized error shape.
 Do not accept client entitlement fields. Add a `BuffApiClient` convenience
 method only if it removes repeated request code.
 
-Create `resources/js/Pages/Settings/Subscription.vue` using the existing settings
-header, row, card, button, and typography components. The page must:
+Create `resources/js/Pages/Settings/Subscription.vue` as an Inertia Vue page
+using the existing settings header, row, card, button, and typography
+components. Do not create a SuperNative screen. The page must:
 
 - require a Buff account; otherwise link to sign in;
-- show cached server entitlement immediately, then call the API refresh;
-- on iOS/Android, configure the bridge with the platform public SDK key and the
-  server-provided RevenueCat UUID, then load the current offering;
-- render monthly/annual options using native localized price/period text;
-- show recurring-billing/trial copy, links to privacy and terms, purchase,
-  Restore Purchases, and Manage Subscription actions;
+- present the single paid tier as Buff+ and state that non-AI tracking remains
+  free;
+- show cached server entitlement immediately, computing active from
+  `expires_at` rather than a sticky `entitled` boolean, then call the API
+  refresh;
+- on iOS/Android, the SDK is already configured from login/resume; this page
+  loads the current offering. If Configure was skipped (no UUID yet), configure
+  here then load;
+- render monthly/annual options using native localized price/period text; the
+  monthly option has no trial and the annual option shows the store-supplied
+  seven-day introductory-trial terms for eligible customers;
+- show Apple Guideline 3.1.2 / Play recurring-billing copy: auto-renewal,
+  duration, price, charge to the store account, cancel in the store
+  subscription settings; plus functional links to privacy, terms/EULA, and
+  support; purchase; Restore Purchases; and Manage Subscription;
+- Manage Subscription opens RevenueCat's `management_url` when present,
+  otherwise the platform fallback (`itms-apps://apps.apple.com/account/subscriptions`
+  on iOS, `https://play.google.com/store/account/subscriptions` on Android);
 - after native purchase/restore success, call `/subscription/refresh` and show
   success/unlock only when the returned server resource is entitled;
-- treat user cancellation as neutral, pending/unavailable/network cases as
-  recoverable, and announce errors/status with accessible live regions;
+- treat user cancellation as neutral, `PurchasePending` / unavailable / network
+  as recoverable, and announce errors/status with accessible live regions;
 - remove native event listeners on unmount and prevent duplicate purchase taps;
 - on web/unsupported builds, explain that purchase and restore are available in
   the iOS/Android app without rendering dead native buttons.
 
+Call `Subscriptions.Configure` from the signed-in app shell (login, resume, and
+token rotation success paths), not only from this page.
+
 Add a Subscription row to the settings hub. Show status such as Active or
-Inactive from the cached server projection, not native CustomerInfo.
+Inactive from the cached server projection (derived from `expires_at`), not
+native CustomerInfo.
 
 Mark the Photo tile in `AddChooser.vue` with an accessible Pro/lock indicator
 when inactive. In `Add.vue`, selecting Photo while cached inactive routes to the
@@ -616,10 +763,13 @@ pnpm type-check
 vendor/bin/pint --dirty --format agent
 ```
 
-Expected: all pass. Tests cover account-resource persistence, refresh success
-and failure, preserved `subscription_required`, signed-out and browser states,
-localized offering mapping, purchase cancellation/pending/failure, server-only
-unlock, listener cleanup, Photo CTA behavior, and account-deletion warning.
+Expected: all pass. Tests cover account-resource persistence, derived
+`expires_at` entitlement, refresh success and failure, preserved
+`subscription_required` including the native-app purchase instruction,
+signed-out and browser states, localized offering mapping, purchase
+cancellation/pending/failure, server-only unlock, listener cleanup, configure
+on login/resume, Photo CTA behavior, Manage Subscription fallback URLs, and
+account-deletion warning.
 
 ### Step 7: Run sandbox/device acceptance on both stores
 
@@ -642,7 +792,8 @@ Use App Store sandbox/TestFlight and Play internal testing/license testers on
 physical devices. Record one pass/fail result per platform for:
 
 - new monthly purchase and new annual purchase;
-- trial/intro offer when configured;
+- no trial on monthly and the seven-day annual introductory trial, including an
+  annual purchase by a customer who is no longer trial-eligible;
 - user-cancelled purchase;
 - pending purchase on Android;
 - renewal, billing retry/grace period, expiration, refund/revocation;
@@ -680,8 +831,11 @@ Do not proceed with a failing or untested store state.
 2. Confirm production has the canonical HTTPS URL, shared cache, queue worker,
    failed-job alerting, RevenueCat secret API key, webhook authorization value,
    webhook signing secret, and environment configuration.
-3. Register the production webhook for production events, send a RevenueCat test
-   event, and confirm HTTP 200 plus successful queued processing.
+3. Register the production webhook for **production events only**, send a
+   RevenueCat test/production event as appropriate, and confirm HTTP 200 plus
+   successful queued processing. Do not attach sandbox events to the production
+   URL. If you rotate the HMAC signing secret, cut over the server env first —
+   RevenueCat invalidates the old secret immediately.
 4. Release iOS and Android builds with their platform-specific public SDK keys.
    Complete App Review/Play review and staged production rollout.
 5. Confirm both live store versions can purchase, restore, refresh, and manage
@@ -696,8 +850,10 @@ Do not proceed with a failing or untested store state.
    billing path is unhealthy.
 
 Update `buff-server/README.md` only with the new environment key inventory,
-queue/webhook operational requirement, safe rollout order, and a no-secret test
-webhook command or dashboard action. Do not create a second operations guide.
+queue/webhook operational requirement, named rate limiters, sandbox vs
+production webhook URLs, HMAC rotation cutover, safe rollout order, and a
+no-secret test webhook command or dashboard action. Do not create a second
+operations guide.
 
 **Verify** from each repository before production enablement:
 
@@ -725,9 +881,11 @@ completed production smoke test.
 - `tests/Feature/SubscriptionTest.php`
   - migration/backfill and UUID uniqueness;
   - resource contract and absence of secrets;
+  - billing columns are not mass-assignable via `User::create`/`fill`;
   - authenticated refresh ignores client-supplied status and queries RevenueCat;
   - active paid/trial/grace, expired, missing, refunded/revoked, transferred,
-    malformed, timeout, and provider-error status projection;
+    production-vs-sandbox filtering, malformed, timeout, and provider-error
+    status projection;
   - old projection survives provider transport failure;
   - rollout switch and entitlement access semantics.
 - `tests/Feature/RevenueCatWebhookTest.php`
@@ -735,31 +893,36 @@ completed production smoke test.
     timestamp, malformed/oversized identity data;
   - exact raw-body HMAC validation;
   - common lifecycle, TEST, alias, and TRANSFER payload identity extraction;
+  - `$RCAnonymousID:` and non-UUID identities are dropped;
   - duplicate event uses the same unique job key;
+  - valid signed requests return 200 and are not throttled as `api`;
   - unknown user and job retry behavior remain sanitized and idempotent.
 - `tests/Feature/MealAnalysisTest.php`
   - analyze/follow-up allow and deny paths, no provider/storage work on denial,
     existing quota preserved, non-generating operations remain accessible.
 - `tests/Feature/McpDraftAndMediaToolsTest.php`
-  - MCP analysis is denied by the same service guard and returns an actionable
-    error without an AI call.
+  - MCP analysis is denied by the same service guard and returns
+    `error_code: subscription_required` plus the native-app purchase/restore
+    instruction, without an AI call.
 
 ### Automated client tests
 
 - `tests/Feature/SubscriptionTest.php`
   - route/page auth states, API refresh proxy, credential-cache update, provider
-    failures, and `subscription_required` preservation.
+    failures, derived `expires_at` entitlement, and `subscription_required`
+    preservation.
 - `tests/Feature/MealPhotoIntegrationTest.php` and `tests/Feature/SettingsTest.php`
   - existing meal and settings behavior remains intact; deletion copy warns that
-    store cancellation is separate.
+    store cancellation is separate; Manage Subscription is not a dead control.
 - `tests/Unit/SubscriptionsPluginTest.php`
-  - plugin manifest, iOS/Android dependencies/capability, bridge/event contract,
-    UUID validation, main-thread dispatch, public-only configuration, and no
-    receipt/token leakage.
+  - plugin manifest, iOS `in-app-purchase` capability, Android `BILLING`
+    permission, SPM/Gradle dependencies, `Subscriptions.*` bridge names,
+    `PurchasePending`, UUID validation, main-thread dispatch in native sources,
+    public-only configuration, and no receipt/token leakage.
 - `tests/subscriptions.test.ts`
-  - localized offering normalization, cached/server state transitions, native
-    cancellation/pending/error categories, server-only unlock, unsupported web,
-    and listener cleanup.
+  - localized offering normalization, cached/server state from `expires_at`,
+    native cancellation/pending/error categories, server-only unlock,
+    unsupported web, Manage Subscription fallback URLs, and listener cleanup.
 
 ### Manual native/store matrix
 
@@ -774,19 +937,29 @@ All must hold:
 
 - [ ] One RevenueCat entitlement named `ai_meal_analysis` maps the approved
   monthly/annual iOS and Android products.
-- [ ] RevenueCat is configured only with Buff's non-guessable UUID; no anonymous
-  RevenueCat customer is created during purchase, restore, logout, or account
-  switch.
+- [ ] The paid tier is Buff+; the UK products are £4.99 monthly without a trial
+  and £24.99 annually with a seven-day introductory trial. There are no weekly,
+  lifetime, or additional paid tiers.
+- [ ] RevenueCat is configured at Buff login/resume/rotation with the
+  non-guessable UUID; no anonymous RevenueCat customer is created during
+  purchase, restore, logout, or account switch.
 - [ ] API refresh and webhook jobs query RevenueCat; neither trusts client or
-  webhook lifecycle fields as entitlement truth.
+  webhook lifecycle fields as entitlement truth. Production projection ignores
+  sandbox entitlements.
 - [ ] Webhooks require both configured Authorization and valid five-minute HMAC
-  signatures over raw bytes, acknowledge quickly, and queue idempotent refresh.
-- [ ] Inactive users cannot call AI through mobile API, follow-up, or MCP; no AI
-  or photo-storage work starts before denial.
+  signatures over raw bytes, acknowledge with HTTP 200, never use
+  `throttle:api`, and queue idempotent refresh.
+- [ ] Inactive users cannot call AI through mobile API, follow-up, or MCP; MCP
+  errors include the native-app purchase/restore instruction; no AI or
+  photo-storage work starts before denial.
 - [ ] Existing drafts/photos and all non-AI logging remain accessible after
   expiry.
-- [ ] Native pages display localized store pricing and unlock only after the API
-  refresh returns entitled.
+- [ ] Manual and barcode logging, macros, recipes, goals, progress, health sync,
+  and existing user data remain free; Buff+ grants only AI meal analysis and
+  follow-up, subject to the existing 10-new-analyses daily quota.
+- [ ] Native pages display localized store pricing, Apple 3.1.2 / Play billing
+  copy, a working Manage Subscription control, and unlock only after the API
+  refresh returns entitled. Client Active/Inactive is derived from `expires_at`.
 - [ ] Purchase, cancellation, pending, restore, transfer, renewal, grace,
   expiration, refund/revocation, offline, and provider-failure cases pass the
   automated/manual matrix.
@@ -804,19 +977,26 @@ Stop and report; do not improvise if:
 
 - RevenueCat, its Pro webhook plan, the new native SDK dependencies, or the
   `Transfer to new App User ID` account policy is not approved.
-- Product identifiers, prices, trials, privacy/terms/support URLs, or store
-  account agreements are undecided. Do not invent commercial terms.
+- Product identifiers, privacy/terms/support URLs, or store account agreements
+  are undecided, or either store cannot configure the fixed Buff+ prices and
+  annual-only trial. Do not invent replacement commercial terms.
 - The live code materially differs from the Current state excerpts or a required
   change falls outside Scope.
 - Current RevenueCat SDKs require a minimum iOS/Android version above this app's
   iOS 18 / Android API 33 targets.
 - A non-expiring/lifetime entitlement is added; the planned timestamp-only
   projection does not represent it.
-- NativePHP Mobile 4 cannot declare the required RevenueCat SDK dependency or
-  In-App Purchase capability in a plugin manifest. Do not patch generated native
-  projects as a workaround.
+- NativePHP Mobile 4 cannot declare the required RevenueCat SDK dependency,
+  `in-app-purchase` capability, or `com.android.vending.BILLING` permission in a
+  plugin manifest, or `native:plugin:create` flags do not match `--help`. Do not
+  patch generated native projects as a workaround. Do not fall back to
+  SuperNative screens, NativePHP Wallet, Stripe, Apple Pay, or Google Pay.
+- A valid signed RevenueCat webhook would have to return non-200 (including 429)
+  to stay within a rate limit.
 - The RevenueCat SDK would create an anonymous customer, expose a secret/receipt,
   or require the client result to be trusted before server refresh.
+- Configure cannot run at Buff login/resume and would only be possible on the
+  subscription page.
 - Store review rules require materially different purchase, restore, legal, or
   account-deletion behavior.
 - Account deletion must erase RevenueCat-held pseudonymous purchase data through
@@ -831,8 +1011,9 @@ Stop and report; do not improvise if:
 ## Maintenance notes
 
 - Reviewer focus: server authority, raw-body HMAC handling, timestamp tolerance,
-  UUID identity/transfer semantics, secrets in logs/bundles, and denial before
-  storage/provider calls.
+  UUID identity/transfer semantics, sandbox vs production entitlements, webhook
+  200 vs 429, secrets in logs/bundles, configure-at-login without anonymous IDs,
+  and denial before storage/provider calls.
 - RevenueCat webhook delivery is at-least-once and may be delayed. The queued job
   therefore fetches current subscriber state and must remain idempotent; never
   turn webhook event types into a hand-maintained subscription state machine.
@@ -841,6 +1022,11 @@ Stop and report; do not improvise if:
   known entitlement and does not extend expiry on failure.
 - The existing daily analysis quota remains the cost-control calibration knob.
   Change it only from observed subscriber usage/cost, not as part of billing.
+- After the first representative paid cohort, calculate average AI and storage
+  variable cost per paid subscriber-month. Keep the £24.99 annual price only
+  while that cost remains below roughly £0.50; otherwise raise annual pricing
+  to £29.99 for new customers and preserve the £24.99 renewal price for existing
+  subscribers. This post-launch review does not block the initial rollout.
 - If more paid features arrive, then consider a small entitlement table. One
   entitlement does not justify that abstraction now.
 - If duplicate deliveries create measurable queue load or compliance requires an
