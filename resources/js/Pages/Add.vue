@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, Link, router, useForm } from '@inertiajs/vue3';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X, ChevronLeft } from '@lucide/vue';
@@ -23,6 +23,7 @@ import SelectItem from '../Components/ui/select/SelectItem.vue';
 import SelectTrigger from '../Components/ui/select/SelectTrigger.vue';
 import SelectValue from '../Components/ui/select/SelectValue.vue';
 import Textarea from '../Components/ui/textarea/Textarea.vue';
+import {isSubscriptionActive} from '../subscriptions';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroField = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -140,6 +141,14 @@ const props = withDefaults(defineProps<{
     previousCustomMeals: () => [],
     recipes: () => [],
 });
+const page = usePage<{
+    buff: {
+        account?: {
+            subscription?: {expires_at?: string | null} | null;
+        } | null;
+    };
+}>();
+const subscriptionActive = computed(() => isSubscriptionActive(page.props.buff.account?.subscription?.expires_at));
 
 const customMealMacroFields: ReadonlyArray<readonly [MacroField, string]> = [
     ['protein_g', 'Protein'],
@@ -166,6 +175,12 @@ function addModeUrl(mode: string, extra: Record<string, string> = {}) {
 }
 
 function openAddMode(mode: string, extra?: Record<string, string>) {
+    if (mode === 'photo' && !subscriptionActive.value) {
+        router.visit('/settings/subscription');
+
+        return;
+    }
+
     router.visit(addModeUrl(mode, extra ?? {}));
 }
 
@@ -209,6 +224,7 @@ const photoProcessing = ref(false);
 const photoNote = ref('');
 const photoAnalysisLoading = ref(false);
 const photoAnalysisError = ref('');
+const subscriptionRequired = ref(false);
 const analysisContext = ref<AnalysisContext | null>(null);
 const analysisFollowUpOpen = ref(false);
 const analysisFollowUp = ref('');
@@ -742,6 +758,7 @@ async function analyzePhotos() {
 
     photoAnalysisLoading.value = true;
     photoAnalysisError.value = '';
+    subscriptionRequired.value = false;
 
     try {
         const photos = await Promise.all(selectedPhotos.value.map(({file}) => photoDataUrl(file)));
@@ -756,7 +773,9 @@ async function analyzePhotos() {
         applyAnalysisDraft(analysis);
     } catch (error) {
         const code = axios.isAxiosError(error) ? error.response?.data?.code : null;
+        subscriptionRequired.value = code === 'subscription_required';
         photoAnalysisError.value = {
+            subscription_required: 'Buff+ is required for AI meal analysis. Subscribe or restore from Settings.',
             meal_analysis_quota_reached: 'Today’s photo-analysis limit has been reached.',
             meal_analysis_in_progress: 'Another meal analysis is still running.',
             invalid_meal_analysis: 'The photos did not produce a usable estimate. Try clearer photos.',
@@ -778,6 +797,7 @@ async function followUpAnalysis() {
 
     analysisFollowUpLoading.value = true;
     analysisFollowUpError.value = '';
+    subscriptionRequired.value = false;
 
     try {
         const response = await axios.post(`/meal-analyses/${id}/follow-up`, {correction});
@@ -792,6 +812,8 @@ async function followUpAnalysis() {
         closeFollowUpModal();
         window.dispatchEvent(new CustomEvent('buff:toast', {detail: 'Estimate updated.'}));
     } catch (error) {
+        const code = axios.isAxiosError(error) ? error.response?.data?.code : null;
+        subscriptionRequired.value = code === 'subscription_required';
         analysisFollowUpError.value = axios.isAxiosError(error)
             ? error.response?.data?.errors?.correction?.[0] || error.response?.data?.message || 'Could not update the estimate.'
             : 'Could not update the estimate.';
@@ -977,7 +999,7 @@ onUnmounted(() => {
             </div>
         </Transition>
 
-        <AddChooser v-if="mode === 'choose'" @select="openAddMode" />
+        <AddChooser v-if="mode === 'choose'" :subscription-active="subscriptionActive" @select="openAddMode" />
 
         <RecipeMode
             v-if="mode === 'recipe'"
@@ -1062,6 +1084,7 @@ onUnmounted(() => {
             <p v-if="photoAnalysisError" class="mt-3 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
                 {{ photoAnalysisError }}
             </p>
+            <Button v-if="subscriptionRequired" :as="Link" href="/settings/subscription" variant="surface" class="mt-2 w-full">View Buff+</Button>
 
             <Button
                 type="button"
@@ -1411,6 +1434,7 @@ onUnmounted(() => {
                     :disabled="analysisFollowUpLoading"
                 />
                 <p v-if="analysisFollowUpError" class="text-sm text-destructive" role="alert">{{ analysisFollowUpError }}</p>
+                <Button v-if="subscriptionRequired" :as="Link" href="/settings/subscription" variant="surface" class="w-full">View Buff+</Button>
                 <Button
                     class="w-full"
                     :disabled="!analysisFollowUp.trim()"

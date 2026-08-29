@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import type { Component } from 'vue';
-import { Camera, Dumbbell, Pencil, ScanBarcode, Search, UtensilsCrossed } from '@lucide/vue';
+import { Camera, Dumbbell, LockKeyhole, Pencil, ScanBarcode, Search, UtensilsCrossed } from '@lucide/vue';
 import Button from '../ui/button/Button.vue';
+
+const props = withDefaults(defineProps<{
+    subscriptionActive?: boolean;
+}>(), {
+    subscriptionActive: false,
+});
 
 export type AddChoiceMode = 'food' | 'custom' | 'workout' | 'photo' | 'recipe';
 
@@ -84,7 +90,7 @@ const emit = defineEmits<{
                 type="button"
                 variant="outline"
                 class="h-auto min-h-20 w-full justify-start gap-3 whitespace-normal rounded-2xl px-3 py-3 text-left"
-                :aria-label="`${choice.label}. ${choice.description}`"
+                :aria-label="`${choice.label}. ${choice.description}${choice.mode === 'photo' && !props.subscriptionActive ? '. Buff+ required' : ''}`"
                 @click="emit('select', choice.mode, choice.extra)"
             >
                 <span
@@ -94,7 +100,12 @@ const emit = defineEmits<{
                     <component :is="choice.icon" :size="20" />
                 </span>
                 <span class="min-w-0">
-                    <span class="block text-sm font-semibold">{{ choice.label }}</span>
+                    <span class="flex items-center gap-1.5 text-sm font-semibold">
+                        {{ choice.label }}
+                        <span v-if="choice.mode === 'photo' && !props.subscriptionActive" class="inline-flex items-center gap-1 rounded-full bg-primary-container px-1.5 py-0.5 text-[0.625rem] uppercase tracking-wide text-primary-container-foreground">
+                            <LockKeyhole :size="11" aria-hidden="true" /> Buff+
+                        </span>
+                    </span>
                     <span class="block text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>
                 </span>
             </Button>

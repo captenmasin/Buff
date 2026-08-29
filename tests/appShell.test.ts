@@ -29,3 +29,11 @@ test('shows the health provider name only in the settings page header', () => {
     assert.match(source, /<SettingsPageHeader>{{ healthImport\?\.name \?\? 'Health' }}<\/SettingsPageHeader>/);
     assert.doesNotMatch(source, /<h2[^>]*>{{ healthImport\?\.name }}<\/h2>/);
 });
+
+test('configures subscriptions from the signed-in shell and gates the Photo shortcut', () => {
+    const source = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
+
+    assert.match(source, /configureCurrentAccount\(page\.props\.buff\.account\)/);
+    assert.match(source, /mode === 'photo' && !subscriptionActive\.value/);
+    assert.match(source, /router\.visit\('\/settings\/subscription'\)/);
+});

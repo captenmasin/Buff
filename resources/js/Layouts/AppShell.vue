@@ -9,12 +9,14 @@ import AppSheet from '../Components/AppSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
 import { publicAssetUrl } from '../publicAssetUrl';
+import {configureSubscriptions, isSubscriptionActive, type SubscriptionAccount} from '../subscriptions';
 
 const page = usePage<{
     summary?: { date: string };
     flash?: { message?: string };
     buff: {
         needs_sign_in: boolean;
+        account?: SubscriptionAccount | null;
     };
 }>();
 const addDrawerOpen = ref(false);
@@ -34,6 +36,7 @@ const navItems = [
 const path = computed(() => new URL(page.url, window.location.origin).pathname);
 
 const isSettingsSubpage = computed(() => path.value.startsWith('/settings/'));
+const subscriptionActive = computed(() => isSubscriptionActive(page.props.buff.account?.subscription?.expires_at));
 
 function isActive(match: string) {
     if (match === '/') {
@@ -117,6 +120,12 @@ function openAddMode(mode: string, extra?: Record<string, string>) {
     hapticImpact();
     closeDrawerImmediately();
 
+    if (mode === 'photo' && !subscriptionActive.value) {
+        router.visit('/settings/subscription');
+
+        return;
+    }
+
     const params = new URLSearchParams({ mode, ...(extra ?? {}) });
     const selectedDate = page.props.summary?.date;
 
@@ -159,11 +168,20 @@ async function syncOnResume() {
 
     try {
         await axios.post('/sync/resume');
+        await configureCurrentAccount(page.props.buff.account);
         router.reload();
     } catch {
         router.reload({only: ['buff']});
     } finally {
         syncInProgress = false;
+    }
+}
+
+async function configureCurrentAccount(account?: SubscriptionAccount | null) {
+    try {
+        await configureSubscriptions(account);
+    } catch {
+        // The subscription page exposes retryable setup errors; app resume stays quiet.
     }
 }
 
@@ -196,11 +214,14 @@ onMounted(() => {
     window.addEventListener('buff:toast', handleToast);
 
     showFlashToast(page.props.flash?.message);
+    void configureCurrentAccount(page.props.buff.account);
 
     removeFlashToastListener = router.on('success', (event) => {
         const flash = event.detail.page.props.flash as { message?: string } | undefined;
+        const buff = event.detail.page.props.buff as {account?: SubscriptionAccount | null} | undefined;
 
         showFlashToast(flash?.message);
+        void configureCurrentAccount(buff?.account);
     });
 });
 
@@ -296,7 +317,7 @@ onUnmounted(() => {
                 </Button>
             </div>
 
-            <AddChooser @select="openAddMode" />
+            <AddChooser :subscription-active="subscriptionActive" @select="openAddMode" />
         </AppSheet>
 
         <nav v-if="!isSettingsSubpage" class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border/70 bg-card/50 shadow-card backdrop-blur-lg sm:hidden">

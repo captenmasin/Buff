@@ -10,6 +10,7 @@ import SettingsGroup from '../Components/SettingsGroup.vue';
 import SettingsRow from '../Components/SettingsRow.vue';
 import Button from '../Components/ui/button/Button.vue';
 import {type HeightUnit, type WeightUnit} from '../bodyUnits';
+import {isSubscriptionActive} from '../subscriptions';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
 type EatBack = 'all' | 'half' | 'none';
@@ -42,6 +43,9 @@ interface BuffAccount {
     email: string;
     timezone: string;
     email_verified: boolean;
+    subscription?: {
+        expires_at?: string | null;
+    } | null;
 }
 
 const page = usePage<{
@@ -96,6 +100,7 @@ const reminderDetail = computed(() => {
 
     return enabled.length === 0 ? 'Off' : `${enabled.length} on`;
 });
+const subscriptionDetail = computed(() => isSubscriptionActive(page.props.buff.account?.subscription?.expires_at) ? 'Active' : 'Inactive');
 
 function openDeleteAccountModal() {
     deleteAccountForm.reset();
@@ -154,6 +159,10 @@ onMounted(() => {
             </template>
         </SettingsGroup>
 
+        <SettingsGroup title="Buff+">
+            <SettingsRow href="/settings/subscription" :detail="subscriptionDetail">Subscription</SettingsRow>
+        </SettingsGroup>
+
         <SettingsGroup title="Preferences">
             <SettingsRow href="/settings/appearance" :detail="appearanceLabels[appearance]">Appearance</SettingsRow>
             <SettingsRow href="/settings/reminders" :detail="reminderDetail">Meal reminders</SettingsRow>
@@ -201,6 +210,10 @@ onMounted(() => {
                 <p class="text-sm text-muted-foreground">
                     Signed in with Google or Apple, or don't know your password?
                     <Link :href="passwordResetUrl" class="text-link">Set or reset it by email first.</Link>
+                </p>
+                <p class="rounded-xl bg-muted p-3 text-sm text-muted-foreground">
+                    Deleting your Buff account does not cancel an App Store or Google Play subscription.
+                    <Link href="/settings/subscription" class="text-link">Manage your subscription first</Link> if you want to cancel it.
                 </p>
                 <label for="delete-account-password" class="block field-label">Password</label>
                 <PasswordInput

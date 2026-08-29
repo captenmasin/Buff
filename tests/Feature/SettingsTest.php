@@ -103,6 +103,10 @@ it('renders the settings hub and nested section pages', function (): void {
             ->where('preferences.eat_back', 'all')
         );
 
+    $this->get('/settings/subscription')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('Settings/Subscription'));
+
     $this->get('/settings/health')->assertRedirect('/settings');
 });
 

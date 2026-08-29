@@ -58,6 +58,19 @@ it('proxies a bounded multipart analysis without exposing the bearer token to Vu
         && $request->hasFile('photos[]', filename: 'meal.jpg'));
 });
 
+it('preserves the subscription-required API contract for the paywall CTA', function (): void {
+    Http::fake(['*/meal-analyses' => Http::response([
+        'message' => 'Access requires an ai_meal_analysis subscription purchased in the iOS or Android app; restore from Settings.',
+        'code' => 'subscription_required',
+    ], 403)]);
+
+    $this->post('/meal-analyses', [
+        'photos' => [UploadedFile::fake()->image('meal.jpg', 800, 600)],
+    ])->assertForbidden()
+        ->assertJsonPath('code', 'subscription_required')
+        ->assertJsonPath('message', 'Access requires an ai_meal_analysis subscription purchased in the iOS or Android app; restore from Settings.');
+});
+
 it('accepts bridge-safe meal photo data URLs', function (): void {
     Http::fake(['*/meal-analyses' => Http::response([
         'analysis' => ['id' => '20000000-0000-4000-8000-000000000002'],

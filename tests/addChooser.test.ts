@@ -9,3 +9,9 @@ test('renders compact descriptions for every add choice', () => {
     assert.equal(source.match(/variant="outline"/g)?.length, 2);
     assert.doesNotMatch(source, /min-h-28|bg-secondary\/70/);
 });
+
+test('marks photo analysis as Buff+ when the cached server expiry is inactive', () => {
+    assert.match(source, /Buff\+ required/);
+    assert.match(source, /LockKeyhole/);
+    assert.match(source, /subscriptionActive/);
+});

@@ -14,6 +14,7 @@ use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\ProgressController;
 use App\Http\Controllers\RecipeController;
 use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SubscriptionController;
 use App\Http\Controllers\SyncController;
 use App\Http\Controllers\WeeklySummaryController;
 use App\Http\Controllers\WorkoutController;
@@ -60,6 +61,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/settings/body-profile', [SettingsController::class, 'bodyProfile']);
     Route::get('/settings/units', [SettingsController::class, 'units']);
     Route::get('/settings/exercise', [SettingsController::class, 'exercise']);
+    Route::get('/settings/subscription', [SettingsController::class, 'subscription']);
     Route::get('/settings/health', [SettingsController::class, 'health']);
     Route::get('/settings/connected-assistants', [SettingsController::class, 'connectedAssistants']);
     Route::delete('/settings/connected-assistants/{connection}', [SettingsController::class, 'revokeConnectedAssistant'])
@@ -73,6 +75,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::delete('/account', [AccountController::class, 'destroy']);
     Route::post('/sync', [SyncController::class, 'store']);
     Route::post('/sync/resume', [SyncController::class, 'resume']);
+    Route::post('/subscription/refresh', [SubscriptionController::class, 'store']);
 
     Route::get('/progress', [ProgressController::class, 'index']);
     Route::post('/progress/body-metrics', [ProgressController::class, 'store']);

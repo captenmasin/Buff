@@ -76,6 +76,11 @@ class SettingsController extends Controller
         ]);
     }
 
+    public function subscription(): Response
+    {
+        return Inertia::render('Settings/Subscription');
+    }
+
     public function health(): Response|RedirectResponse
     {
         $healthConnect = HealthConnectController::sharedStatus();
