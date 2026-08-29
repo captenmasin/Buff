@@ -85,6 +85,7 @@ test('keeps unlock server-authoritative and renders the required store controls'
 
     assert.match(page, /axios\.post\('\/subscription\/refresh'\)/);
     assert.match(page, /isSubscriptionActive\(account\.value\?\.subscription\?\.expires_at\)/);
+    assert.match(page, /platformResolved && platform === 'unsupported'/);
     assert.match(page, /Restore purchases/);
     assert.match(page, /Manage subscription/);
     assert.match(page, /https:\/\/usebuff\.app\/privacy\//);

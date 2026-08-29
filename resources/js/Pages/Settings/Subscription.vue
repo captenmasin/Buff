@@ -27,6 +27,7 @@ interface BuffAccount extends SubscriptionAccount {
 const page = usePage<{buff: {account: BuffAccount | null}}>();
 const account = ref<BuffAccount | null>(page.props.buff.account);
 const platform = ref<SubscriptionPlatform>('unsupported');
+const platformResolved = ref(false);
 const packages = ref<SubscriptionPackage[]>([]);
 const busy = ref<string | null>(null);
 const refreshing = ref(false);
@@ -93,6 +94,7 @@ async function startNativeSubscriptions(): Promise<void> {
     try {
         const configuration = await configureSubscriptions(account.value);
         platform.value = configuration.platform;
+        platformResolved.value = true;
 
         if (!configuration.configured) {
             if (configuration.reason === 'missing_key') {
@@ -133,6 +135,7 @@ async function startNativeSubscriptions(): Promise<void> {
         busy.value = 'offering';
         await subscriptionNative.loadOffering();
     } catch {
+        platformResolved.value = true;
         busy.value = null;
         errorMessage.value = 'Subscriptions are temporarily unavailable.';
     }
@@ -192,9 +195,9 @@ async function openManagement(): Promise<void> {
     window.location.assign(url);
 }
 
-onMounted(async () => {
-    await refreshServer(true);
-    await startNativeSubscriptions();
+onMounted(() => {
+    void refreshServer(true);
+    void startNativeSubscriptions();
 });
 
 onUnmounted(() => removeNativeListeners?.());
@@ -256,7 +259,7 @@ onUnmounted(() => removeNativeListeners?.());
                 </Card>
             </div>
 
-            <Card v-else-if="platform === 'unsupported'" class="gap-2">
+            <Card v-else-if="platformResolved && platform === 'unsupported'" class="gap-2">
                 <h2 class="card-title">Use the Buff mobile app</h2>
                 <p class="text-sm text-muted-foreground">Purchases and restore are available in Buff for iOS and Android.</p>
             </Card>
@@ -267,7 +270,7 @@ onUnmounted(() => removeNativeListeners?.());
             <p v-if="errorMessage" class="rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert" aria-live="assertive">{{ errorMessage }}</p>
 
             <div class="grid gap-2">
-                <Button v-if="platform !== 'unsupported'" variant="surface" :disabled="busy !== null" :loading="busy === 'restore'" loading-label="Restoring…" @click="restorePurchases">
+                <Button v-if="platformResolved && platform !== 'unsupported'" variant="surface" :disabled="busy !== null" :loading="busy === 'restore'" loading-label="Restoring…" @click="restorePurchases">
                     Restore purchases
                 </Button>
                 <Button v-if="manageUrl" variant="surface" @click="openManagement">
