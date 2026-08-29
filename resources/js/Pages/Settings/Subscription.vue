@@ -219,13 +219,13 @@ onUnmounted(() => removeNativeListeners?.());
                         <Crown :size="22" aria-hidden="true" />
                     </span>
                     <div>
-                        <h2 class="card-title">AI meal analysis</h2>
+                        <h2 class="card-title">Buff+</h2>
                         <p class="mt-1 text-sm text-muted-foreground">Photo estimates and AI follow-ups are included. Manual and barcode logging, recipes, goals, progress, health sync, and your existing data stay free.</p>
                     </div>
                 </div>
                 <p class="flex items-center gap-2 text-sm font-semibold" :class="active ? 'text-success-soft-foreground' : 'text-muted-foreground'">
                     <Check v-if="active" :size="17" aria-hidden="true" />
-                    {{ active ? 'Buff+ active' : 'Buff+ inactive' }}<span v-if="active && expiryLabel"> · access through {{ expiryLabel }}</span>
+                    {{ active ? 'Buff+ active' : '' }}<span v-if="active && expiryLabel"> · access through {{ expiryLabel }}</span>
                 </p>
             </Card>
 
