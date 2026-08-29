@@ -11,6 +11,7 @@
         "buff/background-tasks": "^1.0",
         "buff/camera-permissions": "^1.0",
         "buff/health-connect": "^1.0",
+        "buff/in-app-purchases": "^1.0",
         "buff/native-refresh": "^1.0",
         "inertiajs/inertia-laravel": "^3.1",
         "laravel/framework": "^13.8",
@@ -66,6 +67,13 @@
         {
             "type": "path",
             "url": "native-plugins/health-connect",
+            "options": {
+                "symlink": true
+            }
+        },
+        {
+            "type": "path",
+            "url": "native-plugins/in-app-purchases",
             "options": {
                 "symlink": true
             }

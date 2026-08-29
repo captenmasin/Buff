@@ -3,6 +3,14 @@
 declare module '#nativephp' {
     export const Browser: {
         auth(url: string): Promise<boolean>;
+        inApp(url: string): Promise<boolean>;
+        open(url: string): Promise<boolean>;
+    };
+
+    export const System: {
+        isAndroid(): Promise<boolean>;
+        isIos(): Promise<boolean>;
+        isMobile(): Promise<boolean>;
     };
 
     export const Dialog: {
@@ -26,6 +34,11 @@ declare module '#nativephp' {
             CodeScanned: string;
         };
     };
+}
+
+interface ImportMetaEnv {
+    readonly VITE_REVENUECAT_IOS_PUBLIC_SDK_KEY?: string;
+    readonly VITE_REVENUECAT_ANDROID_PUBLIC_SDK_KEY?: string;
 }
 
 interface Window {

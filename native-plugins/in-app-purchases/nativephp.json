@@ -1,0 +1,71 @@
+{
+    "namespace": "InAppPurchases",
+    "platforms": ["android", "ios"],
+    "bridge_functions": [
+        {
+            "name": "Subscriptions.Configure",
+            "android": "com.buff.inapppurchases.SubscriptionsFunctions.Configure",
+            "android_params": ["context"],
+            "ios": "SubscriptionsFunctions.Configure",
+            "description": "Configure RevenueCat for a signed-in Buff account."
+        },
+        {
+            "name": "Subscriptions.LoadOffering",
+            "android": "com.buff.inapppurchases.SubscriptionsFunctions.LoadOffering",
+            "android_params": ["activity"],
+            "ios": "SubscriptionsFunctions.LoadOffering",
+            "description": "Load the current monthly and annual offering."
+        },
+        {
+            "name": "Subscriptions.Purchase",
+            "android": "com.buff.inapppurchases.SubscriptionsFunctions.Purchase",
+            "android_params": ["activity"],
+            "ios": "SubscriptionsFunctions.Purchase",
+            "description": "Purchase a package from the current offering."
+        },
+        {
+            "name": "Subscriptions.Restore",
+            "android": "com.buff.inapppurchases.SubscriptionsFunctions.Restore",
+            "android_params": ["activity"],
+            "ios": "SubscriptionsFunctions.Restore",
+            "description": "Restore purchases for the signed-in Buff account."
+        },
+        {
+            "name": "Subscriptions.CustomerInfo",
+            "android": "com.buff.inapppurchases.SubscriptionsFunctions.CustomerInfo",
+            "android_params": ["context"],
+            "ios": "SubscriptionsFunctions.CustomerInfo",
+            "description": "Return minimal RevenueCat customer information."
+        }
+    ],
+    "android": {
+        "min_version": 33,
+        "permissions": ["com.android.vending.BILLING"],
+        "dependencies": {
+            "implementation": ["com.revenuecat.purchases:purchases:10.19.1"]
+        }
+    },
+    "ios": {
+        "min_version": "18.0",
+        "capabilities": ["in-app-purchase"],
+        "dependencies": {
+            "swift_packages": [
+                {
+                    "url": "https://github.com/RevenueCat/purchases-ios-spm.git",
+                    "version": "5.87.1",
+                    "products": ["RevenueCat"]
+                }
+            ]
+        }
+    },
+    "events": [
+        "Buff\\InAppPurchases\\Events\\OfferingLoaded",
+        "Buff\\InAppPurchases\\Events\\OfferingFailed",
+        "Buff\\InAppPurchases\\Events\\PurchaseCompleted",
+        "Buff\\InAppPurchases\\Events\\PurchaseCancelled",
+        "Buff\\InAppPurchases\\Events\\PurchasePending",
+        "Buff\\InAppPurchases\\Events\\PurchaseFailed",
+        "Buff\\InAppPurchases\\Events\\RestoreCompleted",
+        "Buff\\InAppPurchases\\Events\\RestoreFailed"
+    ]
+}

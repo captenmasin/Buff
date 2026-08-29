@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f7290b174af81b1ac8013222e9ae61d2",
+    "content-hash": "9e431ffed6b6300b70d3d176a13f9bf2",
     "packages": [
         {
             "name": "bacon/bacon-qr-code",
@@ -247,6 +247,43 @@
                 "MIT"
             ],
             "description": "Android Health Connect workout importer for Buff.",
+            "transport-options": {
+                "symlink": true,
+                "relative": true
+            }
+        },
+        {
+            "name": "buff/in-app-purchases",
+            "version": "1.0.0",
+            "dist": {
+                "type": "path",
+                "url": "native-plugins/in-app-purchases",
+                "reference": "109e7b471a343a23dfbab17acbbd246c543bbc47"
+            },
+            "require": {
+                "nativephp/mobile": "^4.0",
+                "php": "^8.4"
+            },
+            "type": "nativephp-plugin",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Buff\\InAppPurchases\\InAppPurchasesServiceProvider"
+                    ]
+                },
+                "nativephp": {
+                    "manifest": "nativephp.json"
+                }
+            },
+            "autoload": {
+                "psr-4": {
+                    "Buff\\InAppPurchases\\": "src/"
+                }
+            },
+            "license": [
+                "MIT"
+            ],
+            "description": "RevenueCat subscriptions for the Buff mobile app.",
             "transport-options": {
                 "symlink": true,
                 "relative": true

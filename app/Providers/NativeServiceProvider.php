@@ -6,6 +6,7 @@ use Buff\AppleHealth\AppleHealthServiceProvider;
 use Buff\BackgroundTasks\BackgroundTasksServiceProvider;
 use Buff\CameraPermissions\CameraPermissionsServiceProvider;
 use Buff\HealthConnect\HealthConnectServiceProvider;
+use Buff\InAppPurchases\InAppPurchasesServiceProvider;
 use Buff\NativeRefresh\NativeRefreshServiceProvider;
 use Illuminate\Support\ServiceProvider;
 use Native\Mobile\Providers\BrowserServiceProvider;
@@ -34,6 +35,7 @@ class NativeServiceProvider extends ServiceProvider
             NativeRefreshServiceProvider::class,
             BackgroundTasksServiceProvider::class,
             BrowserServiceProvider::class,
+            InAppPurchasesServiceProvider::class,
 
         ];
     }
