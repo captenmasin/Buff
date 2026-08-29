@@ -204,10 +204,10 @@ onUnmounted(() => removeNativeListeners?.());
 </script>
 
 <template>
-    <Head title="Buff+ subscription" />
+    <Head title="Subscription" />
 
     <section class="space-y-5 pb-8">
-        <SettingsPageHeader>Buff+</SettingsPageHeader>
+        <SettingsPageHeader>Subscription</SettingsPageHeader>
 
         <Card v-if="!account" class="gap-4">
             <h2 class="card-title">Sign in to subscribe</h2>
@@ -221,16 +221,19 @@ onUnmounted(() => removeNativeListeners?.());
                     <span class="grid size-11 shrink-0 place-items-center rounded-xl bg-primary text-primary-foreground">
                         <Crown :size="22" aria-hidden="true" />
                     </span>
-                    <div>
+                    <div class="grid gap-2">
                         <h2 class="card-title">Buff+</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">Photo estimates and AI follow-ups are included. Manual and barcode logging, recipes, goals, progress, health sync, and your existing data stay free.</p>
+                        <ul class="grid gap-2 text-sm text-muted-foreground">
+                            <li class="flex items-center gap-2"><Check :size="17" aria-hidden="true" /> AI meal analysis and follow-ups</li>
+                            <li class="flex items-center gap-2"><Check :size="17" aria-hidden="true" /> No ads</li>
+                        </ul>
                     </div>
                 </div>
-                <p class="flex items-center gap-2 text-sm font-semibold" :class="active ? 'text-success-soft-foreground' : 'text-muted-foreground'">
-                    <Check v-if="active" :size="17" aria-hidden="true" />
-                    {{ active ? 'Buff+ active' : '' }}<span v-if="active && expiryLabel"> · access through {{ expiryLabel }}</span>
-                </p>
             </Card>
+            <p v-if="active" class="flex items-center gap-2 text-sm font-semibold text-success-soft-foreground">
+                <Check :size="17" aria-hidden="true" />
+                Buff+ active<span v-if="expiryLabel"> · access through {{ expiryLabel }}</span>
+            </p>
 
             <div v-if="packages.length" class="grid gap-3">
                 <Card v-for="subscriptionPackage in packages" :key="subscriptionPackage.packageIdentifier" class="gap-3">

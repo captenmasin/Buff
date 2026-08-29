@@ -71,7 +71,7 @@ that is a different plan.
   decisions; do not invent or hard-code them.
 - Manual and barcode food logging, calories and macros, recipes, goals,
   progress, health sync, and existing user data remain free. Buff+ unlocks AI
-  meal analysis and follow-up only.
+  meal analysis and follow-up and includes no ads. Ad delivery is deferred.
 - The existing quota of 10 new AI meal analyses per day remains in force for
   subscribers. A subscription grants access; it does not make analysis
   unlimited.
@@ -974,8 +974,8 @@ All must hold:
 - [ ] Existing drafts/photos and all non-AI logging remain accessible after
   expiry.
 - [ ] Manual and barcode logging, macros, recipes, goals, progress, health sync,
-  and existing user data remain free; Buff+ grants only AI meal analysis and
-  follow-up, subject to the existing 10-new-analyses daily quota.
+  and existing user data remain free; Buff+ grants AI meal analysis and
+  follow-up, subject to the existing 10-new-analyses daily quota, and no ads.
 - [ ] Native pages display localized store pricing, Apple 3.1.2 / Play billing
   copy, a working Manage Subscription control, and unlock only after the API
   refresh returns entitled. Client Active/Inactive is derived from `expires_at`.
