@@ -55,3 +55,9 @@ test('closes the workout editor from the successful Inertia callback', () => {
     assert.doesNotMatch(closeWorkoutEditor, /editWorkoutForm\.processing/);
     assert.match(closeWorkoutEditor, /selectedWorkout\.value = null/);
 });
+
+test('does not render the meal editor after its selected meal is cleared', () => {
+    assert.match(todaySource, /v-if="mealSheetMode === 'details' && selectedMeal"/);
+    assert.match(todaySource, /v-else-if="mealSheetMode === 'edit' && selectedMeal"/);
+    assert.doesNotMatch(todaySource, /<div v-else key="edit">/);
+});

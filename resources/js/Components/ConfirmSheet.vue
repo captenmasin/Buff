@@ -10,13 +10,18 @@ import {
 } from './ui/alert-dialog'
 import Button from './ui/button/Button.vue'
 
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
     open: boolean
     title: string
     message: string
     confirmLabel?: string
+    processing?: boolean
+    processingLabel?: string
+    error?: string
 }>(), {
     confirmLabel: 'Delete',
+    processingLabel: 'Deleting…',
+    error: '',
 })
 
 const emit = defineEmits<{
@@ -25,7 +30,7 @@ const emit = defineEmits<{
 }>()
 
 function onOpenChange(open: boolean) {
-    if (!open) {
+    if (!open && !props.processing) {
         emit('cancel')
     }
 }
@@ -38,9 +43,18 @@ function onOpenChange(open: boolean) {
                 <AlertDialogTitle id="confirm-sheet-title">{{ title }}</AlertDialogTitle>
                 <AlertDialogDescription>{{ message }}</AlertDialogDescription>
             </AlertDialogHeader>
+            <p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
             <AlertDialogFooter>
-                <AlertDialogCancel variant="surface" @click="emit('cancel')">Cancel</AlertDialogCancel>
-                <Button type="button" variant="destructive-solid" @click="emit('confirm')">{{ confirmLabel }}</Button>
+                <AlertDialogCancel variant="surface" :disabled="processing" @click="emit('cancel')">Cancel</AlertDialogCancel>
+                <Button
+                    type="button"
+                    variant="destructive-solid"
+                    :loading="processing"
+                    :loading-label="processingLabel"
+                    @click="emit('confirm')"
+                >
+                    {{ confirmLabel }}
+                </Button>
             </AlertDialogFooter>
         </AlertDialogContent>
     </AlertDialog>

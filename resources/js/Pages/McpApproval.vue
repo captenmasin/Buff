@@ -107,13 +107,26 @@ function deny() {
                                 {{ approvalForm.errors.token || denialForm.errors.token || denialForm.errors.decision }}
                             </p>
                             <form @submit.prevent="approve">
-                                <Button type="submit" class="w-full" :disabled="approvalForm.processing || denialForm.processing">
-                                    {{ approvalForm.processing ? 'Approving…' : `Approve ${approval.clientName}` }}
+                                <Button
+                                    type="submit"
+                                    class="w-full"
+                                    :disabled="denialForm.processing"
+                                    :loading="approvalForm.processing"
+                                    loading-label="Approving…"
+                                >
+                                    Approve {{ approval.clientName }}
                                 </Button>
                             </form>
                             <form @submit.prevent="deny">
-                                <Button type="submit" variant="surface" class="w-full" :disabled="approvalForm.processing || denialForm.processing">
-                                    {{ denialForm.processing ? 'Denying…' : `Don't connect ${approval.clientName}` }}
+                                <Button
+                                    type="submit"
+                                    variant="surface"
+                                    class="w-full"
+                                    :disabled="approvalForm.processing"
+                                    :loading="denialForm.processing"
+                                    loading-label="Denying…"
+                                >
+                                    Don't connect {{ approval.clientName }}
                                 </Button>
                             </form>
                         </div>

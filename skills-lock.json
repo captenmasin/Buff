@@ -31,6 +31,12 @@
       "skillPath": "skills/improve-animations/SKILL.md",
       "computedHash": "eeb219a407e325b687af88db25771cc3018e3148245604112f5ac6990b6fd79c"
     },
+    "microinteractions": {
+      "source": "wondelai/skills",
+      "sourceType": "github",
+      "skillPath": "microinteractions/SKILL.md",
+      "computedHash": "0062b8e7d7bd5ad6820c8370423fb5074ab961861704ac0e93af4e5a2467ba1c"
+    },
     "review-animations": {
       "source": "emilkowalski/skill",
       "sourceType": "github",

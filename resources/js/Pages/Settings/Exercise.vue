@@ -4,6 +4,7 @@ import Card from '../../Components/Card.vue';
 import SettingsPageHeader from '../../Components/SettingsPageHeader.vue';
 import Button from '../../Components/ui/button/Button.vue';
 import {type HeightUnit, type WeightUnit} from '../../bodyUnits';
+import {useQueuedSave} from '../../useQueuedSave';
 
 type EatBack = 'all' | 'half' | 'none';
 
@@ -24,13 +25,13 @@ const eatBackOptions: Array<{ value: EatBack; label: string; description: string
     {value: 'none', label: "Don't eat back", description: 'Keep the food target as set. Workouts still log; they just don’t unlock extra food.'},
 ];
 
-function saveEatBack(eatBack: EatBack) {
-    if (eatBackForm.processing) {
-        return;
-    }
+const {save, status: saveStatus} = useQueuedSave((callbacks) => {
+    eatBackForm.put('/settings/eat-back', {preserveScroll: true, ...callbacks});
+});
 
+function saveEatBack(eatBack: EatBack) {
     eatBackForm.eat_back = eatBack;
-    eatBackForm.put('/settings/eat-back', {preserveScroll: true});
+    save();
 }
 </script>
 
@@ -42,10 +43,15 @@ function saveEatBack(eatBack: EatBack) {
 
         <Card>
             <div class="space-y-3">
-                <div>
-                    <h2 class="card-title">Exercise calories</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">
-                        How much of a workout to add to today’s food target. Wearables often overestimate burn, and eating every unlocked calorie can stall a cut. The ring still shows everything you burned — this only changes remaining calories and macros.
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="card-title">Exercise calories</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">
+                            How much of a workout to add to today’s food target. Wearables often overestimate burn, and eating every unlocked calorie can stall a cut. The ring still shows everything you burned — this only changes remaining calories and macros.
+                        </p>
+                    </div>
+                    <p class="shrink-0 text-sm text-muted-foreground" role="status" aria-live="polite">
+                        {{ saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Couldn’t save' : '' }}
                     </p>
                 </div>
                 <div class="grid gap-2">
@@ -55,7 +61,6 @@ function saveEatBack(eatBack: EatBack) {
                         type="button"
                         class="h-auto w-full min-w-0 justify-start whitespace-normal rounded-2xl px-4 py-3 text-left"
                         :variant="eatBackForm.eat_back === option.value ? 'default' : 'surface'"
-                        :disabled="eatBackForm.processing"
                         @click="saveEatBack(option.value)"
                     >
                         <span class="min-w-0">

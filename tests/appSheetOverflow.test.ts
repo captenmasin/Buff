@@ -28,3 +28,8 @@ test('hides the drawer grabber on desktop', () => {
 test('transitions the translate property used to slide sheets', () => {
     assert.match(sheetContentSource, /transition-\[translate,transform,opacity\]/);
 });
+
+test('registers an accessible title and description for every sheet variant', () => {
+    assert.equal(appSheetSource.match(/<DialogTitle class="sr-only">\{\{ title \}\}<\/DialogTitle>/g)?.length, 2);
+    assert.equal(appSheetSource.match(/<DialogDescription class="sr-only">\{\{ description \}\}<\/DialogDescription>/g)?.length, 2);
+});

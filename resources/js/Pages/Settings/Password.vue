@@ -2,9 +2,9 @@
 import {Head, Link, useForm, usePage} from '@inertiajs/vue3';
 import {computed} from 'vue';
 import Card from '../../Components/Card.vue';
+import PasswordInput from '../../Components/PasswordInput.vue';
 import SettingsPageHeader from '../../Components/SettingsPageHeader.vue';
 import Button from '../../Components/ui/button/Button.vue';
-import Input from '../../Components/ui/input/Input.vue';
 
 interface BuffAccount {
     email: string;
@@ -50,42 +50,42 @@ function updatePassword() {
                     Signed in with Google or Apple, or don't know your current password?
                     <Link :href="passwordResetUrl" class="text-link">Reset it by email.</Link>
                 </p>
-                <label class="block">
-                    <span class="field-label">Current password</span>
-                    <Input
+                <div>
+                    <label for="current-password" class="field-label">Current password</label>
+                    <PasswordInput
+                        id="current-password"
                         v-model="passwordForm.current_password"
-                        type="password"
                         autocomplete="current-password"
                         required
                         class="mt-1"
                     />
                     <span v-if="passwordForm.errors.current_password" class="mt-1 block text-sm text-destructive">{{ passwordForm.errors.current_password }}</span>
-                </label>
-                <label class="block">
-                    <span class="field-label">New password</span>
-                    <Input
+                </div>
+                <div>
+                    <label for="new-password" class="field-label">New password</label>
+                    <PasswordInput
+                        id="new-password"
                         v-model="passwordForm.password"
-                        type="password"
                         autocomplete="new-password"
                         minlength="8"
                         required
                         class="mt-1"
                     />
                     <span v-if="passwordForm.errors.password" class="mt-1 block text-sm text-destructive">{{ passwordForm.errors.password }}</span>
-                </label>
-                <label class="block">
-                    <span class="field-label">Confirm new password</span>
-                    <Input
+                </div>
+                <div>
+                    <label for="new-password-confirmation" class="field-label">Confirm new password</label>
+                    <PasswordInput
+                        id="new-password-confirmation"
                         v-model="passwordForm.password_confirmation"
-                        type="password"
                         autocomplete="new-password"
                         minlength="8"
                         required
                         class="mt-1"
                     />
-                </label>
+                </div>
                 <div class="grid gap-2">
-                    <Button :disabled="passwordForm.processing">Update password</Button>
+                    <Button :loading="passwordForm.processing" loading-label="Updating password…">Update password</Button>
                 </div>
             </form>
         </Card>

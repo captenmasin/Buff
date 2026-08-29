@@ -3,10 +3,10 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3';
 import { Browser } from '#nativephp';
 import axios from 'axios';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
-import { Eye, EyeOff } from '@lucide/vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
+import PasswordInput from '../Components/PasswordInput.vue';
 import SetupFlow from '../Components/SetupFlow.vue';
 import SocialLoginButtons from '../Components/SocialLoginButtons.vue';
 import Button from '../Components/ui/button/Button.vue';
@@ -60,10 +60,12 @@ const resumeForm = useForm({ account: '', email: '' });
 const showLoginOptions = ref(localAccountEmail.value === null);
 const switchConfirmOpen = ref(false);
 const clearDataConfirmOpen = ref(false);
+const socialSwitchProcessing = ref(false);
+const switchError = ref('');
+const clearDataError = ref('');
 const pendingSocialProvider = ref<SocialProvider | null>(null);
 const registerForm = useForm({ name: rememberedRegistrationName(), email: '', password: '', password_confirmation: '', timezone });
 const registerStep = ref<RegisterStep>('name');
-const passwordVisible = ref(false);
 const forgotForm = useForm({ email: props.email || '' });
 const resetForm = useForm({
     email: props.email || '',
@@ -180,27 +182,56 @@ function useDifferentAccount() {
 }
 
 function cancelSwitch() {
+    if (loginForm.processing || socialSwitchProcessing.value) {
+        return;
+    }
+
     pendingSocialProvider.value = null;
+    switchError.value = '';
     switchConfirmOpen.value = false;
 }
 
-function confirmSwitch() {
+async function confirmSwitch() {
     const provider = pendingSocialProvider.value;
-    pendingSocialProvider.value = null;
-    switchConfirmOpen.value = false;
+    switchError.value = '';
 
     if (provider !== null) {
-        void launchSocialSignIn(provider);
+        socialSwitchProcessing.value = true;
+
+        try {
+            await launchSocialSignIn(provider);
+            pendingSocialProvider.value = null;
+            switchConfirmOpen.value = false;
+        } catch {
+            switchError.value = 'Couldn’t switch accounts. Try again.';
+        } finally {
+            socialSwitchProcessing.value = false;
+        }
 
         return;
     }
 
-    loginForm.post('/account/login');
+    loginForm.post('/account/login', {
+        onSuccess: () => {
+            pendingSocialProvider.value = null;
+            switchConfirmOpen.value = false;
+        },
+        onError: () => {
+            switchError.value = 'Couldn’t switch accounts. Check your details and try again.';
+        },
+    });
 }
 
 function confirmClearData() {
-    clearDataConfirmOpen.value = false;
-    clearDataForm.delete('/account/local-data');
+    clearDataError.value = '';
+    clearDataForm.delete('/account/local-data', {
+        onSuccess: () => {
+            clearDataConfirmOpen.value = false;
+        },
+        onError: () => {
+            clearDataError.value = 'Couldn’t clear this device’s data. Try again.';
+        },
+    });
 }
 
 function previousRegisterStep() {
@@ -367,31 +398,21 @@ async function signInWith(provider: SocialProvider) {
                             <h1 class="page-title">Create a password</h1>
                             <p class="mt-2 text-lg font-medium text-muted-foreground">Use at least 8 characters. You can reveal it to check for typos.</p>
                         </header>
-                        <label class="block">
-                            <span class="field-label">Password</span>
-                            <span class="relative mt-2 block">
-                                <Input
-                                    v-model="registerForm.password"
-                                    :type="passwordVisible ? 'text' : 'password'"
-                                    autocomplete="new-password"
-                                    minlength="8"
-                                    autofocus
-                                    class="h-16 rounded-xl px-4 pr-14 text-lg"
-                                    :aria-invalid="Boolean(registerForm.errors.password)"
-                                    @keyup.enter="nextRegisterStep"
-                                />
-                                <button
-                                    type="button"
-                                    class="absolute inset-y-0 right-0 grid w-14 place-items-center rounded-r-xl text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                                    :aria-label="passwordVisible ? 'Hide password' : 'Show password'"
-                                    @click="passwordVisible = !passwordVisible"
-                                >
-                                    <EyeOff v-if="passwordVisible" :size="22" />
-                                    <Eye v-else :size="22" />
-                                </button>
-                            </span>
+                        <div>
+                            <label for="register-password" class="field-label">Password</label>
+                            <PasswordInput
+                                id="register-password"
+                                v-model="registerForm.password"
+                                autocomplete="new-password"
+                                minlength="8"
+                                autofocus
+                                class="mt-2"
+                                input-class="h-16 rounded-xl px-4 pr-14 text-lg"
+                                :aria-invalid="Boolean(registerForm.errors.password)"
+                                @keyup.enter="nextRegisterStep"
+                            />
                             <span v-if="registerForm.errors.password" class="mt-2 block text-sm text-destructive">{{ registerForm.errors.password }}</span>
-                        </label>
+                        </div>
                     </template>
 
                     <p v-if="page.props.flash?.message" class="rounded-xl bg-secondary px-4 py-3 text-sm" role="status">
@@ -426,7 +447,7 @@ async function signInWith(provider: SocialProvider) {
                                 </div>
                             </div>
                             <form @submit.prevent="continueWithLocalAccount">
-                                <Button class="w-full" :disabled="resumeForm.processing">Continue as {{ localAccountName }}</Button>
+                                <Button class="w-full" :loading="resumeForm.processing" loading-label="Continuing…">Continue as {{ localAccountName }}</Button>
                             </form>
                             <p v-if="resumeForm.errors.account || resumeForm.errors.email" class="text-sm text-destructive">
                                 {{ resumeForm.errors.account || resumeForm.errors.email }}
@@ -441,12 +462,12 @@ async function signInWith(provider: SocialProvider) {
                                 <Input v-model="loginForm.email" type="email" autocomplete="email" required class="mt-1" />
                                 <span v-if="loginForm.errors.email" class="mt-1 block text-sm text-destructive">{{ loginForm.errors.email }}</span>
                             </label>
-                            <label class="block">
-                                <span class="field-label">Password</span>
-                                <Input v-model="loginForm.password" type="password" autocomplete="current-password" required class="mt-1" />
+                            <div>
+                                <label for="login-password" class="field-label">Password</label>
+                                <PasswordInput id="login-password" v-model="loginForm.password" autocomplete="current-password" required class="mt-1" />
                                 <span v-if="loginForm.errors.password" class="mt-1 block text-sm text-destructive">{{ loginForm.errors.password }}</span>
-                            </label>
-                            <Button class="w-full" :disabled="loginForm.processing">Sign in</Button>
+                            </div>
+                            <Button class="w-full" :loading="loginForm.processing" loading-label="Signing in…">Sign in</Button>
                             <SocialLoginButtons :apple-login-available="appleLoginAvailable" @sign-in="signInWith" />
                             <div class="flex justify-between text-sm">
                                 <Link href="/account/forgot-password" class="text-link">Forgot password?</Link>
@@ -460,7 +481,7 @@ async function signInWith(provider: SocialProvider) {
                         variant="destructive"
                         class="w-full"
                         :disabled="clearDataForm.processing"
-                        @click="clearDataConfirmOpen = true"
+                        @click="clearDataError = ''; clearDataConfirmOpen = true"
                     >
                         Clear device data
                     </Button>
@@ -474,7 +495,7 @@ async function signInWith(provider: SocialProvider) {
                             <Input v-model="forgotForm.email" type="email" autocomplete="email" required class="mt-1" />
                             <span v-if="forgotForm.errors.email" class="mt-1 block text-sm text-destructive">{{ forgotForm.errors.email }}</span>
                         </label>
-                        <Button class="w-full" :disabled="forgotForm.processing">Send reset link</Button>
+                        <Button class="w-full" :loading="forgotForm.processing" loading-label="Sending reset link…">Send reset link</Button>
                         <p class="text-center text-sm"><Link href="/account/login" class="text-link">Back to sign in</Link></p>
                     </form>
                 </Card>
@@ -486,16 +507,16 @@ async function signInWith(provider: SocialProvider) {
                             <Input v-model="resetForm.email" type="email" autocomplete="email" required class="mt-1" />
                             <span v-if="resetForm.errors.email" class="mt-1 block text-sm text-destructive">{{ resetForm.errors.email }}</span>
                         </label>
-                        <label class="block">
-                            <span class="field-label">New password</span>
-                            <Input v-model="resetForm.password" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
+                        <div>
+                            <label for="reset-password" class="field-label">New password</label>
+                            <PasswordInput id="reset-password" v-model="resetForm.password" autocomplete="new-password" minlength="8" required class="mt-1" />
                             <span v-if="resetForm.errors.password" class="mt-1 block text-sm text-destructive">{{ resetForm.errors.password }}</span>
-                        </label>
-                        <label class="block">
-                            <span class="field-label">Confirm password</span>
-                            <Input v-model="resetForm.password_confirmation" type="password" autocomplete="new-password" minlength="8" required class="mt-1" />
-                        </label>
-                        <Button class="w-full" :disabled="resetForm.processing">Reset password</Button>
+                        </div>
+                        <div>
+                            <label for="reset-password-confirmation" class="field-label">Confirm password</label>
+                            <PasswordInput id="reset-password-confirmation" v-model="resetForm.password_confirmation" autocomplete="new-password" minlength="8" required class="mt-1" />
+                        </div>
+                        <Button class="w-full" :loading="resetForm.processing" loading-label="Resetting password…">Reset password</Button>
                     </form>
                 </Card>
 
@@ -504,7 +525,7 @@ async function signInWith(provider: SocialProvider) {
                         <p class="text-sm text-muted-foreground">We sent a verification link to <strong class="text-foreground">{{ email }}</strong>.</p>
                         <p class="text-sm text-muted-foreground">This screen checks automatically while it is open.</p>
                         <form @submit.prevent="resendForm.post('/account/verification/resend')">
-                            <Button variant="surface" class="w-full" :disabled="resendForm.processing">Resend email</Button>
+                            <Button variant="surface" class="w-full" :loading="resendForm.processing" loading-label="Sending email…">Resend email</Button>
                         </form>
                         <Button :as="Link" href="/" class="w-full">Continue to Buff</Button>
                         <form @submit.prevent="logoutForm.post('/account/logout')">
@@ -520,6 +541,9 @@ async function signInWith(provider: SocialProvider) {
             title="Switch accounts?"
             message="The data on this device will be removed. Anything already synced stays in the other account."
             confirm-label="Switch"
+            :processing="loginForm.processing || socialSwitchProcessing"
+            processing-label="Switching…"
+            :error="switchError"
             @cancel="cancelSwitch"
             @confirm="confirmSwitch"
         />
@@ -528,7 +552,10 @@ async function signInWith(provider: SocialProvider) {
             title="Clear device data?"
             message="This permanently removes local health data from this device. Anything already synced stays in your account."
             confirm-label="Clear data"
-            @cancel="clearDataConfirmOpen = false"
+            :processing="clearDataForm.processing"
+            processing-label="Clearing data…"
+            :error="clearDataError"
+            @cancel="clearDataError = ''; clearDataConfirmOpen = false"
             @confirm="confirmClearData"
         />
     </div>

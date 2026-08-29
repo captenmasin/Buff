@@ -34,7 +34,10 @@ function save(): void {
     form.transform((data) => ({
         ...data,
         target_weight_kg: weightToKg(data.target_weight_kg, props.preferences.weight_unit),
-    })).put('/goals', { preserveScroll: true });
+    })).put('/goals', {
+        preserveScroll: true,
+        onSuccess: () => form.defaults(),
+    });
 }
 </script>
 
@@ -69,7 +72,15 @@ function save(): void {
                     </label>
                 </div>
             </Card>
-            <Button class="w-full" size="lg" :disabled="form.processing || !targetsValid">Save goals</Button>
+            <Button
+                class="w-full"
+                size="lg"
+                :disabled="!targetsValid || !form.isDirty"
+                :loading="form.processing"
+                loading-label="Saving goals…"
+            >
+                Save goals
+            </Button>
         </form>
     </section>
 </template>

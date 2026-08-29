@@ -142,7 +142,7 @@ class SettingsController extends Controller
 
         AppPreference::current()->update($validated);
 
-        return back()->with('message', 'Units saved.');
+        return back();
     }
 
     public function updateEatBack(Request $request): RedirectResponse
@@ -153,7 +153,7 @@ class SettingsController extends Controller
 
         AppPreference::current()->update($validated);
 
-        return back()->with('message', 'Exercise calorie setting saved.');
+        return back();
     }
 
     public function updateBodyProfile(Request $request): RedirectResponse
@@ -176,18 +176,21 @@ class SettingsController extends Controller
 
         $result = $bridge->sync($validated);
 
-        if ($result['status'] !== 'error') {
-            AppPreference::current()->update(['meal_reminders' => $validated]);
+        if ($result['status'] === 'error') {
+            throw ValidationException::withMessages([
+                'reminders' => ['Meal reminder settings were not saved because reminders could not be scheduled.'],
+            ]);
         }
+
+        AppPreference::current()->update(['meal_reminders' => $validated]);
 
         $message = match ($result['status']) {
             'permission_requested' => 'Meal reminders saved. Allow notifications when prompted.',
             'notifications_disabled' => 'Meal reminders saved, but notifications are off.',
-            'error' => 'Meal reminder settings were not saved because reminders could not be scheduled.',
             default => 'Meal reminders saved.',
         };
 
-        return back()->with('message', $message);
+        return back()->with('save_status', $message);
     }
 
     /**

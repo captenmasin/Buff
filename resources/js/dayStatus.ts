@@ -15,12 +15,12 @@ export function dayStatusHasTick(status: DayStatus): boolean {
 }
 
 export function dayStatusIcon(status: DayStatus): DayStatusIcon | null {
-    return {
+    return ({
         target: 'check',
         under: 'minus',
         over: 'plus',
         neutral: null,
-    }[status];
+    } satisfies Record<DayStatus, DayStatusIcon | null>)[status];
 }
 
 export function dayStatusClass(status: DayStatus): string {

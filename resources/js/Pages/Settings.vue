@@ -5,10 +5,10 @@ import {X} from '@lucide/vue';
 import {storedAppearance, type Appearance} from '../appearance';
 import AppSheet from '../Components/AppSheet.vue';
 import PageHeader from '../Components/PageHeader.vue';
+import PasswordInput from '../Components/PasswordInput.vue';
 import SettingsGroup from '../Components/SettingsGroup.vue';
 import SettingsRow from '../Components/SettingsRow.vue';
 import Button from '../Components/ui/button/Button.vue';
-import Input from '../Components/ui/input/Input.vue';
 import {type HeightUnit, type WeightUnit} from '../bodyUnits';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
@@ -180,7 +180,13 @@ onMounted(() => {
             </SettingsRow>
         </SettingsGroup>
 
-        <AppSheet :open="deleteAccountOpen" labelled-by="delete-account-title" @close="closeDeleteAccountModal">
+        <AppSheet
+            :open="deleteAccountOpen"
+            labelled-by="delete-account-title"
+            title="Delete account"
+            description="Permanently delete your Buff account and all synced data."
+            @close="closeDeleteAccountModal"
+        >
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h2 id="delete-account-title" class="text-xl font-semibold">Delete account</h2>
@@ -197,10 +203,9 @@ onMounted(() => {
                     <Link :href="passwordResetUrl" class="text-link">Set or reset it by email first.</Link>
                 </p>
                 <label for="delete-account-password" class="block field-label">Password</label>
-                <Input
+                <PasswordInput
                     id="delete-account-password"
                     v-model="deleteAccountForm.password"
-                    type="password"
                     autocomplete="current-password"
                     placeholder="Current password"
                     required
@@ -212,7 +217,7 @@ onMounted(() => {
                     <Button type="button" variant="surface" :disabled="deleteAccountForm.processing" @click="closeDeleteAccountModal">
                         Cancel
                     </Button>
-                    <Button variant="destructive-solid" :disabled="deleteAccountForm.processing">
+                    <Button variant="destructive-solid" :loading="deleteAccountForm.processing" loading-label="Deleting account…">
                         Delete account
                     </Button>
                 </div>

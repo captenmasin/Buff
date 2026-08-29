@@ -62,6 +62,7 @@ const creating = ref(false);
 const selectedRecipe = ref<Recipe | null>(null);
 const transitionDirection = ref<'forward' | 'back'>('forward');
 const pendingRecipeDelete = ref<Recipe | null>(null);
+const recipeDeleteError = ref('');
 const searchQuery = ref('');
 const searchResults = ref<FoodProduct[]>([]);
 const searchLoading = ref(false);
@@ -217,17 +218,40 @@ function logRecipe(): void {
     logForm.post('/meals/recipe');
 }
 
-function requestRecipeDelete(recipe: Recipe): void { pendingRecipeDelete.value = recipe; }
-function cancelRecipeDelete(): void { pendingRecipeDelete.value = null; }
-function confirmRecipeDelete(): void {
-    const recipe = pendingRecipeDelete.value;
-
-    if (!recipe) {
+function requestRecipeDelete(recipe: Recipe): void {
+    recipeDeleteError.value = '';
+    pendingRecipeDelete.value = recipe;
+}
+function cancelRecipeDelete(): void {
+    if (logForm.processing) {
         return;
     }
 
+    recipeDeleteError.value = '';
     pendingRecipeDelete.value = null;
-    logForm.delete(`/recipes/${recipe.id}`, { preserveScroll: true });
+}
+function confirmRecipeDelete(): void {
+    const recipe = pendingRecipeDelete.value;
+
+    if (!recipe || logForm.processing) {
+        return;
+    }
+
+    recipeDeleteError.value = '';
+    logForm.delete(`/recipes/${recipe.id}`, {
+        preserveScroll: true,
+        onSuccess: () => {
+            pendingRecipeDelete.value = null;
+        },
+        onError: () => {
+            recipeDeleteError.value = 'Couldn’t delete this recipe. Try again.';
+        },
+        onFinish: () => {
+            if (pendingRecipeDelete.value && !recipeDeleteError.value) {
+                recipeDeleteError.value = 'Couldn’t delete this recipe. Try again.';
+            }
+        },
+    });
 }
 </script>
 
@@ -329,7 +353,7 @@ function confirmRecipeDelete(): void {
                 <p class="text-sm text-muted-foreground">{{ recipeTotals.calories }} kcal · P {{ recipeTotals.protein_g }}g · C {{ recipeTotals.carbs_g }}g · F {{ recipeTotals.fat_g }}g</p>
                 <div class="grid grid-cols-2 gap-2">
                     <Button type="button" variant="surface" @click="returnToRecipes">Cancel</Button>
-                    <Button :disabled="recipeForm.processing || recipeForm.items.length === 0">Save recipe</Button>
+                    <Button :disabled="recipeForm.items.length === 0" :loading="recipeForm.processing" loading-label="Saving recipe…">Save recipe</Button>
                 </div>
             </form>
         </Card>
@@ -350,7 +374,7 @@ function confirmRecipeDelete(): void {
                 </label>
                 <div class="grid grid-cols-2 gap-2">
                     <Button type="button" variant="surface" @click="returnToRecipes">Back</Button>
-                    <Button :disabled="logForm.processing">Log recipe</Button>
+                    <Button :loading="logForm.processing" loading-label="Logging recipe…">Log recipe</Button>
                 </div>
             </form>
         </Card>
@@ -392,6 +416,9 @@ function confirmRecipeDelete(): void {
             :open="Boolean(pendingRecipeDelete)"
             title="Delete recipe"
             :message="pendingRecipeDelete ? `Delete ${pendingRecipeDelete.name}?` : ''"
+            :processing="logForm.processing"
+            processing-label="Deleting recipe…"
+            :error="recipeDeleteError"
             @cancel="cancelRecipeDelete"
             @confirm="confirmRecipeDelete"
         />

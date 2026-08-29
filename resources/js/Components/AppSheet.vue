@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import Card from './Card.vue'
-import { Dialog, DialogContent } from './ui/dialog'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { Sheet, SheetContent } from './ui/sheet'
 import { cn } from '../lib/utils'
 
 const props = withDefaults(defineProps<{
     open: boolean
     labelledBy: string
+    title: string
+    description: string
     variant?: 'modal' | 'drawer'
     class?: string
     /** When false, outside click and Escape will not dismiss the sheet. */
@@ -72,7 +74,9 @@ function onHandlePointerDown(event: PointerEvent) {
     lastY = event.clientY
     lastT = event.timeStamp
     velocity = 0
-    event.currentTarget.setPointerCapture(event.pointerId)
+    if (event.currentTarget instanceof HTMLElement) {
+        event.currentTarget.setPointerCapture(event.pointerId)
+    }
 }
 
 function onHandlePointerMove(event: PointerEvent) {
@@ -121,6 +125,8 @@ function onHandlePointerUp() {
             @interact-outside="preventDismiss"
             @escape-key-down="preventDismiss"
         >
+            <DialogTitle class="sr-only">{{ title }}</DialogTitle>
+            <DialogDescription class="sr-only">{{ description }}</DialogDescription>
             <div
                 class="flex cursor-grab touch-none justify-center py-1 active:cursor-grabbing sm:hidden"
                 @pointerdown="onHandlePointerDown"
@@ -146,6 +152,8 @@ function onHandlePointerUp() {
             @interact-outside="preventDismiss"
             @escape-key-down="preventDismiss"
         >
+            <DialogTitle class="sr-only">{{ title }}</DialogTitle>
+            <DialogDescription class="sr-only">{{ description }}</DialogDescription>
             <Card class="border-0 shadow-none ring-0">
                 <slot />
             </Card>

@@ -75,10 +75,12 @@ const progressWidth = computed(() => `${Math.min(100, Math.max(0, props.progress
                     type="button"
                     size="lg"
                     class="h-14 rounded-full text-lg font-semibold"
-                    :disabled="nextDisabled || processing"
+                    :disabled="nextDisabled"
+                    :loading="processing"
+                    loading-label="Please wait…"
                     @click="emit('next')"
                 >
-                    {{ processing ? 'Please wait…' : nextLabel }}
+                    {{ nextLabel }}
                 </Button>
             </div>
         </footer>

@@ -1063,19 +1063,26 @@ onUnmounted(() => {
                 {{ photoAnalysisError }}
             </p>
 
-            <Button type="button" class="mt-4 h-14 w-full rounded-xl" :disabled="photoProcessing || photoAnalysisLoading || selectedPhotos.length === 0" @click="analyzePhotos">
-                <LoaderCircle v-if="photoAnalysisLoading" :size="18" class="motion-safe:animate-spin" />
-                {{ photoAnalysisLoading ? 'Analyzing meal…' : 'Analyze meal' }}
+            <Button
+                type="button"
+                class="mt-4 h-14 w-full rounded-xl"
+                :disabled="photoProcessing || selectedPhotos.length === 0"
+                :loading="photoAnalysisLoading"
+                loading-label="Analyzing meal…"
+                @click="analyzePhotos"
+            >
+                Analyze meal
             </Button>
 
         </Card>
 
-        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Analyzing your meal">
+        <div v-if="photoAnalysisLoading" class="fixed inset-0 z-50 overflow-y-auto bg-background/95 px-6 py-10 backdrop-blur-sm" role="status" aria-live="polite" aria-label="Buff Vision is analyzing your meal">
             <div class="mx-auto w-full max-w-sm">
                 <h2 class="page-title">See what Buff sees.</h2>
                 <p class="mt-1 text-sm text-muted-foreground">Your meal is becoming an editable macro estimate.</p>
 
                 <div class="mt-5 rounded-3xl bg-brand-night p-5 text-brand-white">
+                    <p class="vision-status text-xs font-semibold uppercase tracking-wider">Buff Vision · analyzing</p>
 
                     <div class="relative mt-4 aspect-[302/270] overflow-hidden rounded-2xl border border-brand-acid/70 bg-brand-night">
                         <img v-if="selectedPhotos[0]" :src="selectedPhotos[0].preview" alt="" class="h-full w-full object-cover">
@@ -1186,6 +1193,8 @@ onUnmounted(() => {
         <AppSheet
             :open="foodAddSheetOpen"
             labelled-by="food-add-title"
+            title="Add food"
+            description="Review this food before adding it to your day."
             variant="drawer"
             class="max-h-[88vh] px-6 pt-6"
             @close="closeFoodAddSheet"
@@ -1253,7 +1262,8 @@ onUnmounted(() => {
                 <Button
                     class="w-full text-lg"
                     size="lg"
-                    :disabled="barcodeMealForm.processing"
+                    :loading="barcodeMealForm.processing"
+                    loading-label="Adding meal…"
                     @click="selectedPreviousMeal ? addPreviousMeal() : addBarcodeMeal()"
                 >
                     <Plus :size="18" />
@@ -1361,14 +1371,24 @@ onUnmounted(() => {
                     <Button v-if="analysisContext" type="button" variant="surface" :disabled="customMealForm.processing" @click="cancelAnalysis">
                         Cancel
                     </Button>
-                    <Button class="w-full" :disabled="customMealForm.processing">
+                    <Button
+                        class="w-full"
+                        :loading="customMealForm.processing"
+                        :loading-label="analysisContext ? 'Saving meal…' : 'Adding meal…'"
+                    >
                         {{ analysisContext ? 'Save' : 'Add' }} {{ customCalories }} kcal
                     </Button>
                 </div>
             </form>
         </Card>
 
-        <AppSheet :open="analysisFollowUpOpen" labelled-by="analysis-follow-up-title" @close="closeFollowUpModal">
+        <AppSheet
+            :open="analysisFollowUpOpen"
+            labelled-by="analysis-follow-up-title"
+            title="Follow up on estimate"
+            description="Tell Buff what needs correcting in the estimate."
+            @close="closeFollowUpModal"
+        >
             <div class="flex items-start justify-between gap-3">
                 <div>
                     <h2 id="analysis-follow-up-title" class="text-xl font-semibold">Follow up on estimate</h2>
@@ -1391,9 +1411,13 @@ onUnmounted(() => {
                     :disabled="analysisFollowUpLoading"
                 />
                 <p v-if="analysisFollowUpError" class="text-sm text-destructive" role="alert">{{ analysisFollowUpError }}</p>
-                <Button class="w-full" :disabled="analysisFollowUpLoading || !analysisFollowUp.trim()">
-                    <LoaderCircle v-if="analysisFollowUpLoading" :size="18" class="animate-spin" />
-                    {{ analysisFollowUpLoading ? 'Updating estimate…' : 'Update estimate' }}
+                <Button
+                    class="w-full"
+                    :disabled="!analysisFollowUp.trim()"
+                    :loading="analysisFollowUpLoading"
+                    loading-label="Updating estimate…"
+                >
+                    Update estimate
                 </Button>
             </form>
         </AppSheet>
@@ -1440,7 +1464,7 @@ onUnmounted(() => {
                     </label>
                 </div>
 
-                <Button class="w-full" :disabled="workoutForm.processing">
+                <Button class="w-full" :loading="workoutForm.processing" loading-label="Adding workout…">
                     <Plus :size="18" />
                     Add workout
                 </Button>

@@ -26,8 +26,21 @@
     "android": {
         "min_version": 33,
         "permissions": [
-            "android.permission.POST_NOTIFICATIONS"
+            "android.permission.POST_NOTIFICATIONS",
+            "android.permission.RECEIVE_BOOT_COMPLETED"
         ],
+        "receivers": [
+            {
+                "name": "com.buff.backgroundtasks.MealReminderReceiver",
+                "exported": false,
+                "intent-filters": [
+                    {
+                        "action": "android.intent.action.BOOT_COMPLETED"
+                    }
+                ]
+            }
+        ],
+        "init_function": "com.buff.backgroundtasks.startBackgroundTaskNotifications",
         "dependencies": {
             "implementation": [
                 "androidx.work:work-runtime-ktx:2.11.2"

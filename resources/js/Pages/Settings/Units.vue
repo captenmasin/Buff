@@ -9,6 +9,7 @@ import SelectItem from '../../Components/ui/select/SelectItem.vue';
 import SelectTrigger from '../../Components/ui/select/SelectTrigger.vue';
 import SelectValue from '../../Components/ui/select/SelectValue.vue';
 import {type HeightUnit, type MeasurementUnit, type WeightUnit} from '../../bodyUnits';
+import {useQueuedSave} from '../../useQueuedSave';
 
 const props = defineProps<{
     preferences: {
@@ -24,13 +25,9 @@ const unitForm = useForm({
     measurement_unit: props.preferences.measurement_unit,
 });
 
-function saveUnits() {
-    if (unitForm.processing) {
-        return;
-    }
-
-    unitForm.put('/settings/units', {preserveScroll: true});
-}
+const {save: saveUnits, status: saveStatus} = useQueuedSave((callbacks) => {
+    unitForm.put('/settings/units', {preserveScroll: true, ...callbacks});
+});
 
 watch(
     () => [unitForm.weight_unit, unitForm.height_unit, unitForm.measurement_unit] as const,
@@ -48,7 +45,12 @@ watch(
 
         <Card>
             <div class="space-y-3">
-                <h2 class="card-title">Units</h2>
+                <div class="flex items-center justify-between gap-3">
+                    <h2 class="card-title">Units</h2>
+                    <p class="text-sm text-muted-foreground" role="status" aria-live="polite">
+                        {{ saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Couldn’t save' : '' }}
+                    </p>
+                </div>
 
                 <div class="grid gap-3 sm:grid-cols-3">
                     <label>

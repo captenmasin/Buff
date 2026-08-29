@@ -283,6 +283,8 @@ onUnmounted(() => {
         <AppSheet
             :open="addDrawerOpen"
             labelled-by="add-drawer-title"
+            title="Add"
+            description="Choose what to add to Buff."
             variant="drawer"
             class="bottom-drawer"
             @close="closeAddDrawer"

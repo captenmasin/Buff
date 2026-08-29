@@ -21,6 +21,7 @@ class HandleInertiaRequests extends Middleware
             ...parent::share($request),
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
+                'save_status' => fn () => $request->session()->get('save_status'),
             ],
             'buff' => [
                 'account' => $credentials->account(),

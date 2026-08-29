@@ -2,9 +2,11 @@ package com.buff.backgroundtasks
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -18,6 +20,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -33,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.time.Duration
 import java.time.ZonedDateTime
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -49,9 +51,11 @@ private const val SUCCESS_PREFIX = "BUFF_BACKGROUND_TASK_OK:"
 private const val MEAL_DUE_PREFIX = "BUFF_MEAL_REMINDER_DUE:"
 private const val MEAL_LOGGED_PREFIX = "BUFF_MEAL_REMINDER_LOGGED:"
 private const val MEAL_PREFERENCES_NAME = "buff-meal-reminders"
+private const val MEAL_ALARM_MIGRATED_KEY = "meal-alarm-migrated"
 private const val MEAL_ID_KEY = "meal-id"
 private const val MEAL_TIME_KEY = "meal-time"
 private const val MEAL_WORK_NAME_PREFIX = "buff-meal-reminder-"
+private const val MEAL_ALARM_ACTION = "com.buff.backgroundtasks.MEAL_REMINDER"
 private const val MEAL_NOTIFICATION_CHANNEL_ID = "meal-reminders"
 private const val DEVICE_NOTIFICATION_CHANNEL_ID = "notifications"
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
@@ -144,11 +148,8 @@ object BackgroundTaskFunctions {
                     .putBoolean(mealEnabledKey(reminder.id), reminder.enabled)
                     .putString(mealTimeKey(reminder.id), reminder.time)
 
-                if (reminder.enabled) {
-                    enqueueMealReminder(context, reminder, ExistingWorkPolicy.REPLACE)
-                } else {
-                    workManager.cancelUniqueWork(MEAL_WORK_NAME_PREFIX + reminder.id)
-                }
+                workManager.cancelUniqueWork(MEAL_WORK_NAME_PREFIX + reminder.id)
+                updateMealReminderAlarm(context, reminder)
             }
             editor.apply()
 
@@ -436,14 +437,57 @@ class MealReminderWorker(
             }
         }
 
-        enqueueMealReminder(
-            applicationContext,
-            MealReminder(mealId, true, scheduledTime),
-            ExistingWorkPolicy.APPEND_OR_REPLACE
-        )
+        scheduleMealReminderAlarm(applicationContext, MealReminder(mealId, true, scheduledTime))
 
         Result.success()
     }
+}
+
+class MealReminderReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
+            restoreMealReminderAlarms(context)
+
+            return
+        }
+
+        val mealId = intent.getStringExtra(MEAL_ID_KEY)
+        val scheduledTime = intent.getStringExtra(MEAL_TIME_KEY)
+
+        if (
+            intent.action != MEAL_ALARM_ACTION
+            || mealId == null
+            || mealId !in MEAL_IDS
+            || scheduledTime == null
+            || !MEAL_TIME_PATTERN.matches(scheduledTime)
+        ) {
+            return
+        }
+
+        val request = OneTimeWorkRequestBuilder<MealReminderWorker>()
+            .setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)
+            .setInputData(workDataOf(
+                MEAL_ID_KEY to mealId,
+                MEAL_TIME_KEY to scheduledTime
+            ))
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            MEAL_WORK_NAME_PREFIX + mealId,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+}
+
+fun startBackgroundTaskNotifications(context: Context) {
+    val preferences = context.getSharedPreferences(MEAL_PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+    if (preferences.getBoolean(MEAL_ALARM_MIGRATED_KEY, false)) {
+        return
+    }
+
+    restoreMealReminderAlarms(context)
 }
 
 private fun runBackgroundArtisan(context: Context, command: String): String =
@@ -474,11 +518,35 @@ private fun runBackgroundArtisan(context: Context, command: String): String =
         }
     }
 
-private fun enqueueMealReminder(
-    context: Context,
-    reminder: MealReminder,
-    policy: ExistingWorkPolicy
-) {
+private fun updateMealReminderAlarm(context: Context, reminder: MealReminder) {
+    if (reminder.enabled) {
+        scheduleMealReminderAlarm(context, reminder)
+    } else {
+        cancelMealReminderAlarm(context, reminder.id)
+    }
+}
+
+private fun restoreMealReminderAlarms(context: Context) {
+    val preferences = context.getSharedPreferences(MEAL_PREFERENCES_NAME, Context.MODE_PRIVATE)
+    val workManager = WorkManager.getInstance(context)
+
+    MEAL_IDS.forEach { mealId ->
+        workManager.cancelUniqueWork(MEAL_WORK_NAME_PREFIX + mealId)
+
+        val enabled = preferences.getBoolean(mealEnabledKey(mealId), false)
+        val time = preferences.getString(mealTimeKey(mealId), null)
+
+        if (enabled && time != null && MEAL_TIME_PATTERN.matches(time)) {
+            scheduleMealReminderAlarm(context, MealReminder(mealId, true, time))
+        } else {
+            cancelMealReminderAlarm(context, mealId)
+        }
+    }
+
+    preferences.edit().putBoolean(MEAL_ALARM_MIGRATED_KEY, true).apply()
+}
+
+private fun scheduleMealReminderAlarm(context: Context, reminder: MealReminder) {
     val now = ZonedDateTime.now()
     val (hour, minute) = reminder.time.split(':').map(String::toInt)
     var next = now.withHour(hour).withMinute(minute).withSecond(0).withNano(0)
@@ -487,19 +555,35 @@ private fun enqueueMealReminder(
         next = next.plusDays(1)
     }
 
-    val request = OneTimeWorkRequestBuilder<MealReminderWorker>()
-        .setInitialDelay(Duration.between(now, next).toMillis(), TimeUnit.MILLISECONDS)
-        .setInputData(workDataOf(
-            MEAL_ID_KEY to reminder.id,
-            MEAL_TIME_KEY to reminder.time
-        ))
-        .build()
-
-    WorkManager.getInstance(context).enqueueUniqueWork(
-        MEAL_WORK_NAME_PREFIX + reminder.id,
-        policy,
-        request
+    val intent = Intent(context, MealReminderReceiver::class.java)
+        .setAction(MEAL_ALARM_ACTION)
+        .putExtra(MEAL_ID_KEY, reminder.id)
+        .putExtra(MEAL_TIME_KEY, reminder.time)
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        mealNotificationId(reminder.id),
+        intent,
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
     )
+
+    context.getSystemService(AlarmManager::class.java).setAndAllowWhileIdle(
+        AlarmManager.RTC_WAKEUP,
+        next.toInstant().toEpochMilli(),
+        pendingIntent
+    )
+}
+
+private fun cancelMealReminderAlarm(context: Context, mealId: String) {
+    val intent = Intent(context, MealReminderReceiver::class.java).setAction(MEAL_ALARM_ACTION)
+    val pendingIntent = PendingIntent.getBroadcast(
+        context,
+        mealNotificationId(mealId),
+        intent,
+        PendingIntent.FLAG_NO_CREATE or PendingIntent.FLAG_IMMUTABLE
+    ) ?: return
+
+    context.getSystemService(AlarmManager::class.java).cancel(pendingIntent)
+    pendingIntent.cancel()
 }
 
 private fun mealEnabledKey(mealId: String): String = "$mealId-enabled"

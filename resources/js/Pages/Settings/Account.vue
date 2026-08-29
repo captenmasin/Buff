@@ -103,7 +103,7 @@ function saveAccount() {
                         <span v-if="accountForm.errors.timezone" class="mt-1 block text-sm text-destructive">{{ accountForm.errors.timezone }}</span>
                     </label>
                     <div class="grid gap-2">
-                        <Button :disabled="accountForm.processing">Save account</Button>
+                        <Button :loading="accountForm.processing" loading-label="Saving account…">Save account</Button>
                     </div>
                 </form>
             </template>
@@ -113,7 +113,7 @@ function saveAccount() {
                 <p class="text-sm text-muted-foreground">Your offline data remains on this device. Sign in before the next sync.</p>
                 <Button :as="Link" href="/account/login" class="w-full">Sign in</Button>
                 <form v-if="page.props.buff.has_local_account" @submit.prevent="logoutForm.post('/account/logout')">
-                    <Button variant="surface" class="w-full" :disabled="logoutForm.processing">Remove local account data</Button>
+                    <Button variant="surface" class="w-full" :loading="logoutForm.processing" loading-label="Removing account…">Remove local account data</Button>
                 </form>
             </div>
         </Card>

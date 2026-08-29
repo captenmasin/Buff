@@ -56,7 +56,7 @@ function saveBodyProfile() {
                         :height-unit="preferences.height_unit"
                         :errors="profileForm.errors"
                     />
-                    <Button class="w-full" :disabled="profileForm.processing">Save profile</Button>
+                    <Button class="w-full" :loading="profileForm.processing" loading-label="Saving profile…">Save profile</Button>
                 </form>
             </div>
         </Card>

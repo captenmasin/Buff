@@ -1,6 +1,6 @@
 <?php
 
-it('registers daily Android meal notifications', function (): void {
+it('schedules Android meal reminders while the device is idle', function (): void {
     $manifest = file_get_contents(__DIR__.'/../../native-plugins/background-tasks/nativephp.json');
     $worker = file_get_contents(__DIR__.'/../../native-plugins/background-tasks/resources/android/src/com/buff/backgroundtasks/BackgroundTaskFunctions.kt');
     $notificationIcon = file_get_contents(__DIR__.'/../../native-plugins/background-tasks/resources/android/res/drawable/buff_notification.xml');
@@ -8,13 +8,22 @@ it('registers daily Android meal notifications', function (): void {
     expect($manifest)
         ->toContain('BackgroundTasks.RegisterMealReminders')
         ->toContain('android.permission.POST_NOTIFICATIONS')
+        ->toContain('android.permission.RECEIVE_BOOT_COMPLETED')
+        ->toContain('com.buff.backgroundtasks.MealReminderReceiver')
+        ->toContain('"init_function": "com.buff.backgroundtasks.startBackgroundTaskNotifications"')
         ->toContain('"android/res/drawable/buff_notification.xml": "res/drawable/buff_notification.xml"')
         ->and($worker)
         ->toContain('ActivityCompat.requestPermissions(')
         ->toContain('!hasPermission && !permissionAlreadyRequested')
+        ->toContain('class MealReminderReceiver : BroadcastReceiver()')
+        ->toContain('Intent.ACTION_BOOT_COMPLETED')
+        ->toContain('preferences.getBoolean(MEAL_ALARM_MIGRATED_KEY, false)')
+        ->toContain('setAndAllowWhileIdle(')
+        ->toContain('AlarmManager.RTC_WAKEUP')
         ->toContain('OneTimeWorkRequestBuilder<MealReminderWorker>()')
-        ->toContain('ExistingWorkPolicy.APPEND_OR_REPLACE')
+        ->toContain('setExpedited(OutOfQuotaPolicy.RUN_AS_NON_EXPEDITED_WORK_REQUEST)')
         ->toContain('ZonedDateTime.now()')
+        ->not->toContain('setInitialDelay(Duration.between(now, next)')
         ->toContain('"meal-reminder:check --meal=$mealId --date=$localDate"')
         ->toContain('output.contains(MEAL_DUE_PREFIX + mealId)')
         ->toContain('!output.contains(MEAL_LOGGED_PREFIX + mealId)')

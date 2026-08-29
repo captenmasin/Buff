@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import {Head, useForm} from '@inertiajs/vue3';
+import {Head, useForm, usePage} from '@inertiajs/vue3';
 import Card from '../../Components/Card.vue';
 import SettingsPageHeader from '../../Components/SettingsPageHeader.vue';
 import Input from '../../Components/ui/input/Input.vue';
 import Switch from '../../Components/ui/switch/Switch.vue';
+import {useQueuedSave} from '../../useQueuedSave';
 
 type MealType = 'breakfast' | 'lunch' | 'dinner';
 
@@ -21,22 +22,23 @@ const mealReminderForm = useForm<MealReminders>({
     lunch: {...props.mealReminders.lunch},
     dinner: {...props.mealReminders.dinner},
 });
+const page = usePage<{flash?: {save_status?: string}}>();
 const mealReminderOptions: Array<{ id: MealType; label: string }> = [
     {id: 'breakfast', label: 'Breakfast'},
     {id: 'lunch', label: 'Lunch'},
     {id: 'dinner', label: 'Dinner'},
 ];
 
-function saveMealReminders() {
-    if (mealReminderForm.processing) {
-        return;
-    }
-
-    mealReminderForm.put('/settings/meal-reminders', {preserveScroll: true});
-}
+const {save: saveMealReminders, status: saveStatus} = useQueuedSave((callbacks) => {
+    mealReminderForm.put('/settings/meal-reminders', {preserveScroll: true, ...callbacks});
+});
 
 function mealReminderError(meal: MealType, field: 'enabled' | 'time') {
     return mealReminderForm.errors[`${meal}.${field}`];
+}
+
+function reminderSaveError(): string | undefined {
+    return (mealReminderForm.errors as Record<string, string | undefined>).reminders;
 }
 </script>
 
@@ -48,10 +50,17 @@ function mealReminderError(meal: MealType, field: 'enabled' | 'time') {
 
         <Card>
             <div class="space-y-3">
-                <div>
-                    <h2 class="card-title">Meal reminders</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <h2 class="card-title">Meal reminders</h2>
+                        <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
+                    </div>
+                    <p class="shrink-0 text-sm text-muted-foreground" role="status" aria-live="polite">
+                        {{ saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? (page.props.flash?.save_status ?? 'Saved') : saveStatus === 'error' ? 'Couldn’t save' : '' }}
+                    </p>
                 </div>
+
+                <p v-if="reminderSaveError()" class="text-sm text-destructive" role="alert">{{ reminderSaveError() }}</p>
 
                 <div class="divide-y divide-border/60">
                     <div v-for="meal in mealReminderOptions" :key="meal.id" class="py-3 first:pt-1 last:pb-1">

@@ -131,7 +131,7 @@ it('updates unit preferences from settings', function (): void {
         'height_unit' => 'in',
         'measurement_unit' => 'in',
     ])->assertRedirect()
-        ->assertSessionHas('message', 'Units saved.');
+        ->assertSessionMissing('message');
 
     $this->assertDatabaseHas('app_preferences', [
         'weight_unit' => 'lb',
@@ -156,7 +156,7 @@ it('updates eat-back preference from settings', function (): void {
     $this->put('/settings/eat-back', [
         'eat_back' => 'half',
     ])->assertRedirect()
-        ->assertSessionHas('message', 'Exercise calorie setting saved.');
+        ->assertSessionMissing('message');
 
     $this->assertDatabaseHas('app_preferences', [
         'eat_back' => 'half',
@@ -272,7 +272,8 @@ it('updates and schedules meal reminders', function (): void {
 
     $this->put('/settings/meal-reminders', $reminders)
         ->assertRedirect()
-        ->assertSessionHas('message', 'Meal reminders saved.');
+        ->assertSessionMissing('message')
+        ->assertSessionHas('save_status', 'Meal reminders saved.');
 
     expect(AppPreference::current()->fresh()->mealReminders())->toBe($reminders)
         ->and($calls)->toBe([[
@@ -292,7 +293,10 @@ it('keeps the previous reminder settings when native scheduling fails', function
         'breakfast' => ['enabled' => true, 'time' => '07:30'],
         'lunch' => ['enabled' => true, 'time' => '12:15'],
         'dinner' => ['enabled' => true, 'time' => '19:00'],
-    ])->assertRedirect();
+    ])->assertRedirect()
+        ->assertSessionHasErrors([
+            'reminders' => 'Meal reminder settings were not saved because reminders could not be scheduled.',
+        ]);
 
     expect(AppPreference::current()->fresh()->mealReminders())->toBe($previous);
 });

@@ -96,6 +96,8 @@ const props = withDefaults(defineProps<{
 
 const pendingDelete = ref<BodyMetric | null>(null);
 const pendingPhotoDelete = ref<ProgressPhoto | null>(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 const chartCarousel = ref<HTMLElement | null>(null);
 const activeChart = ref(0);
 const photoInput = ref<HTMLInputElement | null>(null);
@@ -591,43 +593,81 @@ function syncChartSlide(event: Event): void {
 }
 
 function deltaLabel(value: number | null | undefined, suffix: string): string { return value === null || value === undefined ? 'No change' : `${value > 0 ? '+' : ''}${value}${suffix}`; }
-function requestDelete(metric: BodyMetric): void { pendingDelete.value = metric; }
-function cancelDelete(): void { pendingDelete.value = null; }
-function confirmDelete(): void {
-    const metric = pendingDelete.value;
-
-    if (!metric) {
+function requestDelete(metric: BodyMetric): void {
+    deleteError.value = '';
+    pendingDelete.value = metric;
+}
+function cancelDelete(): void {
+    if (deleteProcessing.value) {
         return;
     }
 
+    deleteError.value = '';
     pendingDelete.value = null;
+}
+function confirmDelete(): void {
+    const metric = pendingDelete.value;
+
+    if (!metric || deleteProcessing.value) {
+        return;
+    }
+
+    deleteProcessing.value = true;
+    deleteError.value = '';
 
     router.delete(`/progress/body-metrics/${metric.id}?range=${encodeURIComponent(props.range)}`, {
         preserveScroll: true,
+        onSuccess: () => {
+            pendingDelete.value = null;
+        },
+        onError: () => {
+            deleteError.value = 'Couldn’t delete this progress item. Try again.';
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+
+            if (pendingDelete.value && !deleteError.value) {
+                deleteError.value = 'Couldn’t delete this progress item. Try again.';
+            }
+        },
     });
 }
 
-function requestPhotoDelete(photo: ProgressPhoto): void { pendingPhotoDelete.value = photo; }
-function cancelPhotoDelete(): void { pendingPhotoDelete.value = null; }
+function requestPhotoDelete(photo: ProgressPhoto): void {
+    deleteError.value = '';
+    pendingPhotoDelete.value = photo;
+}
+function cancelPhotoDelete(): void {
+    if (deleteProcessing.value) {
+        return;
+    }
+
+    deleteError.value = '';
+    pendingPhotoDelete.value = null;
+}
 async function confirmPhotoDelete(): Promise<void> {
     const metric = photosMetric.value;
     const photo = pendingPhotoDelete.value;
 
-    if (!metric || !photo || photo.pending) {
+    if (!metric || !photo || photo.pending || deleteProcessing.value) {
         return;
     }
 
-    pendingPhotoDelete.value = null;
+    deleteProcessing.value = true;
+    deleteError.value = '';
     photoUploadError.value = '';
 
     try {
         await axios.delete(`/progress/body-metrics/${metric.id}/photos/${encodeURIComponent(photo.id)}`);
         remotePhotos.value = remotePhotos.value.filter((entry) => entry.id !== photo.id);
         photoCache.value[metric.id] = remotePhotos.value;
+        pendingPhotoDelete.value = null;
         void loadOverlayPhotos();
     } catch (error) {
-        photoUploadError.value = (axios.isAxiosError(error) ? error.response?.data?.message : null)
+        deleteError.value = (axios.isAxiosError(error) ? error.response?.data?.message : null)
             || 'Could not delete the progress photo. Check your connection.';
+    } finally {
+        deleteProcessing.value = false;
     }
 }
 
@@ -1032,9 +1072,12 @@ onUnmounted(() => {
                     <span class="field-label">Notes</span>
                     <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
                 </label>
-                <Button class="w-full" :disabled="metricForm.processing || photoUploading">
-                    <LoaderCircle v-if="metricForm.processing || photoUploading" :size="18" class="animate-spin" />
-                    {{ photoUploading ? 'Uploading photos…' : 'Save progress' }}
+                <Button
+                    class="w-full"
+                    :loading="metricForm.processing || photoUploading"
+                    :loading-label="photoUploading ? 'Uploading photos…' : 'Saving progress…'"
+                >
+                    Save progress
                 </Button>
             </form>
         </Card>
@@ -1068,7 +1111,14 @@ onUnmounted(() => {
             </Card>
         </section>
 
-        <AppSheet :open="photosMetric !== null" variant="drawer" labelled-by="progress-photos-title" @close="closePhotos">
+        <AppSheet
+            :open="photosMetric !== null"
+            variant="drawer"
+            labelled-by="progress-photos-title"
+            title="Progress photos"
+            description="Review or add photos for this progress measurement."
+            @close="closePhotos"
+        >
             <div class="mb-4 flex justify-between gap-3">
                 <h2 id="progress-photos-title" class="text-xl font-semibold tracking-tight">
                     Photos · {{ photosMetric?.date }}
@@ -1104,9 +1154,8 @@ onUnmounted(() => {
                 <p v-if="remotePhotos.length === 0" class="text-sm text-muted-foreground">No photos for this measurement yet.</p>
                 <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
                 <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
-                <Button type="button" class="w-full" :disabled="photoUploading" @click.stop="addPhotosForMetric">
-                    <LoaderCircle v-if="photoUploading" :size="18" class="animate-spin" />
-                    {{ photoUploading ? 'Uploading photos…' : 'Add photos' }}
+                <Button type="button" class="w-full" :loading="photoUploading" loading-label="Uploading photos…" @click.stop="addPhotosForMetric">
+                    Add photos
                 </Button>
                 <Button type="button" variant="surface" class="w-full" :disabled="photoUploading" @click.stop="addPhotosFromLibrary">
                     Choose from library
@@ -1124,6 +1173,9 @@ onUnmounted(() => {
             :open="Boolean(pendingDelete)"
             title="Delete progress item"
             :message="pendingDelete ? `Delete progress item from ${pendingDelete.date}?` : ''"
+            :processing="deleteProcessing"
+            processing-label="Deleting item…"
+            :error="deleteError"
             @cancel="cancelDelete"
             @confirm="confirmDelete"
         />
@@ -1131,6 +1183,9 @@ onUnmounted(() => {
             :open="Boolean(pendingPhotoDelete)"
             title="Delete progress photo"
             :message="pendingPhotoDelete ? `Delete the ${photoPoseLabel(pendingPhotoDelete.pose).toLowerCase()} photo?` : ''"
+            :processing="deleteProcessing"
+            processing-label="Deleting photo…"
+            :error="deleteError"
             @cancel="cancelPhotoDelete"
             @confirm="confirmPhotoDelete"
         />

@@ -206,6 +206,8 @@ const selectedWorkout = ref<WorkoutEntry | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
 const mealPhotosLoading = ref(false);
 const pendingDelete = ref<null | { kind: 'meal' | 'workout'; id: string; title: string }>(null);
+const deleteProcessing = ref(false);
+const deleteError = ref('');
 let mealRowTrigger: HTMLElement | null = null;
 let mealPhotoRequest = 0;
 const macros = computed<MacroCard[]>(() => [
@@ -267,35 +269,50 @@ function macroProgress(consumed: number, goal?: number) {
 }
 
 function requestDelete(kind: 'meal' | 'workout', id: string, title: string) {
+    deleteError.value = '';
     pendingDelete.value = {kind, id, title};
 }
 
 function cancelDelete() {
+    if (deleteProcessing.value) {
+        return;
+    }
+
+    deleteError.value = '';
     pendingDelete.value = null;
 }
 
 function confirmDelete() {
     const pending = pendingDelete.value;
 
-    if (!pending) {
+    if (!pending || deleteProcessing.value) {
         return;
     }
 
     const {kind, id} = pending;
-    pendingDelete.value = null;
+    deleteProcessing.value = true;
+    deleteError.value = '';
     hapticImpact();
 
-    if (kind === 'meal') {
-        router.delete(`/meals/${id}`, {
-            preserveScroll: true,
-            onSuccess: closeMeal,
-        });
-
-        return;
-    }
-
-    router.delete(`/workouts/${id}`, {
+    router.delete(kind === 'meal' ? `/meals/${id}` : `/workouts/${id}`, {
         preserveScroll: true,
+        onSuccess: () => {
+            pendingDelete.value = null;
+
+            if (kind === 'meal') {
+                closeMeal();
+            }
+        },
+        onError: () => {
+            deleteError.value = `Couldn’t delete this ${kind}. Try again.`;
+        },
+        onFinish: () => {
+            deleteProcessing.value = false;
+
+            if (pendingDelete.value && !deleteError.value) {
+                deleteError.value = `Couldn’t delete this ${kind}. Try again.`;
+            }
+        },
     });
 }
 
@@ -806,7 +823,7 @@ onBeforeUnmount(() => {
                                 <Button variant="ghost" size="sm" class="w-full justify-start" @click="startEditingWorkout(workout, close)">
                                     <Pencil :size="16"/>Edit
                                 </Button>
-                                <Button variant="ghost" size="sm" class="w-full justify-start text-destructive hover:text-destructive" @click="close(); requestDelete('workout', workout.id, 'Delete this workout?')">
+                                <Button variant="ghost" size="sm" class="w-full justify-start text-destructive hover:text-destructive" @click="close(); requestDelete('workout', workout.id, `Delete ${workout.title}?`)">
                                     <Trash2 :size="16"/>Delete
                                 </Button>
                             </PopoverContent>
@@ -832,7 +849,14 @@ onBeforeUnmount(() => {
 
         <p class="text-center text-xs text-muted-foreground">🔥 {{ summary.streak }} day streak</p>
 
-        <AppSheet :open="Boolean(mealSheetMode && selectedMeal)" labelled-by="meal-sheet-title" @close="closeMeal">
+        <AppSheet
+            :open="Boolean(mealSheetMode && selectedMeal)"
+            labelled-by="meal-sheet-title"
+            :title="mealSheetMode === 'edit' ? 'Edit meal' : 'Meal details'"
+            description="Review, edit, or delete this meal."
+            :dismissible="!editMealForm.processing"
+            @close="closeMeal"
+        >
             <Transition
                 mode="out-in"
                 enter-active-class="transition duration-200 ease-out"
@@ -842,7 +866,7 @@ onBeforeUnmount(() => {
                 leave-from-class="opacity-100"
                 leave-to-class="opacity-0"
             >
-                <div v-if="mealSheetMode === 'details'" key="details">
+                <div v-if="mealSheetMode === 'details' && selectedMeal" key="details">
                 <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0 flex-1">
                         <p class="field-label">{{ mealLabels[selectedMeal.meal_type] }}</p>
@@ -886,13 +910,13 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="mt-4 grid grid-cols-2 gap-2">
                     <Button type="button" variant="surface" @click="startEditingMeal"><Pencil :size="18" />Edit</Button>
-                    <Button type="button" variant="destructive" @click="requestDelete('meal', selectedMeal.id, 'Delete this meal?')"><Trash2 :size="18" />Delete</Button>
+                    <Button type="button" variant="destructive" @click="requestDelete('meal', selectedMeal.id, `Delete ${selectedMeal.name} from ${mealLabels[selectedMeal.meal_type]}?`)"><Trash2 :size="18" />Delete</Button>
                 </div>
                 </div>
-                <div v-else key="edit">
+                <div v-else-if="mealSheetMode === 'edit' && selectedMeal" key="edit">
                 <div class="mb-4 flex items-center justify-between gap-3">
                     <h2 id="meal-sheet-title" class="text-xl font-semibold tracking-tight">Edit meal</h2>
-                    <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close meal editor" @click="closeMeal">
+                    <Button variant="ghost" size="icon" class="rounded-full" aria-label="Close meal editor" :disabled="editMealForm.processing" @click="closeMeal">
                         <X :size="20"/>
                     </Button>
                 </div>
@@ -948,7 +972,7 @@ onBeforeUnmount(() => {
                         </Button>
                     </div>
 
-                    <Button class="w-full" :disabled="editMealForm.processing">
+                    <Button class="w-full" :loading="editMealForm.processing" loading-label="Saving meal…">
                         Save meal
                     </Button>
                 </form>
@@ -958,6 +982,8 @@ onBeforeUnmount(() => {
         <AppSheet
             :open="selectedWorkout !== null"
             labelled-by="workout-sheet-title"
+            title="Edit workout"
+            description="Update this workout’s details."
             :dismissible="!editWorkoutForm.processing"
             @close="closeWorkoutEditor"
         >
@@ -988,7 +1014,7 @@ onBeforeUnmount(() => {
                     </label>
                 </div>
 
-                <Button class="w-full" :disabled="editWorkoutForm.processing">
+                <Button class="w-full" :loading="editWorkoutForm.processing" loading-label="Saving workout…">
                     Save workout
                 </Button>
             </form>
@@ -997,6 +1023,9 @@ onBeforeUnmount(() => {
             :open="Boolean(pendingDelete)"
             :title="pendingDelete?.kind === 'workout' ? 'Delete workout' : 'Delete meal'"
             :message="pendingDelete?.title ?? ''"
+            :processing="deleteProcessing"
+            :processing-label="pendingDelete?.kind === 'workout' ? 'Deleting workout…' : 'Deleting meal…'"
+            :error="deleteError"
             @cancel="cancelDelete"
             @confirm="confirmDelete"
         />
