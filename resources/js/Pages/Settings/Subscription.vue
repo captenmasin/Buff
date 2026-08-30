@@ -13,6 +13,7 @@ import {
     managementUrl,
     nativeError,
     normalizeOffering,
+    subscriptionPackageButtonLabel,
     subscriptionNative,
     type SubscriptionAccount,
     type SubscriptionPackage,
@@ -257,7 +258,7 @@ onUnmounted(() => removeNativeListeners?.());
                         :disabled="busy !== null || active"
                         @click="purchase(subscriptionPackage)"
                     >
-                        {{ active ? 'Current plan active' : `Choose ${subscriptionPackage.kind}` }}
+                        {{ subscriptionPackageButtonLabel(subscriptionPackage, active, account?.subscription?.product_id) }}
                     </Button>
                 </Card>
             </div>

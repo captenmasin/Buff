@@ -31,7 +31,7 @@ const tiles: AddChoice[] = [
     {
         mode: 'food',
         label: 'Search',
-        description: 'Packaged food and previous items',
+        description: 'Food & history',
         icon: Search,
         tone: 'acid',
     },
@@ -39,21 +39,21 @@ const tiles: AddChoice[] = [
         mode: 'food',
         extra: { scan: '1' },
         label: 'Scan',
-        description: 'Look up a barcode',
+        description: 'Barcode',
         icon: ScanBarcode,
         tone: 'violet',
     },
     {
         mode: 'photo',
         label: 'Photo',
-        description: 'Estimate editable macros',
+        description: 'Macro estimate',
         icon: Camera,
         tone: 'night',
     },
     {
         mode: 'custom',
         label: 'Custom',
-        description: 'Enter name and macros',
+        description: 'Manual entry',
         icon: Pencil,
         tone: 'muted',
     },
@@ -106,7 +106,7 @@ const emit = defineEmits<{
                             <LockKeyhole :size="11" aria-hidden="true" /> Buff+
                         </span>
                     </span>
-                    <span class="block text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>
+                    <span class="block truncate text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>
                 </span>
             </Button>
         </div>

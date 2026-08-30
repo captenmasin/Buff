@@ -7,7 +7,7 @@ withDefaults(defineProps<{
 </script>
 
 <template>
-    <header class="flex items-start justify-between gap-3">
+    <header class="flex items-center justify-between gap-3">
         <div class="flex min-w-0 items-center gap-1">
             <div v-if="$slots.leading" class="flex shrink-0 items-center pt-0.5">
                 <slot name="leading" />

@@ -8,6 +8,7 @@ export interface SubscriptionAccount {
     subscription?: {
         expires_at?: string | null;
         management_url?: string | null;
+        product_id?: string | null;
     } | null;
 }
 
@@ -55,6 +56,20 @@ export function isSubscriptionActive(expiresAt?: string | null, now = Date.now()
     const expiry = expiresAt ? Date.parse(expiresAt) : Number.NaN;
 
     return Number.isFinite(expiry) && expiry > now;
+}
+
+export function subscriptionPackageButtonLabel(
+    subscriptionPackage: Pick<SubscriptionPackage, 'kind' | 'productIdentifier'>,
+    active: boolean,
+    activeProductId?: string | null,
+): string {
+    if (!active) {
+        return `Choose ${subscriptionPackage.kind}`;
+    }
+
+    return subscriptionPackage.productIdentifier === activeProductId
+        ? 'Current plan active'
+        : 'Manage subscription to change plan';
 }
 
 export function managementUrl(platform: SubscriptionPlatform, providerUrl?: string | null): string | null {

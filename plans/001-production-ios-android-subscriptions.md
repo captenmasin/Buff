@@ -1,5 +1,11 @@
 # Plan 001: Put AI meal analysis behind production iOS and Android subscriptions
 
+> **Superseded decision (2026-08-30)**: Plan 002 changes the RevenueCat
+> entitlement identifier from `ai_meal_analysis` to `buff_plus` before
+> production and owns the no-ads benefit. Follow Plan 002 wherever those
+> decisions conflict; the existing database column and AI enforcement flag do
+> not need renaming.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and
@@ -215,10 +221,10 @@ Run commands from the repository named in the first column.
 
 | Repository | Purpose | Command | Expected on success |
 |------------|---------|---------|---------------------|
-| `buff-server` | Targeted subscription tests | `php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php tests/Feature/RevenueCatWebhookTest.php tests/Feature/MealAnalysisTest.php tests/Feature/McpDraftAndMediaToolsTest.php` | all pass |
+| `buff-server` | Targeted subscription tests | `php artisan test --compact tests/Feature/SubscriptionTest.php tests/Feature/RevenueCatWebhookTest.php tests/Feature/MealAnalysisTest.php tests/Feature/McpDraftAndMediaToolsTest.php` | all pass |
 | `buff-server` | Full tests | `composer run test` | exit 0, all pass |
 | `buff-server` | PHP format | `vendor/bin/pint --dirty --format agent` | exit 0 |
-| `Buff` | Targeted PHP tests | `php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php tests/Feature/MealPhotoIntegrationTest.php tests/Feature/SettingsTest.php tests/Unit/SubscriptionsPluginTest.php` | all pass |
+| `Buff` | Targeted PHP tests | `php artisan test --compact tests/Feature/SubscriptionTest.php tests/Feature/MealPhotoIntegrationTest.php tests/Feature/SettingsTest.php tests/Unit/SubscriptionsPluginTest.php` | all pass |
 | `Buff` | Frontend tests | `pnpm test:frontend` | exit 0, all pass |
 | `Buff` | Type check | `pnpm type-check` | exit 0, no errors |
 | `Buff` | PHP format | `vendor/bin/pint --dirty --format agent` | exit 0 |
@@ -457,7 +463,7 @@ stable. Extra keys must not break existing account-cache restore.
 **Verify**:
 
 ```sh
-php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php
+php artisan test --compact tests/Feature/SubscriptionTest.php
 ```
 
 Expected: tests prove existing-user backfill, new-user UUID assignment and
@@ -545,7 +551,7 @@ duplicates and out-of-order notifications harmless.
 **Verify**:
 
 ```sh
-php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php tests/Feature/RevenueCatWebhookTest.php
+php artisan test --compact tests/Feature/SubscriptionTest.php tests/Feature/RevenueCatWebhookTest.php
 ```
 
 Expected: `Http::fake()` covers active, grace/trial, expired, absent,
@@ -586,7 +592,7 @@ Extend existing tests to prove:
 **Verify**:
 
 ```sh
-php artisan test --compact --no-interaction tests/Feature/MealAnalysisTest.php tests/Feature/McpDraftAndMediaToolsTest.php tests/Feature/SubscriptionTest.php
+php artisan test --compact tests/Feature/MealAnalysisTest.php tests/Feature/McpDraftAndMediaToolsTest.php tests/Feature/SubscriptionTest.php
 vendor/bin/pint --dirty --format agent
 ```
 
@@ -686,7 +692,7 @@ not try to run Swift/Kotlin on a device from this test.
 composer validate --no-check-publish
 php artisan native:plugin:validate --no-interaction
 php artisan native:plugin:list --no-interaction
-php artisan test --compact --no-interaction tests/Unit/SubscriptionsPluginTest.php
+php artisan test --compact tests/Unit/SubscriptionsPluginTest.php
 pnpm type-check
 ```
 
@@ -776,7 +782,7 @@ components.
 **Verify**:
 
 ```sh
-php artisan test --compact --no-interaction tests/Feature/SubscriptionTest.php tests/Feature/MealPhotoIntegrationTest.php tests/Feature/SettingsTest.php
+php artisan test --compact tests/Feature/SubscriptionTest.php tests/Feature/MealPhotoIntegrationTest.php tests/Feature/SettingsTest.php
 pnpm test:frontend
 pnpm type-check
 vendor/bin/pint --dirty --format agent

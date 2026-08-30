@@ -6,6 +6,7 @@ import {
     managementUrl,
     nativeError,
     normalizeOffering,
+    subscriptionPackageButtonLabel,
     subscriptionPlatform,
 } from '../resources/js/subscriptions.ts';
 
@@ -15,6 +16,15 @@ test('derives access only from a future server expiry', () => {
     assert.equal(isSubscriptionActive('2026-08-29T12:00:01Z', now), true);
     assert.equal(isSubscriptionActive('2026-08-29T12:00:00Z', now), false);
     assert.equal(isSubscriptionActive(null, now), false);
+});
+
+test('labels only the purchased package as the current plan', () => {
+    const monthly = {kind: 'monthly', productIdentifier: 'monthly-product'} as const;
+    const annual = {kind: 'annual', productIdentifier: 'annual-product'} as const;
+
+    assert.equal(subscriptionPackageButtonLabel(monthly, true, 'monthly-product'), 'Current plan active');
+    assert.equal(subscriptionPackageButtonLabel(annual, true, 'monthly-product'), 'Manage subscription to change plan');
+    assert.equal(subscriptionPackageButtonLabel(annual, false, null), 'Choose annual');
 });
 
 test('normalizes localized monthly and annual offering data', () => {

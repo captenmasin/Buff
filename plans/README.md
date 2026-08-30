@@ -9,6 +9,7 @@ starting, honor its STOP conditions, and update the row when done.
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
 | 001 | Put AI meal analysis behind production iOS and Android subscriptions | P1 | L | — | TODO |
+| 002 | Show AdMob banners only to non-Buff+ users | P1 | L | 001 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale — finding fixed independently or approach
@@ -19,6 +20,10 @@ abandoned)
 - Plan 001 spans the NativePHP client in this repository and its sibling API
   repository at `../buff-server`; deploy the API portion before releasing the
   mobile builds, and enable enforcement only after both store releases are live.
+- Plan 002 spans the same repositories and uses Plan 001's authoritative
+  RevenueCat refresh. It supersedes Plan 001's entitlement-name decision:
+  configure and use `buff_plus` before releasing either plan. AdMob remains off
+  until the privacy/account/device checklist in Plan 002 passes.
 
 ## Findings considered and rejected
 
@@ -26,7 +31,7 @@ abandoned)
   production version because it duplicates purchase verification, renewal,
   grace-period, refund, transfer, and notification handling across two stores.
 - A generic plans/permissions framework: rejected because the requested product
-  has one paid entitlement, `ai_meal_analysis`.
+  has one paid tier, Buff+, represented by the `buff_plus` entitlement.
 - Stripe/web checkout, NativePHP Wallet, Apple Pay, or Google Pay: rejected
   because this plan is specifically for App Store and Google Play auto-renewable
   subscriptions in the native apps. Guideline 3.1.1 requires IAP for this
