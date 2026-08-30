@@ -209,7 +209,7 @@ it('registers during onboarding without blocking unverified accounts', function 
 
     app()->forgetInstance(BuffCredentialStore::class);
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/auth/register'
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/auth/register'
         && $request['timezone'] === 'Europe/London'
         && $request['device_name'] === 'Buff mobile');
 
@@ -407,7 +407,7 @@ it('resumes the saved device account without asking for credentials', function (
     expect(app(BuffCredentialStore::class)->token())->toBe('resumed-token')
         ->and(app(BuffCredentialStore::class)->refreshToken())->toBe('rotated-refresh-token');
     $this->assertDatabaseCount('daily_goals', 1);
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/auth/resume'
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/auth/resume'
         && $request->hasHeader('Authorization', 'Bearer device-refresh-token')
         && $request['device_name'] === 'Buff mobile');
 });
@@ -635,7 +635,7 @@ it('updates the password from settings', function (): void {
         'password_confirmation' => 'new-password-123',
     ])->assertRedirect('/settings/password');
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/account/password'
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/account/password'
         && $request->method() === 'PUT'
         && $request['current_password'] === 'password123'
         && $request['password'] === 'new-password-123'

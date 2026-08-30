@@ -43,7 +43,7 @@ it('resolves a deep-link token without approving it', function (): void {
 
     Http::assertSentCount(1);
     Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'GET'
-        && $request->url() === 'https://dev.api.usebuff.app/api/v1/mcp/browser-approvals/'.$token
+        && $request->url() === 'https://api.usebuff.app/api/v1/mcp/browser-approvals/'.$token
         && $request->hasHeader('Authorization', 'Bearer mobile-token'));
 });
 

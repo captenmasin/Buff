@@ -111,7 +111,7 @@ it('proxies multipart body metric photos when the metric is not pending sync', f
     ])->assertOk()
         ->assertJsonPath('photos.0.id', '30000000-0000-4000-8000-000000000003');
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://dev.api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos"
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos"
         && $request->hasHeader('Authorization', 'Bearer photo-token')
         && $request->hasFile('photos[]', filename: 'progress.jpg')
         && outgoingField($request, 'poses') === ['front']);
@@ -263,7 +263,7 @@ it('uploads staged photos after the body metric syncs', function (): void {
     $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $metric->id]);
     $this->assertDatabaseCount('pending_body_metric_photo_uploads', 0);
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://dev.api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos"
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos"
         && $request->hasFile('photos[]')
         && outgoingField($request, 'poses') === ['front']);
 });
@@ -353,7 +353,7 @@ it('proxies deleting a body metric photo', function (): void {
     $this->deleteJson("/progress/body-metrics/{$metric->id}/photos/{$photoId}")
         ->assertNoContent();
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://dev.api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos/{$photoId}"
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos/{$photoId}"
         && $request->method() === 'DELETE');
 });
 

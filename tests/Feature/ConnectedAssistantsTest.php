@@ -54,7 +54,7 @@ it('lists connected assistants from the account API', function (): void {
             ->where('mcpEndpoint', 'https://api.example.test/mcp/buff'));
 
     Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'GET'
-        && $request->url() === 'https://dev.api.usebuff.app/api/v1/mcp/connections'
+        && $request->url() === 'https://api.usebuff.app/api/v1/mcp/connections'
         && $request->hasHeader('Authorization', 'Bearer mobile-token'));
 });
 
@@ -83,7 +83,7 @@ it('revokes one connected assistant through the account API', function (): void 
         ->assertSessionHas('message', 'Assistant access revoked.');
 
     Http::assertSent(fn (ClientRequest $request): bool => $request->method() === 'DELETE'
-        && $request->url() === 'https://dev.api.usebuff.app/api/v1/mcp/connections/'.$connectionId
+        && $request->url() === 'https://api.usebuff.app/api/v1/mcp/connections/'.$connectionId
         && $request->hasHeader('Authorization', 'Bearer mobile-token'));
 });
 

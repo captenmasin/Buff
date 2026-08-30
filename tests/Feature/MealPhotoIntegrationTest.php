@@ -53,7 +53,7 @@ it('proxies a bounded multipart analysis without exposing the bearer token to Vu
         ->assertJsonPath('analysis.draft.name', 'Chicken rice bowl')
         ->assertJsonPath('quota_remaining', 4);
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/meal-analyses'
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/meal-analyses'
         && $request->hasHeader('Authorization', 'Bearer photo-token')
         && $request->hasFile('photos[]', filename: 'meal.jpg'));
 });
@@ -104,7 +104,7 @@ it('proxies a follow-up correction to revise the draft', function (): void {
         'correction' => 'It was blue cheese, not feta.',
     ])->assertOk()->assertJsonPath('analysis.draft.name', 'Chicken and blue cheese salad');
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://dev.api.usebuff.app/api/v1/meal-analyses/{$analysisId}/follow-up"
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://api.usebuff.app/api/v1/meal-analyses/{$analysisId}/follow-up"
         && $request['correction'] === 'It was blue cheese, not feta.');
 });
 

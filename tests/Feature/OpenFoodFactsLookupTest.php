@@ -42,7 +42,7 @@ it('removes whitespace before requesting the barcode proxy', function (): void {
         ->assertOk()
         ->assertJsonPath('product.barcode', '737628064502');
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://dev.api.usebuff.app/api/v1/foods/barcodes/737628064502'
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/foods/barcodes/737628064502'
         && $request->hasHeader('Authorization', 'Bearer food-token'));
 });
 
