@@ -4,8 +4,10 @@ export type SubscriptionPlatform = 'ios' | 'android' | 'unsupported';
 export type SubscriptionPackageKind = 'monthly' | 'annual';
 
 export interface SubscriptionAccount {
+    id?: string | number;
     revenuecat_app_user_id?: string | null;
     subscription?: {
+        entitled?: boolean;
         expires_at?: string | null;
         management_url?: string | null;
         product_id?: string | null;

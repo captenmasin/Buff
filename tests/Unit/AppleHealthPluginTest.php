@@ -10,6 +10,7 @@ it('uses HealthKit and the NativePHP ephemeral runtime for Apple Health imports'
 
     expect($manifest)
         ->toContain('"platforms": ["ios"]')
+        ->toContain('"min_version": 33')
         ->toContain('AppleHealth.Status')
         ->toContain('AppleHealth.RequestPermissions')
         ->toContain('AppleHealth.SyncNow')

@@ -1,0 +1,798 @@
+package com.blessedzulu.nativephp.admob
+
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.view.Gravity
+import android.view.ViewGroup
+import android.widget.FrameLayout
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.fragment.app.FragmentActivity
+import com.google.android.gms.ads.AdError
+import com.google.android.gms.ads.AdListener
+import com.google.android.gms.ads.AdRequest
+import com.google.android.gms.ads.AdSize
+import com.google.android.gms.ads.AdView
+import com.google.android.gms.ads.FullScreenContentCallback
+import com.google.android.gms.ads.LoadAdError
+import com.google.android.gms.ads.OnUserEarnedRewardListener
+import com.google.android.gms.ads.appopen.AppOpenAd
+import com.google.android.gms.ads.interstitial.InterstitialAd
+import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
+import com.google.android.gms.ads.rewarded.RewardedAd
+import com.google.android.gms.ads.rewarded.RewardedAdLoadCallback
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAd
+import com.google.android.gms.ads.rewardedinterstitial.RewardedInterstitialAdLoadCallback
+import com.google.android.ump.UserMessagingPlatform
+import com.nativephp.mobile.bridge.BridgeFunction
+import com.nativephp.mobile.utils.NativeActionCoordinator
+import org.json.JSONObject
+
+/**
+ * AdMob bridge function implementations.
+ *
+ * Every class takes a FragmentActivity in its primary constructor because
+ * NativePHP's AndroidPluginCompiler emits `ClassName(activity)` when
+ * `params` is omitted from the manifest entry (the default).
+ *
+ * Implements the full AdMob surface - banner, interstitial, rewarded,
+ * rewarded interstitial, and app-open ads, plus UMP consent. Verified on
+ * real Android hardware.
+ */
+object AdmobFunctions {
+    private const val TAG = "AdmobFunctions"
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private const val EVENT_BASE = "BlessedZulu\\NativePhpAdmob\\Events"
+
+    private fun notImplemented(name: String): Map<String, Any> =
+        mapOf("success" to false, "error" to "$name not implemented.")
+
+    private fun success(data: Any? = null): Map<String, Any> {
+        val result = mutableMapOf<String, Any>("success" to true)
+        if (data != null) result["data"] = data
+        return result
+    }
+
+    private fun failure(message: String): Map<String, Any> =
+        mapOf("success" to false, "error" to message)
+
+    private fun runOnUiThread(block: () -> Unit) {
+        if (Looper.myLooper() == Looper.getMainLooper()) block()
+        else mainHandler.post { block() }
+    }
+
+    private fun dispatchEvent(activity: FragmentActivity, eventClass: String, payload: Map<String, Any>) {
+        runOnUiThread {
+            try {
+                NativeActionCoordinator.dispatchEvent(
+                    activity,
+                    "$EVENT_BASE\\$eventClass",
+                    JSONObject(payload).toString()
+                )
+            } catch (e: Exception) {
+                Log.e(TAG, "❌ Failed to dispatch $eventClass: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun adaptiveBannerSize(activity: FragmentActivity): AdSize {
+        val display = activity.resources.displayMetrics
+        val widthDp = (display.widthPixels / display.density).toInt()
+        return AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(activity, widthDp)
+    }
+
+    private fun consentPayload(
+        info: com.google.android.ump.ConsentInformation,
+        succeeded: Boolean,
+        error: String? = null,
+    ): Map<String, Any> {
+        val payload = mutableMapOf<String, Any>(
+            "status" to if (succeeded) ConsentManager.statusString(info) else "unknown",
+            "success" to succeeded,
+            "canRequestAds" to (succeeded && info.canRequestAds()),
+            "privacyOptionsRequired" to ConsentManager.privacyOptionsRequired(info),
+        )
+
+        if (error != null) {
+            payload["error"] = error
+        }
+
+        return payload
+    }
+
+    // ---------- Explicit policy and initialization ----------
+
+    class ConfigurePolicy(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val underAge = parameters["under_age_of_consent"] as? Boolean
+                ?: return failure("under_age_of_consent must be boolean")
+            val nonPersonalized = parameters["non_personalized"] as? Boolean
+                ?: return failure("non_personalized must be boolean")
+            val maxContentRating = parameters["max_content_rating"] as? String
+                ?: return failure("max_content_rating is required")
+
+            return if (AdmobInit.configurePolicy(underAge, nonPersonalized, maxContentRating)) {
+                success()
+            } else {
+                failure("invalid_policy")
+            }
+        }
+    }
+
+    class Initialize(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> =
+            if (AdmobInit.initialize(activity)) {
+                success(mapOf("initialized" to true))
+            } else {
+                failure("policy_or_consent_not_ready")
+            }
+    }
+
+    // ---------- Real implementations: banner ----------
+
+    class LoadBanner(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("LoadBanner: slot missing")
+            val unitId = parameters["unit_id"] as? String ?: return notImplemented("LoadBanner: unit_id missing")
+
+            if (!AdmobInit.canLoadBanner(activity)) {
+                dispatchEvent(activity, "AdFailedToLoad", mapOf(
+                    "slot" to slot,
+                    "format" to "banner",
+                    "errorCode" to -1,
+                    "errorMessage" to "admob_not_ready",
+                ))
+                return failure("admob_not_ready")
+            }
+
+            runOnUiThread {
+                val existing = BannerRegistry.get(slot)
+                val adView = existing ?: AdView(activity).also { newAdView ->
+                    newAdView.setAdSize(adaptiveBannerSize(activity))
+                    newAdView.adUnitId = unitId
+                    newAdView.adListener = object : AdListener() {
+                        override fun onAdLoaded() {
+                            dispatchEvent(activity, "AdLoaded", mapOf(
+                                "slot" to slot,
+                                "format" to "banner",
+                                "height" to (newAdView.adSize?.height ?: 0),
+                            ))
+                        }
+
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            dispatchEvent(activity, "AdFailedToLoad", mapOf(
+                                "slot" to slot,
+                                "format" to "banner",
+                                "errorCode" to error.code,
+                                "errorMessage" to error.message,
+                            ))
+                        }
+
+                        override fun onAdImpression() {
+                            dispatchEvent(activity, "AdImpression", mapOf("slot" to slot, "format" to "banner"))
+                        }
+
+                        override fun onAdClicked() {
+                            dispatchEvent(activity, "AdClicked", mapOf("slot" to slot, "format" to "banner"))
+                        }
+                    }
+                    BannerRegistry.put(slot, newAdView)
+                }
+
+                adView.loadAd(AdmobInit.bannerRequest())
+            }
+
+            return success()
+        }
+    }
+
+    class ShowBanner(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("ShowBanner: slot missing")
+
+            if (!AdmobInit.canLoadBanner(activity)) {
+                dispatchEvent(activity, "AdFailedToShow", mapOf(
+                    "slot" to slot,
+                    "format" to "banner",
+                    "errorCode" to -1,
+                    "errorMessage" to "admob_not_ready",
+                ))
+                return failure("admob_not_ready")
+            }
+
+            val position = (parameters["position"] as? String) ?: "bottom"
+            val offsetDp = (parameters["offset"] as? Number)?.toInt() ?: 0
+            val safeArea = parameters["safe_area"] as? Boolean ?: true
+
+            runOnUiThread {
+                val adView = BannerRegistry.get(slot) ?: run {
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf(
+                            "slot" to slot,
+                            "format" to "banner",
+                            "errorCode" to -2,
+                            "errorMessage" to "no_loaded_ad",
+                        ),
+                    )
+                    return@runOnUiThread
+                }
+
+                BannerRegistry.removeContainer(slot)?.let { existing ->
+                    (existing.parent as? ViewGroup)?.removeView(existing)
+                }
+
+                (adView.parent as? ViewGroup)?.removeView(adView)
+
+                val decorContent = activity.findViewById<ViewGroup>(android.R.id.content)
+
+                // Inset past the OS system bars (status bar / nav-or-gesture bar)
+                // so the banner isn't clipped behind them. The configured offset
+                // stacks on top. iOS does this via its safe-area guide already.
+                val bars = if (safeArea) {
+                    ViewCompat.getRootWindowInsets(decorContent ?: activity.window.decorView)
+                        ?.getInsets(WindowInsetsCompat.Type.systemBars())
+                } else {
+                    null
+                }
+                val edgeInsetPx = if (position == "top") (bars?.top ?: 0) else (bars?.bottom ?: 0)
+                val offsetPx = (offsetDp * activity.resources.displayMetrics.density).toInt() + edgeInsetPx
+
+                val container = FrameLayout(activity)
+                val containerParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    gravity = if (position == "top") Gravity.TOP else Gravity.BOTTOM
+                    if (position == "top") topMargin = offsetPx else bottomMargin = offsetPx
+                }
+
+                val adViewParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                ).apply {
+                    gravity = if (position == "top") Gravity.TOP else Gravity.BOTTOM
+                }
+                container.addView(adView, adViewParams)
+
+                decorContent?.addView(container, containerParams)
+                BannerRegistry.putContainer(slot, container)
+
+                dispatchEvent(activity, "AdShown", mapOf("slot" to slot, "format" to "banner"))
+            }
+
+            return success()
+        }
+    }
+
+    class HideBanner(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("HideBanner: slot missing")
+
+            runOnUiThread {
+                BannerRegistry.removeContainer(slot)?.let { container ->
+                    (container.parent as? ViewGroup)?.removeView(container)
+                }
+            }
+
+            return success()
+        }
+    }
+
+    // ---------- Always-real: platform identifier ----------
+
+    class Platform(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> =
+            success(mapOf("platform" to "android"))
+    }
+
+    // Toggle the app-open auto-show observer. Hosts call this to suppress the
+    // app-open ad while a user has, e.g., a temporary ad-free pass - the native
+    // AppOpenLifecycle auto-shows on foreground outside any per-request gate, so
+    // it must be told to stand down.
+    class SetAppOpenSuppressed(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val suppressed = parameters["suppressed"] as? Boolean ?: false
+            AppOpenLifecycle.autoShowSuppressed = suppressed
+            return success(mapOf("suppressed" to suppressed))
+        }
+    }
+
+    class LoadInterstitial(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("LoadInterstitial: slot missing")
+            val unitId = parameters["unit_id"] as? String ?: return notImplemented("LoadInterstitial: unit_id missing")
+
+            runOnUiThread {
+                InterstitialAd.load(
+                    activity,
+                    unitId,
+                    AdRequest.Builder().build(),
+                    object : InterstitialAdLoadCallback() {
+                        override fun onAdLoaded(ad: InterstitialAd) {
+                            InterstitialRegistry.put(slot, ad)
+                            dispatchEvent(activity, "AdLoaded", mapOf("slot" to slot, "format" to "interstitial"))
+                        }
+
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            InterstitialRegistry.remove(slot)
+                            dispatchEvent(
+                                activity,
+                                "AdFailedToLoad",
+                                mapOf(
+                                    "slot" to slot,
+                                    "format" to "interstitial",
+                                    "errorCode" to error.code,
+                                    "errorMessage" to error.message,
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
+
+            return success()
+        }
+    }
+
+    class InterstitialReady(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("InterstitialReady: slot missing")
+            return success(mapOf("ready" to (InterstitialRegistry.get(slot) != null)))
+        }
+    }
+
+    class ShowInterstitial(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("ShowInterstitial: slot missing")
+
+            runOnUiThread {
+                val ad = InterstitialRegistry.get(slot) ?: run {
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf("slot" to slot, "format" to "interstitial", "error" to "no_loaded_ad"),
+                    )
+                    return@runOnUiThread
+                }
+
+                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                    override fun onAdShowedFullScreenContent() {
+                        dispatchEvent(activity, "AdShown", mapOf("slot" to slot, "format" to "interstitial"))
+                    }
+
+                    override fun onAdDismissedFullScreenContent() {
+                        FullScreenAdState.markDismissed()
+                        InterstitialRegistry.remove(slot)
+                        dispatchEvent(activity, "AdDismissed", mapOf("slot" to slot, "format" to "interstitial"))
+                    }
+
+                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                        FullScreenAdState.markDismissed()
+                        InterstitialRegistry.remove(slot)
+                        dispatchEvent(
+                            activity,
+                            "AdFailedToShow",
+                            mapOf(
+                                "slot" to slot,
+                                "format" to "interstitial",
+                                "errorCode" to error.code,
+                                "errorMessage" to error.message,
+                            ),
+                        )
+                    }
+
+                    override fun onAdImpression() {
+                        dispatchEvent(activity, "AdImpression", mapOf("slot" to slot, "format" to "interstitial"))
+                    }
+
+                    override fun onAdClicked() {
+                        dispatchEvent(activity, "AdClicked", mapOf("slot" to slot, "format" to "interstitial"))
+                    }
+                }
+
+                ad.show(activity)
+            }
+
+            return success()
+        }
+    }
+
+    class LoadRewarded(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("LoadRewarded: slot missing")
+            val unitId = parameters["unit_id"] as? String ?: return notImplemented("LoadRewarded: unit_id missing")
+
+            runOnUiThread {
+                RewardedAd.load(
+                    activity,
+                    unitId,
+                    AdRequest.Builder().build(),
+                    object : RewardedAdLoadCallback() {
+                        override fun onAdLoaded(ad: RewardedAd) {
+                            RewardedRegistry.put(slot, ad)
+                            dispatchEvent(activity, "AdLoaded", mapOf("slot" to slot, "format" to "rewarded"))
+                        }
+
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            RewardedRegistry.remove(slot)
+                            dispatchEvent(
+                                activity,
+                                "AdFailedToLoad",
+                                mapOf(
+                                    "slot" to slot,
+                                    "format" to "rewarded",
+                                    "errorCode" to error.code,
+                                    "errorMessage" to error.message,
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
+
+            return success()
+        }
+    }
+
+    class RewardedReady(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("RewardedReady: slot missing")
+            return success(mapOf("ready" to (RewardedRegistry.get(slot) != null)))
+        }
+    }
+
+    class ShowRewarded(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("ShowRewarded: slot missing")
+
+            runOnUiThread {
+                val ad = RewardedRegistry.get(slot) ?: run {
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf("slot" to slot, "format" to "rewarded", "error" to "no_loaded_ad"),
+                    )
+                    return@runOnUiThread
+                }
+
+                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                    override fun onAdShowedFullScreenContent() {
+                        dispatchEvent(activity, "AdShown", mapOf("slot" to slot, "format" to "rewarded"))
+                    }
+
+                    override fun onAdDismissedFullScreenContent() {
+                        FullScreenAdState.markDismissed()
+                        RewardedRegistry.remove(slot)
+                        dispatchEvent(activity, "AdDismissed", mapOf("slot" to slot, "format" to "rewarded"))
+                    }
+
+                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                        FullScreenAdState.markDismissed()
+                        RewardedRegistry.remove(slot)
+                        dispatchEvent(
+                            activity,
+                            "AdFailedToShow",
+                            mapOf(
+                                "slot" to slot,
+                                "format" to "rewarded",
+                                "errorCode" to error.code,
+                                "errorMessage" to error.message,
+                            ),
+                        )
+                    }
+
+                    override fun onAdImpression() {
+                        dispatchEvent(activity, "AdImpression", mapOf("slot" to slot, "format" to "rewarded"))
+                    }
+
+                    override fun onAdClicked() {
+                        dispatchEvent(activity, "AdClicked", mapOf("slot" to slot, "format" to "rewarded"))
+                    }
+                }
+
+                ad.show(activity, OnUserEarnedRewardListener { rewardItem ->
+                    dispatchEvent(
+                        activity,
+                        "UserEarnedReward",
+                        mapOf(
+                            "slot" to slot,
+                            "format" to "rewarded",
+                            "type" to rewardItem.type,
+                            "amount" to rewardItem.amount,
+                        ),
+                    )
+                })
+            }
+
+            return success()
+        }
+    }
+
+    class LoadRewardedInterstitial(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("LoadRewardedInterstitial: slot missing")
+            val unitId = parameters["unit_id"] as? String ?: return notImplemented("LoadRewardedInterstitial: unit_id missing")
+
+            runOnUiThread {
+                RewardedInterstitialAd.load(
+                    activity,
+                    unitId,
+                    AdRequest.Builder().build(),
+                    object : RewardedInterstitialAdLoadCallback() {
+                        override fun onAdLoaded(ad: RewardedInterstitialAd) {
+                            RewardedInterstitialRegistry.put(slot, ad)
+                            dispatchEvent(activity, "AdLoaded", mapOf("slot" to slot, "format" to "rewarded_interstitial"))
+                        }
+
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            RewardedInterstitialRegistry.remove(slot)
+                            dispatchEvent(
+                                activity,
+                                "AdFailedToLoad",
+                                mapOf(
+                                    "slot" to slot,
+                                    "format" to "rewarded_interstitial",
+                                    "errorCode" to error.code,
+                                    "errorMessage" to error.message,
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
+
+            return success()
+        }
+    }
+
+    class RewardedInterstitialReady(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("RewardedInterstitialReady: slot missing")
+            return success(mapOf("ready" to (RewardedInterstitialRegistry.get(slot) != null)))
+        }
+    }
+
+    class ShowRewardedInterstitial(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("ShowRewardedInterstitial: slot missing")
+
+            runOnUiThread {
+                val ad = RewardedInterstitialRegistry.get(slot) ?: run {
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf("slot" to slot, "format" to "rewarded_interstitial", "error" to "no_loaded_ad"),
+                    )
+                    return@runOnUiThread
+                }
+
+                ad.fullScreenContentCallback = object : FullScreenContentCallback() {
+                    override fun onAdShowedFullScreenContent() {
+                        dispatchEvent(activity, "AdShown", mapOf("slot" to slot, "format" to "rewarded_interstitial"))
+                    }
+
+                    override fun onAdDismissedFullScreenContent() {
+                        FullScreenAdState.markDismissed()
+                        RewardedInterstitialRegistry.remove(slot)
+                        dispatchEvent(activity, "AdDismissed", mapOf("slot" to slot, "format" to "rewarded_interstitial"))
+                    }
+
+                    override fun onAdFailedToShowFullScreenContent(error: AdError) {
+                        FullScreenAdState.markDismissed()
+                        RewardedInterstitialRegistry.remove(slot)
+                        dispatchEvent(
+                            activity,
+                            "AdFailedToShow",
+                            mapOf(
+                                "slot" to slot,
+                                "format" to "rewarded_interstitial",
+                                "errorCode" to error.code,
+                                "errorMessage" to error.message,
+                            ),
+                        )
+                    }
+
+                    override fun onAdImpression() {
+                        dispatchEvent(activity, "AdImpression", mapOf("slot" to slot, "format" to "rewarded_interstitial"))
+                    }
+
+                    override fun onAdClicked() {
+                        dispatchEvent(activity, "AdClicked", mapOf("slot" to slot, "format" to "rewarded_interstitial"))
+                    }
+                }
+
+                ad.show(activity, OnUserEarnedRewardListener { rewardItem ->
+                    dispatchEvent(
+                        activity,
+                        "UserEarnedReward",
+                        mapOf(
+                            "slot" to slot,
+                            "format" to "rewarded_interstitial",
+                            "type" to rewardItem.type,
+                            "amount" to rewardItem.amount,
+                        ),
+                    )
+                })
+            }
+
+            return success()
+        }
+    }
+
+    class LoadAppOpen(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("LoadAppOpen: slot missing")
+            val unitId = parameters["unit_id"] as? String ?: return notImplemented("LoadAppOpen: unit_id missing")
+
+            AppOpenLifecycle.bindActivity(activity)
+
+            runOnUiThread {
+                AppOpenAd.load(
+                    activity,
+                    unitId,
+                    AdRequest.Builder().build(),
+                    object : AppOpenAd.AppOpenAdLoadCallback() {
+                        override fun onAdLoaded(ad: AppOpenAd) {
+                            AppOpenRegistry.put(slot, ad)
+                            dispatchEvent(activity, "AdLoaded", mapOf("slot" to slot, "format" to "app_open"))
+                        }
+
+                        override fun onAdFailedToLoad(error: LoadAdError) {
+                            AppOpenRegistry.remove(slot)
+                            dispatchEvent(
+                                activity,
+                                "AdFailedToLoad",
+                                mapOf(
+                                    "slot" to slot,
+                                    "format" to "app_open",
+                                    "errorCode" to error.code,
+                                    "errorMessage" to error.message,
+                                ),
+                            )
+                        }
+                    },
+                )
+            }
+
+            return success()
+        }
+    }
+
+    class AppOpenReady(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("AppOpenReady: slot missing")
+            val hasAd = AppOpenRegistry.get(slot) != null
+            val fresh = AppOpenRegistry.isFresh(slot)
+            val ageMs = AppOpenRegistry.ageMs(slot) ?: -1L
+            return success(mapOf("ready" to (hasAd && fresh), "fresh" to fresh, "age_ms" to ageMs))
+        }
+    }
+
+    class ShowAppOpen(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val slot = parameters["slot"] as? String ?: return notImplemented("ShowAppOpen: slot missing")
+
+            runOnUiThread {
+                val ad = AppOpenRegistry.get(slot) ?: run {
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf("slot" to slot, "format" to "app_open", "error" to "no_loaded_ad"),
+                    )
+                    return@runOnUiThread
+                }
+                if (!AppOpenRegistry.isFresh(slot)) {
+                    AppOpenRegistry.remove(slot)
+                    dispatchEvent(
+                        activity,
+                        "AdFailedToShow",
+                        mapOf("slot" to slot, "format" to "app_open", "error" to "stale"),
+                    )
+                    return@runOnUiThread
+                }
+                AppOpenLifecycle.attachCallback(activity, slot, ad)
+                ad.show(activity)
+            }
+
+            return success()
+        }
+    }
+
+    // ---------- Real implementations: UMP consent ----------
+
+    class UmpRequestInfo(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            if (!AdmobInit.isPolicyConfigured()) {
+                return failure("policy_not_configured")
+            }
+
+            val info = ConsentManager.info(activity)
+            val debugGeography = parameters["debug_geography"] as? String ?: "DISABLED"
+            runOnUiThread {
+                info.requestConsentInfoUpdate(
+                    activity,
+                    ConsentManager.requestParameters(activity, debugGeography),
+                    {
+                        val status = ConsentManager.statusString(info)
+                        dispatchEvent(activity, "ConsentChanged", mapOf("status" to status))
+                        dispatchEvent(activity, "ConsentInfoUpdated", consentPayload(info, true))
+                    },
+                    { error ->
+                        Log.w(TAG, "UMP requestConsentInfoUpdate failed: ${error.message}")
+                        dispatchEvent(activity, "ConsentChanged", mapOf("status" to "unknown"))
+                        dispatchEvent(activity, "ConsentInfoUpdated", consentPayload(info, false, error.message))
+                    },
+                )
+            }
+
+            return success()
+        }
+    }
+
+    class UmpShowForm(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val info = ConsentManager.info(activity)
+            runOnUiThread {
+                if (ConsentManager.isFormRequired(info)) {
+                    dispatchEvent(activity, "ConsentFormShown", emptyMap())
+                }
+                UserMessagingPlatform.loadAndShowConsentFormIfRequired(activity) { formError ->
+                    val succeeded = formError == null
+                    val status = if (succeeded) ConsentManager.statusString(info) else "unknown"
+                    dispatchEvent(activity, "ConsentChanged", mapOf("status" to status))
+                    dispatchEvent(activity, "ConsentFormDismissed", consentPayload(info, succeeded, formError?.message))
+                }
+            }
+
+            return success()
+        }
+    }
+
+    class UmpCanRequestAds(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> =
+            success(mapOf("can_request" to ConsentManager.info(activity).canRequestAds()))
+    }
+
+    class UmpStatus(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> =
+            success(mapOf("status" to ConsentManager.statusString(ConsentManager.info(activity))))
+    }
+
+    class UmpPrivacyOptionsStatus(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val status = ConsentManager.privacyOptionsStatusString(ConsentManager.info(activity))
+            return success(mapOf("status" to status))
+        }
+    }
+
+    class UmpShowPrivacyOptionsForm(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> {
+            val info = ConsentManager.info(activity)
+            runOnUiThread {
+                UserMessagingPlatform.showPrivacyOptionsForm(activity) { formError ->
+                    dispatchEvent(
+                        activity,
+                        "PrivacyOptionsFormDismissed",
+                        consentPayload(info, formError == null, formError?.message),
+                    )
+                }
+            }
+
+            return success()
+        }
+    }
+
+    // ---------- ATT: iOS-only. Android short-circuits in PHP (Att::isSupported),
+    // so these are never invoked here - kept as safe no-ops for completeness. ----------
+
+    class AttRequest(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> = success()
+    }
+
+    class AttStatus(private val activity: FragmentActivity) : BridgeFunction {
+        override fun execute(parameters: Map<String, Any>): Map<String, Any> = success(mapOf("status" to "unsupported"))
+    }
+}

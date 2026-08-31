@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use BlessedZulu\NativePhpAdmob\AdmobServiceProvider;
 use Buff\AppleHealth\AppleHealthServiceProvider;
 use Buff\BackgroundTasks\BackgroundTasksServiceProvider;
 use Buff\CameraPermissions\CameraPermissionsServiceProvider;
@@ -36,7 +37,7 @@ class NativeServiceProvider extends ServiceProvider
             BackgroundTasksServiceProvider::class,
             BrowserServiceProvider::class,
             InAppPurchasesServiceProvider::class,
-
+            AdmobServiceProvider::class,
         ];
     }
 }

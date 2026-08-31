@@ -1,0 +1,718 @@
+import AppTrackingTransparency
+import Foundation
+import GoogleMobileAds
+import UIKit
+import UserMessagingPlatform
+
+/**
+ * AdMob bridge function implementations.
+ *
+ * iOS bridge functions are emitted with no-arg constructors by NativePHP's
+ * IOSPluginCompiler (`registry.register("...", function: AdmobFunctions.X())`).
+ * Window access happens via `UIApplication.shared.connectedScenes` when
+ * needed.
+ *
+ * Implements the full AdMob surface - banner, interstitial, rewarded,
+ * rewarded interstitial, and app-open ads, plus UMP consent and ATT -
+ * following Google's canonical Swift samples at
+ * developers.google.com/admob/ios. Verified on real iOS hardware.
+ */
+enum AdmobFunctions {
+
+    private static let eventBase = "BlessedZulu\\NativePhpAdmob\\Events"
+
+    static func notImplemented(_ name: String) -> [String: Any] {
+        return ["success": false, "data": NSNull(), "error": "\(name) not implemented."]
+    }
+
+    static func success(_ data: Any? = nil) -> [String: Any] {
+        return ["success": true, "data": data ?? NSNull(), "error": NSNull()]
+    }
+
+    static func keyWindow() -> UIWindow? {
+        let windowScenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let active = windowScenes.first { $0.activationState == .foregroundActive } ?? windowScenes.first
+        return active?.windows.first(where: { $0.isKeyWindow }) ?? active?.windows.first
+    }
+
+    static func rootViewController() -> UIViewController? {
+        return keyWindow()?.rootViewController
+    }
+
+    static func consentPayload(succeeded: Bool, error: String? = nil) -> [String: Any] {
+        var payload: [String: Any] = [
+            "status": succeeded ? ConsentManager.statusString() : "unknown",
+            "success": succeeded,
+            "canRequestAds": succeeded && ConsentManager.info.canRequestAds,
+            "privacyOptionsRequired": ConsentManager.privacyOptionsRequired(),
+        ]
+
+        if let error {
+            payload["error"] = error
+        }
+
+        return payload
+    }
+
+    static func dispatch(_ eventClass: String, _ payload: [String: Any]) {
+        DispatchQueue.main.async {
+            LaravelBridge.shared.send?("\(eventBase)\\\(eventClass)", payload)
+        }
+    }
+
+    // ---------- Explicit policy and initialization ----------
+
+    class ConfigurePolicy: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let underAge = parameters["under_age_of_consent"] as? Bool,
+                  let nonPersonalized = parameters["non_personalized"] as? Bool,
+                  let maxContentRating = parameters["max_content_rating"] as? String else {
+                return AdmobFunctions.notImplemented("invalid_policy")
+            }
+
+            return AdmobInit.configurePolicy(
+                underAgeOfConsent: underAge,
+                nonPersonalized: nonPersonalized,
+                maxContentRating: maxContentRating
+            ) ? AdmobFunctions.success() : AdmobFunctions.notImplemented("invalid_policy")
+        }
+    }
+
+    class Initialize: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return AdmobInit.initialize()
+                ? AdmobFunctions.success(["initialized": true])
+                : AdmobFunctions.notImplemented("policy_or_consent_not_ready")
+        }
+    }
+
+    // ---------- Real implementations: banner ----------
+
+    class LoadBanner: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("LoadBanner: slot missing")
+            }
+            guard let unitId = parameters["unit_id"] as? String else {
+                return AdmobFunctions.notImplemented("LoadBanner: unit_id missing")
+            }
+
+            guard AdmobInit.canLoadBanner() else {
+                AdmobFunctions.dispatch("AdFailedToLoad", [
+                    "slot": slot,
+                    "format": "banner",
+                    "errorCode": -1,
+                    "errorMessage": "admob_not_ready",
+                ])
+                return AdmobFunctions.notImplemented("admob_not_ready")
+            }
+
+            DispatchQueue.main.async {
+                let bannerView: BannerView
+                if let existing = BannerRegistry.shared.get(slot: slot) {
+                    bannerView = existing
+                } else {
+                    let width = AdmobFunctions.keyWindow()?.bounds.width ?? UIScreen.main.bounds.width
+                    let size = currentOrientationAnchoredAdaptiveBanner(width: width)
+                    bannerView = BannerView(adSize: size)
+                    bannerView.adUnitID = unitId
+                    bannerView.rootViewController = AdmobFunctions.rootViewController()
+
+                    let delegate = BannerDelegate(slot: slot)
+                    bannerView.delegate = delegate
+                    objc_setAssociatedObject(bannerView, &BannerDelegate.associationKey, delegate, .OBJC_ASSOCIATION_RETAIN)
+
+                    BannerRegistry.shared.put(slot: slot, ad: bannerView)
+                }
+
+                let width = AdmobFunctions.keyWindow()?.bounds.width ?? UIScreen.main.bounds.width
+                bannerView.adSize = currentOrientationAnchoredAdaptiveBanner(width: width)
+                bannerView.load(AdmobInit.bannerRequest())
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class ShowBanner: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("ShowBanner: slot missing")
+            }
+
+            guard AdmobInit.canLoadBanner() else {
+                AdmobFunctions.dispatch("AdFailedToShow", [
+                    "slot": slot,
+                    "format": "banner",
+                    "errorCode": -1,
+                    "errorMessage": "admob_not_ready",
+                ])
+                return AdmobFunctions.notImplemented("admob_not_ready")
+            }
+
+            let position = (parameters["position"] as? String) ?? "bottom"
+            let offset = (parameters["offset"] as? NSNumber)?.doubleValue ?? 0
+            let safeArea = (parameters["safe_area"] as? Bool) ?? true
+
+            DispatchQueue.main.async {
+                guard let bannerView = BannerRegistry.shared.get(slot: slot) else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot,
+                        "format": "banner",
+                        "errorCode": -2,
+                        "errorMessage": "no_loaded_ad",
+                    ])
+                    return
+                }
+                guard let window = AdmobFunctions.keyWindow() else { return }
+
+                if let existing = BannerRegistry.shared.removeContainer(slot: slot) {
+                    existing.removeFromSuperview()
+                }
+
+                bannerView.removeFromSuperview()
+                bannerView.translatesAutoresizingMaskIntoConstraints = false
+                window.addSubview(bannerView)
+
+                // safeArea=true anchors to the safe-area guide (clears the notch /
+                // home indicator); false anchors to the raw window edge.
+                let topAnchor = safeArea ? window.safeAreaLayoutGuide.topAnchor : window.topAnchor
+                let bottomAnchor = safeArea ? window.safeAreaLayoutGuide.bottomAnchor : window.bottomAnchor
+
+                NSLayoutConstraint.activate([
+                    bannerView.centerXAnchor.constraint(equalTo: window.centerXAnchor),
+                    bannerView.widthAnchor.constraint(equalToConstant: bannerView.adSize.size.width),
+                    bannerView.heightAnchor.constraint(equalToConstant: bannerView.adSize.size.height),
+                    position == "top"
+                        ? bannerView.topAnchor.constraint(equalTo: topAnchor, constant: offset)
+                        : bannerView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -offset),
+                ])
+
+                BannerRegistry.shared.putContainer(slot: slot, container: bannerView)
+                AdmobFunctions.dispatch("AdShown", ["slot": slot, "format": "banner"])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class HideBanner: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("HideBanner: slot missing")
+            }
+
+            DispatchQueue.main.async {
+                if let container = BannerRegistry.shared.removeContainer(slot: slot) {
+                    container.removeFromSuperview()
+                }
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    // ---------- Always-real: platform identifier ----------
+
+    class Platform: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return AdmobFunctions.success(["platform": "ios"])
+        }
+    }
+
+    // Toggle the app-open auto-show (e.g. while a user holds an ad-free pass).
+    class SetAppOpenSuppressed: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            let suppressed = parameters["suppressed"] as? Bool ?? false
+            AppOpenLifecycle.autoShowSuppressed = suppressed
+            return AdmobFunctions.success(["suppressed": suppressed])
+        }
+    }
+
+    class LoadInterstitial: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("LoadInterstitial: slot missing")
+            }
+            guard let unitId = parameters["unit_id"] as? String else {
+                return AdmobFunctions.notImplemented("LoadInterstitial: unit_id missing")
+            }
+
+            InterstitialAd.load(with: unitId, request: Request()) { ad, error in
+                if let error = error {
+                    InterstitialRegistry.shared.remove(slot: slot)
+                    let nsError = error as NSError
+                    AdmobFunctions.dispatch("AdFailedToLoad", [
+                        "slot": slot,
+                        "format": "interstitial",
+                        "errorCode": nsError.code,
+                        "errorMessage": error.localizedDescription,
+                    ])
+                    return
+                }
+                guard let ad = ad else { return }
+                let delegate = InterstitialDelegate(slot: slot)
+                ad.fullScreenContentDelegate = delegate
+                InterstitialRegistry.shared.put(slot: slot, ad: ad, delegate: delegate)
+                AdmobFunctions.dispatch("AdLoaded", ["slot": slot, "format": "interstitial"])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class InterstitialReady: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("InterstitialReady: slot missing")
+            }
+            return AdmobFunctions.success(["ready": InterstitialRegistry.shared.get(slot: slot) != nil])
+        }
+    }
+
+    class ShowInterstitial: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("ShowInterstitial: slot missing")
+            }
+
+            DispatchQueue.main.async {
+                guard let ad = InterstitialRegistry.shared.get(slot: slot) else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "interstitial", "error": "no_loaded_ad",
+                    ])
+                    return
+                }
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "interstitial", "error": "no_root_view_controller",
+                    ])
+                    return
+                }
+                ad.present(from: root)
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class LoadRewarded: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("LoadRewarded: slot missing")
+            }
+            guard let unitId = parameters["unit_id"] as? String else {
+                return AdmobFunctions.notImplemented("LoadRewarded: unit_id missing")
+            }
+
+            RewardedAd.load(with: unitId, request: Request()) { ad, error in
+                if let error = error {
+                    RewardedRegistry.shared.remove(slot: slot)
+                    let nsError = error as NSError
+                    AdmobFunctions.dispatch("AdFailedToLoad", [
+                        "slot": slot,
+                        "format": "rewarded",
+                        "errorCode": nsError.code,
+                        "errorMessage": error.localizedDescription,
+                    ])
+                    return
+                }
+                guard let ad = ad else { return }
+                let delegate = RewardedDelegate(slot: slot)
+                ad.fullScreenContentDelegate = delegate
+                RewardedRegistry.shared.put(slot: slot, ad: ad, delegate: delegate)
+                AdmobFunctions.dispatch("AdLoaded", ["slot": slot, "format": "rewarded"])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class RewardedReady: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("RewardedReady: slot missing")
+            }
+            return AdmobFunctions.success(["ready": RewardedRegistry.shared.get(slot: slot) != nil])
+        }
+    }
+
+    class ShowRewarded: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("ShowRewarded: slot missing")
+            }
+
+            DispatchQueue.main.async {
+                guard let ad = RewardedRegistry.shared.get(slot: slot) else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "rewarded", "error": "no_loaded_ad",
+                    ])
+                    return
+                }
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "rewarded", "error": "no_root_view_controller",
+                    ])
+                    return
+                }
+                ad.present(from: root) {
+                    let reward = ad.adReward
+                    AdmobFunctions.dispatch("UserEarnedReward", [
+                        "slot": slot,
+                        "format": "rewarded",
+                        "type": reward.type,
+                        "amount": Int(truncating: reward.amount),
+                    ])
+                }
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class LoadRewardedInterstitial: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("LoadRewardedInterstitial: slot missing")
+            }
+            guard let unitId = parameters["unit_id"] as? String else {
+                return AdmobFunctions.notImplemented("LoadRewardedInterstitial: unit_id missing")
+            }
+
+            RewardedInterstitialAd.load(with: unitId, request: Request()) { ad, error in
+                if let error = error {
+                    RewardedInterstitialRegistry.shared.remove(slot: slot)
+                    let nsError = error as NSError
+                    AdmobFunctions.dispatch("AdFailedToLoad", [
+                        "slot": slot,
+                        "format": "rewarded_interstitial",
+                        "errorCode": nsError.code,
+                        "errorMessage": error.localizedDescription,
+                    ])
+                    return
+                }
+                guard let ad = ad else { return }
+                let delegate = RewardedInterstitialDelegate(slot: slot)
+                ad.fullScreenContentDelegate = delegate
+                RewardedInterstitialRegistry.shared.put(slot: slot, ad: ad, delegate: delegate)
+                AdmobFunctions.dispatch("AdLoaded", ["slot": slot, "format": "rewarded_interstitial"])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class RewardedInterstitialReady: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("RewardedInterstitialReady: slot missing")
+            }
+            return AdmobFunctions.success(["ready": RewardedInterstitialRegistry.shared.get(slot: slot) != nil])
+        }
+    }
+
+    class ShowRewardedInterstitial: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("ShowRewardedInterstitial: slot missing")
+            }
+
+            DispatchQueue.main.async {
+                guard let ad = RewardedInterstitialRegistry.shared.get(slot: slot) else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "rewarded_interstitial", "error": "no_loaded_ad",
+                    ])
+                    return
+                }
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "rewarded_interstitial", "error": "no_root_view_controller",
+                    ])
+                    return
+                }
+                ad.present(from: root) {
+                    let reward = ad.adReward
+                    AdmobFunctions.dispatch("UserEarnedReward", [
+                        "slot": slot,
+                        "format": "rewarded_interstitial",
+                        "type": reward.type,
+                        "amount": Int(truncating: reward.amount),
+                    ])
+                }
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class LoadAppOpen: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("LoadAppOpen: slot missing")
+            }
+            guard let unitId = parameters["unit_id"] as? String else {
+                return AdmobFunctions.notImplemented("LoadAppOpen: unit_id missing")
+            }
+
+            AppOpenAd.load(with: unitId, request: Request()) { ad, error in
+                if let error = error {
+                    AppOpenRegistry.shared.remove(slot: slot)
+                    let nsError = error as NSError
+                    AdmobFunctions.dispatch("AdFailedToLoad", [
+                        "slot": slot,
+                        "format": "app_open",
+                        "errorCode": nsError.code,
+                        "errorMessage": error.localizedDescription,
+                    ])
+                    return
+                }
+                guard let ad = ad else { return }
+                let delegate = AppOpenDelegate(slot: slot)
+                ad.fullScreenContentDelegate = delegate
+                AppOpenRegistry.shared.put(slot: slot, ad: ad, delegate: delegate)
+                AdmobFunctions.dispatch("AdLoaded", ["slot": slot, "format": "app_open"])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class AppOpenReady: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("AppOpenReady: slot missing")
+            }
+            let hasAd = AppOpenRegistry.shared.get(slot: slot) != nil
+            let fresh = AppOpenRegistry.shared.isFresh(slot: slot)
+            return AdmobFunctions.success([
+                "ready": hasAd && fresh,
+                "fresh": fresh,
+                "age_ms": AppOpenRegistry.shared.ageMs(slot: slot),
+            ])
+        }
+    }
+
+    class ShowAppOpen: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard let slot = parameters["slot"] as? String else {
+                return AdmobFunctions.notImplemented("ShowAppOpen: slot missing")
+            }
+
+            DispatchQueue.main.async {
+                guard let ad = AppOpenRegistry.shared.get(slot: slot) else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "app_open", "error": "no_loaded_ad",
+                    ])
+                    return
+                }
+                if !AppOpenRegistry.shared.isFresh(slot: slot) {
+                    AppOpenRegistry.shared.remove(slot: slot)
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "app_open", "error": "stale",
+                    ])
+                    return
+                }
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch("AdFailedToShow", [
+                        "slot": slot, "format": "app_open", "error": "no_root_view_controller",
+                    ])
+                    return
+                }
+                ad.present(from: root)
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    // ---------- Real implementations: UMP consent ----------
+
+    class UmpRequestInfo: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            guard AdmobInit.isPolicyConfigured else {
+                return AdmobFunctions.notImplemented("policy_not_configured")
+            }
+
+            let debugGeography = parameters["debug_geography"] as? String ?? "DISABLED"
+            ConsentManager.info.requestConsentInfoUpdate(
+                with: ConsentManager.requestParameters(debugGeography: debugGeography)
+            ) { error in
+                if let error = error {
+                    NSLog("UMP requestConsentInfoUpdate error: \(error.localizedDescription)")
+                    AdmobFunctions.dispatch("ConsentChanged", ["status": "unknown"])
+                    AdmobFunctions.dispatch(
+                        "ConsentInfoUpdated",
+                        AdmobFunctions.consentPayload(succeeded: false, error: error.localizedDescription)
+                    )
+                    return
+                }
+                let status = ConsentManager.statusString()
+                AdmobFunctions.dispatch("ConsentChanged", ["status": status])
+                AdmobFunctions.dispatch("ConsentInfoUpdated", AdmobFunctions.consentPayload(succeeded: true))
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class UmpShowForm: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            DispatchQueue.main.async {
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch("ConsentChanged", ["status": "unknown"])
+                    AdmobFunctions.dispatch(
+                        "ConsentFormDismissed",
+                        AdmobFunctions.consentPayload(succeeded: false, error: "no_root_view_controller")
+                    )
+                    return
+                }
+                if ConsentManager.isFormRequired() {
+                    AdmobFunctions.dispatch("ConsentFormShown", [:])
+                }
+                UMPConsentForm.loadAndPresentIfRequired(from: root) { error in
+                    if let error = error {
+                        NSLog("UMP loadAndPresentIfRequired error: \(error.localizedDescription)")
+                    }
+                    let succeeded = error == nil
+                    let status = succeeded ? ConsentManager.statusString() : "unknown"
+                    AdmobFunctions.dispatch("ConsentChanged", ["status": status])
+                    AdmobFunctions.dispatch(
+                        "ConsentFormDismissed",
+                        AdmobFunctions.consentPayload(succeeded: succeeded, error: error?.localizedDescription)
+                    )
+                }
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class UmpCanRequestAds: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return AdmobFunctions.success(["can_request": ConsentManager.info.canRequestAds])
+        }
+    }
+
+    class UmpStatus: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return AdmobFunctions.success(["status": ConsentManager.statusString()])
+        }
+    }
+
+    class UmpPrivacyOptionsStatus: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            return AdmobFunctions.success(["status": ConsentManager.privacyOptionsStatusString()])
+        }
+    }
+
+    class UmpShowPrivacyOptionsForm: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            DispatchQueue.main.async {
+                guard let root = AdmobFunctions.rootViewController() else {
+                    AdmobFunctions.dispatch(
+                        "PrivacyOptionsFormDismissed",
+                        AdmobFunctions.consentPayload(succeeded: false, error: "no_root_view_controller")
+                    )
+                    return
+                }
+
+                UMPConsentForm.presentPrivacyOptionsForm(from: root) { error in
+                    AdmobFunctions.dispatch(
+                        "PrivacyOptionsFormDismissed",
+                        AdmobFunctions.consentPayload(
+                            succeeded: error == nil,
+                            error: error?.localizedDescription
+                        )
+                    )
+                }
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    // ---------- Real implementations: ATT (App Tracking Transparency) ----------
+
+    class AttRequest: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            ATTrackingManager.requestTrackingAuthorization { status in
+                let event = status == .authorized
+                    ? "TrackingAuthorizationGranted"
+                    : "TrackingAuthorizationDenied"
+                let value: String
+                switch status {
+                case .authorized: value = "authorized"
+                case .denied: value = "denied"
+                case .restricted: value = "restricted"
+                case .notDetermined: value = "notDetermined"
+                @unknown default: value = "notDetermined"
+                }
+                AdmobFunctions.dispatch(event, ["status": value])
+            }
+
+            return AdmobFunctions.success()
+        }
+    }
+
+    class AttStatus: BridgeFunction {
+        func execute(parameters: [String: Any]) throws -> [String: Any] {
+            let status: String
+            switch ATTrackingManager.trackingAuthorizationStatus {
+            case .authorized: status = "authorized"
+            case .denied: status = "denied"
+            case .restricted: status = "restricted"
+            case .notDetermined: status = "notDetermined"
+            @unknown default: status = "notDetermined"
+            }
+
+            return AdmobFunctions.success(["status": status])
+        }
+    }
+}
+
+/// GADBannerView delegate that bridges native callbacks back to PHP events.
+/// Each banner gets its own delegate instance retained via objc_setAssociatedObject
+/// on the BannerView so it lives as long as the banner does.
+private final class BannerDelegate: NSObject, BannerViewDelegate {
+    fileprivate static var associationKey: UInt8 = 0
+
+    let slot: String
+    private let eventBase = "BlessedZulu\\NativePhpAdmob\\Events"
+
+    init(slot: String) {
+        self.slot = slot
+    }
+
+    private func dispatch(_ eventClass: String, _ payload: [String: Any]) {
+        DispatchQueue.main.async {
+            LaravelBridge.shared.send?("\(self.eventBase)\\\(eventClass)", payload)
+        }
+    }
+
+    func bannerViewDidReceiveAd(_ bannerView: BannerView) {
+        dispatch("AdLoaded", [
+            "slot": slot,
+            "format": "banner",
+            "height": Int(bannerView.adSize.size.height.rounded(.up)),
+        ])
+    }
+
+    func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
+        let nsError = error as NSError
+        dispatch("AdFailedToLoad", [
+            "slot": slot,
+            "format": "banner",
+            "errorCode": nsError.code,
+            "errorMessage": nsError.localizedDescription,
+        ])
+    }
+
+    func bannerViewDidRecordImpression(_ bannerView: BannerView) {
+        dispatch("AdImpression", ["slot": slot, "format": "banner"])
+    }
+
+    func bannerViewDidRecordClick(_ bannerView: BannerView) {
+        dispatch("AdClicked", ["slot": slot, "format": "banner"])
+    }
+}

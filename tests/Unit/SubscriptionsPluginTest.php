@@ -23,7 +23,8 @@ it('declares a minimal public RevenueCat bridge for both mobile platforms', func
         ->and($manifest['ios']['capabilities'])->toContain('in-app-purchase')
         ->and($manifest['ios']['dependencies']['swift_packages'][0]['url'])->toBe('https://github.com/RevenueCat/purchases-ios-spm.git')
         ->and($manifest['events'])->toContain('Buff\\InAppPurchases\\Events\\PurchasePending')
-        ->and($swift)->toContain('UUID(uuidString: appUserID)', 'DispatchQueue.main.async', 'PurchasePending')
-        ->and($kotlin)->toContain('UUID.fromString(appUserID)', 'Dispatchers.Main', 'PURCHASE_PENDING')
+        ->and($swift)->toContain('UUID(uuidString: appUserID)', 'DispatchQueue.main.async', 'PurchasePending', 'buff_plus')
+        ->and($kotlin)->toContain('UUID.fromString(appUserID)', 'Dispatchers.Main', 'PURCHASE_PENDING', 'buff_plus')
+        ->and($swift.$kotlin)->not->toContain('ai_meal_analysis')
         ->and(strtolower($swift.$kotlin))->not->toContain('receipt', 'secret', 'transactiontoken', 'purchasetoken', 'logout');
 });

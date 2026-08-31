@@ -8,8 +8,9 @@ starting, honor its STOP conditions, and update the row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Put AI meal analysis behind production iOS and Android subscriptions | P1 | L | — | TODO |
-| 002 | Show AdMob banners only to non-Buff+ users | P1 | L | 001 | TODO |
+| 001 | Put AI meal analysis behind production iOS and Android subscriptions | P1 | L | — | IN PROGRESS — source implementation complete; launch remains |
+| 003 | Launch Buff+ subscriptions safely on iOS and Android | P1 | M | 001 | TODO |
+| 002 | Show AdMob banners only to non-Buff+ users | P1 | L | 003 | TODO |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale — finding fixed independently or approach
@@ -18,11 +19,16 @@ abandoned)
 ## Dependency notes
 
 - Plan 001 spans the NativePHP client in this repository and its sibling API
-  repository at `../buff-server`; deploy the API portion before releasing the
-  mobile builds, and enable enforcement only after both store releases are live.
+  repository at `../buff-server`. Its source implementation is complete in the
+  current working trees; Plan 003 owns the remaining launch work and must finish
+  before Plan 001 can be marked DONE.
+- Plan 003 configures RevenueCat and both stores, preserves a restricted Apple
+  App Review sandbox path, runs physical-device acceptance, releases both apps,
+  and only then enables server enforcement.
 - Plan 002 spans the same repositories and uses Plan 001's authoritative
   RevenueCat refresh. It supersedes Plan 001's entitlement-name decision:
-  configure and use `buff_plus` before releasing either plan. AdMob remains off
+  configure and use `buff_plus` before releasing either plan. It follows Plan
+  003 so ads cannot depend on an unlaunched paid entitlement. AdMob remains off
   until the privacy/account/device checklist in Plan 002 passes.
 
 ## Findings considered and rejected

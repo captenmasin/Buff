@@ -2,6 +2,7 @@
 import {Head, Link, useForm, usePage} from '@inertiajs/vue3';
 import {computed, onMounted, ref, watch} from 'vue';
 import {X} from '@lucide/vue';
+import {adPrivacyOptionsRequired, showAdPrivacyOptions, type AdAudience} from '../ads';
 import {storedAppearance, type Appearance} from '../appearance';
 import AppSheet from '../Components/AppSheet.vue';
 import PageHeader from '../Components/PageHeader.vue';
@@ -51,6 +52,7 @@ interface BuffAccount {
 const page = usePage<{
     buff: {
         account: BuffAccount | null;
+        ad_audience?: AdAudience;
         has_local_account: boolean;
     };
 }>();
@@ -59,6 +61,8 @@ const logoutForm = useForm({});
 const deleteAccountForm = useForm({password: ''});
 const deleteAccountOpen = ref(false);
 const appearance = ref<Appearance>(storedAppearance());
+const adPrivacyChoicesRequired = ref(false);
+const adPrivacyChoicesOpening = ref(false);
 
 const appearanceLabels: Record<Appearance, string> = {
     system: 'System',
@@ -128,6 +132,21 @@ function submitDeleteAccount() {
     });
 }
 
+async function refreshAdPrivacyChoices() {
+    adPrivacyChoicesRequired.value = await adPrivacyOptionsRequired(page.props.buff.ad_audience ?? 'teen');
+}
+
+async function openAdPrivacyChoices() {
+    if (adPrivacyChoicesOpening.value) {
+        return;
+    }
+
+    adPrivacyChoicesOpening.value = true;
+    await showAdPrivacyOptions();
+    await refreshAdPrivacyChoices();
+    adPrivacyChoicesOpening.value = false;
+}
+
 watch(() => deleteAccountForm.errors.password, (error) => {
     if (error) {
         deleteAccountOpen.value = true;
@@ -138,6 +157,8 @@ onMounted(() => {
     if (deleteAccountForm.errors.password) {
         deleteAccountOpen.value = true;
     }
+
+    void refreshAdPrivacyChoices();
 });
 </script>
 
@@ -169,6 +190,12 @@ onMounted(() => {
             <SettingsRow href="/settings/body-profile">Body profile</SettingsRow>
             <SettingsRow href="/settings/units" :detail="unitsDetail">Units</SettingsRow>
             <SettingsRow href="/settings/exercise" :detail="eatBackLabels[preferences.eat_back]">Exercise calories</SettingsRow>
+        </SettingsGroup>
+
+        <SettingsGroup v-if="adPrivacyChoicesRequired" title="Privacy">
+            <SettingsRow :detail="adPrivacyChoicesOpening ? 'Opening…' : undefined" @click="openAdPrivacyChoices">
+                Ad privacy choices
+            </SettingsRow>
         </SettingsGroup>
 
         <SettingsGroup v-if="healthName || page.props.buff.account" title="Apps & devices">

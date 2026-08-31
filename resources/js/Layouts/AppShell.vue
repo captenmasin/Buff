@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { Link, router, usePage } from '@inertiajs/vue3';
 import axios from 'axios';
-import { computed, onMounted, onUnmounted, provide, ref } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, provide, ref } from 'vue';
 import { Home, Plus, Scale, Settings, Target, X } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import AddChooser from '../Components/Add/AddChooser.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
+import {createAdCoordinator, type AdAudience} from '../ads';
 import { publicAssetUrl } from '../publicAssetUrl';
 import {configureSubscriptions, isSubscriptionActive, type SubscriptionAccount} from '../subscriptions';
 
@@ -17,14 +18,26 @@ const page = usePage<{
     buff: {
         needs_sign_in: boolean;
         account?: SubscriptionAccount | null;
+        ad_audience?: AdAudience;
     };
 }>();
 const addDrawerOpen = ref(false);
 const drawerHistoryActive = ref(false);
 const fallbackToast = ref('');
 const toastTimer = ref<number | null>(null);
+const adBannerHeight = ref(0);
+const mobileNavContent = ref<HTMLElement | null>(null);
+const mobileNavOffset = ref<number | null>(null);
 let removeFlashToastListener: (() => void) | null = null;
+let removeAdBeforeListener: (() => void) | null = null;
+let mobileNavObserver: ResizeObserver | null = null;
+let layoutFrame: number | null = null;
 let syncInProgress = false;
+const adCoordinator = createAdCoordinator({
+    setBannerHeight: (height) => {
+        adBannerHeight.value = height;
+    },
+});
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home, match: '/' },
@@ -52,6 +65,7 @@ function openAddDrawer(pushHistory = true) {
     }
 
     hapticImpact();
+    void adCoordinator.beforeNavigation('/add');
 
     if (pushHistory) {
         window.history.pushState({ ...(window.history.state || {}), buffAddDrawer: true }, '');
@@ -72,11 +86,13 @@ function closeAddDrawer() {
     if (drawerHistoryActive.value) {
         closeDrawerImmediately();
         window.history.back();
+        void reconcileAds();
 
         return;
     }
 
     closeDrawerImmediately();
+    void reconcileAds();
 }
 
 function handlePopState() {
@@ -85,6 +101,7 @@ function handlePopState() {
     }
 
     closeDrawerImmediately();
+    void reconcileAds();
 }
 
 function handleNativeAndroidBack() {
@@ -159,7 +176,43 @@ function handleToast(event: Event) {
     showFlashToast((event as CustomEvent<string>).detail);
 }
 
+function updateMobileNavOffset() {
+    mobileNavOffset.value = window.matchMedia('(min-width: 40rem)').matches
+        ? 0
+        : mobileNavContent.value
+            ? Math.ceil(mobileNavContent.value.getBoundingClientRect().height)
+            : null;
+}
+
+async function reconcileAds(
+    account = page.props.buff.needs_sign_in === false ? page.props.buff.account : null,
+    url = page.url,
+    audience = page.props.buff.ad_audience ?? 'teen',
+) {
+    await nextTick();
+    updateMobileNavOffset();
+    await adCoordinator.reconcile({
+        account,
+        url: addDrawerOpen.value ? '/add' : url,
+        audience,
+        bottomOffset: mobileNavOffset.value,
+    });
+}
+
+function handleViewportChange() {
+    if (layoutFrame !== null) {
+        window.cancelAnimationFrame(layoutFrame);
+    }
+
+    layoutFrame = window.requestAnimationFrame(() => {
+        layoutFrame = null;
+        void reconcileAds();
+    });
+}
+
 async function syncOnResume() {
+    void reconcileAds();
+
     if (page.props.buff.needs_sign_in || !navigator.onLine || syncInProgress) {
         return;
     }
@@ -210,18 +263,35 @@ onMounted(() => {
     syncOnResume();
     window.addEventListener('focus', syncOnResume);
     window.addEventListener('online', syncOnResume);
+    window.addEventListener('resize', handleViewportChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     window.addEventListener('buff:toast', handleToast);
 
     showFlashToast(page.props.flash?.message);
     void configureCurrentAccount(page.props.buff.account);
 
+    if (typeof ResizeObserver !== 'undefined' && mobileNavContent.value) {
+        mobileNavObserver = new ResizeObserver(updateMobileNavOffset);
+        mobileNavObserver.observe(mobileNavContent.value);
+    }
+
+    removeAdBeforeListener = router.on('before', (event) => {
+        void adCoordinator.beforeNavigation(String(event.detail.visit.url));
+    });
+
     removeFlashToastListener = router.on('success', (event) => {
         const flash = event.detail.page.props.flash as { message?: string } | undefined;
-        const buff = event.detail.page.props.buff as {account?: SubscriptionAccount | null} | undefined;
+        const buff = event.detail.page.props.buff as {
+            account?: SubscriptionAccount | null;
+            ad_audience?: AdAudience;
+            needs_sign_in?: boolean;
+        } | undefined;
 
         showFlashToast(flash?.message);
         void configureCurrentAccount(buff?.account);
+        const adAccount = buff?.needs_sign_in === false ? buff.account ?? null : null;
+
+        void reconcileAds(adAccount, event.detail.page.url, buff?.ad_audience ?? 'teen');
     });
 });
 
@@ -229,9 +299,17 @@ onUnmounted(() => {
     window.removeEventListener('popstate', handlePopState);
     window.removeEventListener('focus', syncOnResume);
     window.removeEventListener('online', syncOnResume);
+    window.removeEventListener('resize', handleViewportChange);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
     window.removeEventListener('buff:toast', handleToast);
     clearFallbackToast();
+    mobileNavObserver?.disconnect();
+    mobileNavObserver = null;
+
+    if (layoutFrame !== null) {
+        window.cancelAnimationFrame(layoutFrame);
+        layoutFrame = null;
+    }
 
     if (window.__buffHandleAndroidBack === handleNativeAndroidBack) {
         delete window.__buffHandleAndroidBack;
@@ -241,11 +319,22 @@ onUnmounted(() => {
         removeFlashToastListener();
         removeFlashToastListener = null;
     }
+
+    if (removeAdBeforeListener) {
+        removeAdBeforeListener();
+        removeAdBeforeListener = null;
+    }
+
+    void adCoordinator.destroy();
 });
 </script>
 
 <template>
-    <div class="app-shell flex bg-background sm:pl-64" :class="{'settings-subpage': isSettingsSubpage}">
+    <div
+        class="app-shell flex bg-background sm:pl-64"
+        :class="{'settings-subpage': isSettingsSubpage}"
+        :style="{'--ad-banner-height': `${adBannerHeight}px`}"
+    >
         <OfflineBanner />
 
         <aside class="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 border-r border-border/70 bg-card/75 px-4 py-5 backdrop-blur-xl sm:flex sm:flex-col">
@@ -321,13 +410,13 @@ onUnmounted(() => {
         </AppSheet>
 
         <nav v-if="!isSettingsSubpage" class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border/70 bg-card/50 shadow-card backdrop-blur-lg sm:hidden">
-            <div class="mx-auto grid grid-cols-5 items-end gap-1 px-2 pt-1.5">
+            <div ref="mobileNavContent" class="mx-auto grid grid-cols-5 items-end gap-1 px-2 pt-1.5">
                 <Button
                     :as="Link"
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'default' : 'ghost'"
-                    :class="['flex rounded-xl font-normal', isActive(navItems[0].match) ? 'bg-primary dark:text-primary-foreground' : '']"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[0].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[0].label }}</span>
@@ -338,7 +427,7 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'default' : 'ghost'"
-                    :class="['flex rounded-xl font-normal', isActive(navItems[1].match) ? 'bg-primary dark:text-primary-foreground' : '']"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[1].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[1].label }}</span>
@@ -359,7 +448,7 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'default' : 'ghost'"
-                    :class="['flex rounded-xl font-normal', isActive(navItems[2].match) ? 'bg-primary dark:text-primary-foreground' : '']"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[2].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[2].label }}</span>
@@ -370,7 +459,7 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'default' : 'ghost'"
-                    :class="['flex rounded-xl font-normal', isActive(navItems[3].match) ? 'bg-primary dark:text-primary-foreground' : '']"
+                    :class="['flex rounded-xl font-normal', isActive(navItems[3].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />
                     <span>{{ navItems[3].label }}</span>

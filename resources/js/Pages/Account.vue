@@ -11,6 +11,7 @@ import SetupFlow from '../Components/SetupFlow.vue';
 import SocialLoginButtons from '../Components/SocialLoginButtons.vue';
 import Button from '../Components/ui/button/Button.vue';
 import Input from '../Components/ui/input/Input.vue';
+import { hideAppShellBanner } from '../ads';
 import { avatarColorClass, avatarInitials } from '../avatar';
 import { publicAssetUrl } from '../publicAssetUrl';
 
@@ -123,6 +124,8 @@ function handleVisibilityChange() {
 }
 
 onMounted(() => {
+    void hideAppShellBanner();
+
     if (!hasDeviceData.value) {
         for (let index = window.localStorage.length - 1; index >= 0; index -= 1) {
             const key = window.localStorage.key(index);
@@ -425,8 +428,7 @@ async function signInWith(provider: SocialProvider) {
         <main v-else class="grid min-h-dvh place-items-center bg-background px-4 py-10 text-foreground">
             <div class="w-full max-w-sm space-y-6">
                 <header class="flex flex-col items-center gap-4 text-center">
-                    <img :src="publicAssetUrl('/icon.png')" alt="Buff" class="size-20 rounded-2xl dark:hidden" />
-                    <img :src="publicAssetUrl('/icon-dark.png')" alt="Buff" class="hidden size-20 rounded-2xl dark:block" />
+                    <img :src="publicAssetUrl('/icon.png')" alt="Buff" class="size-20 rounded-2xl" />
                     <h1 class="page-title">{{ title }}</h1>
                 </header>
 
@@ -475,16 +477,16 @@ async function signInWith(provider: SocialProvider) {
                             </div>
                         </form>
                     </Card>
-                    <Button
-                        v-if="hasDeviceData"
-                        type="button"
-                        variant="destructive"
-                        class="w-full"
-                        :disabled="clearDataForm.processing"
-                        @click="clearDataError = ''; clearDataConfirmOpen = true"
-                    >
-                        Clear device data
-                    </Button>
+<!--                    <Button-->
+<!--                        v-if="hasDeviceData"-->
+<!--                        type="button"-->
+<!--                        variant="destructive"-->
+<!--                        class="w-full"-->
+<!--                        :disabled="clearDataForm.processing"-->
+<!--                        @click="clearDataError = ''; clearDataConfirmOpen = true"-->
+<!--                    >-->
+<!--                        Clear device data-->
+<!--                    </Button>-->
                 </template>
 
                 <Card v-else-if="screen === 'forgot'">
@@ -547,16 +549,16 @@ async function signInWith(provider: SocialProvider) {
             @cancel="cancelSwitch"
             @confirm="confirmSwitch"
         />
-        <ConfirmSheet
-            :open="clearDataConfirmOpen"
-            title="Clear device data?"
-            message="This permanently removes local health data from this device. Anything already synced stays in your account."
-            confirm-label="Clear data"
-            :processing="clearDataForm.processing"
-            processing-label="Clearing data…"
-            :error="clearDataError"
-            @cancel="clearDataError = ''; clearDataConfirmOpen = false"
-            @confirm="confirmClearData"
-        />
+<!--        <ConfirmSheet-->
+<!--            :open="clearDataConfirmOpen"-->
+<!--            title="Clear device data?"-->
+<!--            message="This permanently removes local health data from this device. Anything already synced stays in your account."-->
+<!--            confirm-label="Clear data"-->
+<!--            :processing="clearDataForm.processing"-->
+<!--            processing-label="Clearing data…"-->
+<!--            :error="clearDataError"-->
+<!--            @cancel="clearDataError = ''; clearDataConfirmOpen = false"-->
+<!--            @confirm="confirmClearData"-->
+<!--        />-->
     </div>
 </template>

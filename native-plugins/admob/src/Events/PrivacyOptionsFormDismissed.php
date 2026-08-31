@@ -1,0 +1,22 @@
+<?php
+
+declare(strict_types=1);
+
+namespace BlessedZulu\NativePhpAdmob\Events;
+
+use Illuminate\Foundation\Events\Dispatchable;
+use Illuminate\Queue\SerializesModels;
+
+class PrivacyOptionsFormDismissed
+{
+    use Dispatchable;
+    use SerializesModels;
+
+    public function __construct(
+        public string $status,
+        public bool $success,
+        public bool $canRequestAds,
+        public bool $privacyOptionsRequired,
+        public ?string $error = null,
+    ) {}
+}

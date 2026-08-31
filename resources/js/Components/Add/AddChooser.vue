@@ -103,7 +103,7 @@ const emit = defineEmits<{
                     <span class="flex items-center gap-1.5 text-sm font-semibold">
                         {{ choice.label }}
                         <span v-if="choice.mode === 'photo' && !props.subscriptionActive" class="inline-flex items-center gap-1 rounded-full bg-primary-container px-1.5 py-0.5 text-[0.625rem] uppercase tracking-wide text-primary-container-foreground">
-                            <LockKeyhole :size="11" aria-hidden="true" /> Buff+
+                            <LockKeyhole :size="11" aria-hidden="true" />
                         </span>
                     </span>
                     <span class="block truncate text-xs leading-snug text-muted-foreground">{{ choice.description }}</span>

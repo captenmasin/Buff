@@ -266,7 +266,7 @@ textarea {
 
 .app-main {
     padding-top: calc(env(safe-area-inset-top, 0px) + 2.75rem);
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.5rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 7.5rem + var(--ad-banner-height, 0px));
 }
 
 @media (width < 40rem) {
@@ -276,7 +276,7 @@ textarea {
 }
 
 .app-shell.settings-subpage .app-main {
-    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem + var(--ad-banner-height, 0px));
 }
 
 .bottom-nav {
@@ -392,7 +392,7 @@ textarea {
 @media (width >= 40rem) {
     .app-main {
         padding-top: calc(env(safe-area-inset-top, 0px) + 1.5rem);
-        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem);
+        padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 2rem + var(--ad-banner-height, 0px));
     }
 
     .bottom-drawer {
@@ -432,7 +432,7 @@ textarea {
 
     @supports (padding-bottom: max(0px)) {
         .app-main {
-            padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 1rem) + 1rem);
+            padding-bottom: calc(max(env(safe-area-inset-bottom, 0px), 1rem) + 1rem + var(--ad-banner-height, 0px));
         }
     }
 }

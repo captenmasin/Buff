@@ -18,6 +18,9 @@
             "description": "Queue an immediate Apple Health workout sync."
         }
     ],
+    "android": {
+        "min_version": 33
+    },
     "ios": {
         "min_version": "18.0",
         "init_function": "AppleHealthPlugin.startObserving",

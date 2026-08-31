@@ -60,7 +60,7 @@ it('proxies a bounded multipart analysis without exposing the bearer token to Vu
 
 it('preserves the subscription-required API contract for the paywall CTA', function (): void {
     Http::fake(['*/meal-analyses' => Http::response([
-        'message' => 'Access requires an ai_meal_analysis subscription purchased in the iOS or Android app; restore from Settings.',
+        'message' => 'Access requires a Buff+ subscription purchased in the iOS or Android app; restore from Settings.',
         'code' => 'subscription_required',
     ], 403)]);
 
@@ -68,7 +68,7 @@ it('preserves the subscription-required API contract for the paywall CTA', funct
         'photos' => [UploadedFile::fake()->image('meal.jpg', 800, 600)],
     ])->assertForbidden()
         ->assertJsonPath('code', 'subscription_required')
-        ->assertJsonPath('message', 'Access requires an ai_meal_analysis subscription purchased in the iOS or Android app; restore from Settings.');
+        ->assertJsonPath('message', 'Access requires a Buff+ subscription purchased in the iOS or Android app; restore from Settings.');
 });
 
 it('accepts bridge-safe meal photo data URLs', function (): void {

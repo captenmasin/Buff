@@ -217,7 +217,7 @@ private enum SubscriptionPayload {
     }
 
     static func isEntitled(_ customerInfo: RevenueCat.CustomerInfo) -> Bool {
-        customerInfo.entitlements.active["ai_meal_analysis"] != nil
+        customerInfo.entitlements.active["buff_plus"] != nil
     }
 
     static func package(_ package: Package) -> [String: Any] {

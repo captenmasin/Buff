@@ -1,0 +1,134 @@
+{
+    "namespace": "Admob",
+    "bridge_functions": [
+        {
+            "name": "Admob.Platform",
+            "ios": "AdmobFunctions.Platform",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.Platform"
+        },
+        {
+            "name": "Admob.ConfigurePolicy",
+            "ios": "AdmobFunctions.ConfigurePolicy",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.ConfigurePolicy"
+        },
+        {
+            "name": "Admob.Initialize",
+            "ios": "AdmobFunctions.Initialize",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.Initialize"
+        },
+        {
+            "name": "Admob.LoadBanner",
+            "ios": "AdmobFunctions.LoadBanner",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.LoadBanner"
+        },
+        {
+            "name": "Admob.ShowBanner",
+            "ios": "AdmobFunctions.ShowBanner",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.ShowBanner"
+        },
+        {
+            "name": "Admob.HideBanner",
+            "ios": "AdmobFunctions.HideBanner",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.HideBanner"
+        },
+        {
+            "name": "Admob.UmpRequestInfo",
+            "ios": "AdmobFunctions.UmpRequestInfo",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpRequestInfo"
+        },
+        {
+            "name": "Admob.UmpShowForm",
+            "ios": "AdmobFunctions.UmpShowForm",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpShowForm"
+        },
+        {
+            "name": "Admob.UmpCanRequestAds",
+            "ios": "AdmobFunctions.UmpCanRequestAds",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpCanRequestAds"
+        },
+        {
+            "name": "Admob.UmpStatus",
+            "ios": "AdmobFunctions.UmpStatus",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpStatus"
+        },
+        {
+            "name": "Admob.UmpPrivacyOptionsStatus",
+            "ios": "AdmobFunctions.UmpPrivacyOptionsStatus",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpPrivacyOptionsStatus"
+        },
+        {
+            "name": "Admob.UmpShowPrivacyOptionsForm",
+            "ios": "AdmobFunctions.UmpShowPrivacyOptionsForm",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.UmpShowPrivacyOptionsForm"
+        },
+        {
+            "name": "Admob.AttRequest",
+            "ios": "AdmobFunctions.AttRequest",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.AttRequest"
+        },
+        {
+            "name": "Admob.AttStatus",
+            "ios": "AdmobFunctions.AttStatus",
+            "android": "com.blessedzulu.nativephp.admob.AdmobFunctions.AttStatus"
+        }
+    ],
+    "events": [
+        "BlessedZulu\\NativePhpAdmob\\Events\\AdLoaded",
+        "BlessedZulu\\NativePhpAdmob\\Events\\AdFailedToLoad",
+        "BlessedZulu\\NativePhpAdmob\\Events\\AdShown",
+        "BlessedZulu\\NativePhpAdmob\\Events\\AdFailedToShow",
+        "BlessedZulu\\NativePhpAdmob\\Events\\ConsentInfoUpdated",
+        "BlessedZulu\\NativePhpAdmob\\Events\\ConsentFormShown",
+        "BlessedZulu\\NativePhpAdmob\\Events\\ConsentFormDismissed",
+        "BlessedZulu\\NativePhpAdmob\\Events\\ConsentChanged",
+        "BlessedZulu\\NativePhpAdmob\\Events\\PrivacyOptionsFormDismissed",
+        "BlessedZulu\\NativePhpAdmob\\Events\\TrackingAuthorizationGranted",
+        "BlessedZulu\\NativePhpAdmob\\Events\\TrackingAuthorizationDenied"
+    ],
+    "android": {
+        "permissions": [
+            "android.permission.INTERNET",
+            "android.permission.ACCESS_NETWORK_STATE"
+        ],
+        "dependencies": {
+            "implementation": [
+                "com.google.android.gms:play-services-ads:24.0.0",
+                "com.google.android.ump:user-messaging-platform:3.0.0"
+            ]
+        },
+        "meta_data": [
+            {
+                "name": "com.google.android.gms.ads.APPLICATION_ID",
+                "value": "${ADMOB_APP_ID}"
+            }
+        ],
+        "activities": [],
+        "min_version": 26
+    },
+    "ios": {
+        "info_plist": {
+            "GADApplicationIdentifier": "${ADMOB_APP_ID}",
+            "NSUserTrackingUsageDescription": "Your data helps us show ads that are relevant to you."
+        },
+        "dependencies": {
+            "pods": [
+                {"name": "Google-Mobile-Ads-SDK", "version": "~> 13.4"},
+                {"name": "GoogleUserMessagingPlatform", "version": "~> 2.7"}
+            ]
+        },
+        "min_version": "18.0"
+    },
+    "hooks": {
+        "post_compile": "nativephp:admob:substitute-placeholders"
+    },
+    "secrets": {
+        "ADMOB_APP_ID_ANDROID": {
+            "description": "Android AdMob app ID (ca-app-pub-XXXX~YYYY).",
+            "required": false
+        },
+        "ADMOB_APP_ID_IOS": {
+            "description": "iOS AdMob app ID (ca-app-pub-XXXX~YYYY).",
+            "required": false
+        }
+    }
+}

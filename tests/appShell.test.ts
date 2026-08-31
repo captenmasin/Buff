@@ -5,7 +5,7 @@ import test from 'node:test';
 test('uses dark text for active bottom navigation links in dark mode', () => {
     const source = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
 
-    assert.equal(source.match(/bg-primary dark:text-primary-foreground/g)?.length, 4);
+    assert.equal(source.match(/bg-primary text-brand-night/g)?.length, 4);
     assert.equal(source.match(/isActive\(navItems\[\d\]\.match\) \? 'default' : 'ghost'/g)?.length, 4);
 });
 
@@ -36,4 +36,28 @@ test('configures subscriptions from the signed-in shell and gates the Photo shor
     assert.match(source, /configureCurrentAccount\(page\.props\.buff\.account\)/);
     assert.match(source, /mode === 'photo' && !subscriptionActive\.value/);
     assert.match(source, /router\.visit\('\/settings\/subscription'\)/);
+});
+
+test('hands native ad reconciliation to the shell lifecycle and measured mobile navigation', () => {
+    const source = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
+    const styles = readFileSync(new URL('../resources/css/app.css', import.meta.url), 'utf8');
+
+    assert.match(source, /createAdCoordinator/);
+    assert.match(source, /router\.on\('before'/);
+    assert.match(source, /adCoordinator\.beforeNavigation/);
+    assert.match(source, /adCoordinator\.beforeNavigation\('\/add'\)/);
+    assert.match(source, /addDrawerOpen\.value \? '\/add' : url/);
+    assert.match(source, /ref="mobileNavContent"/);
+    assert.match(source, /getBoundingClientRect\(\)\.height/);
+    assert.match(source, /needs_sign_in === false/);
+    assert.match(source, /adCoordinator\.destroy\(\)/);
+    assert.match(styles, /var\(--ad-banner-height, 0px\)/);
+});
+
+test('refreshes UMP privacy status with the shared teen-safe audience fallback', () => {
+    const source = readFileSync(new URL('../resources/js/Pages/Settings.vue', import.meta.url), 'utf8');
+    const ads = readFileSync(new URL('../resources/js/ads.ts', import.meta.url), 'utf8');
+
+    assert.match(source, /adPrivacyOptionsRequired\(page\.props\.buff\.ad_audience \?\? 'teen'\)/);
+    assert.match(ads, /adPrivacyOptionsRequired[\s\S]+bridge\.ump\.requestInfo\(\)[\s\S]+privacyOptionsRequired === true/);
 });

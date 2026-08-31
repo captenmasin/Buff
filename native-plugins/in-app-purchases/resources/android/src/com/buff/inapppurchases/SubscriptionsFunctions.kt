@@ -270,7 +270,7 @@ private object SubscriptionPayload {
     }
 
     fun isEntitled(customerInfo: CustomerInfo): Boolean =
-        customerInfo.entitlements.active.containsKey("ai_meal_analysis")
+        customerInfo.entitlements.active.containsKey("buff_plus")
 
     fun productIdentifier(packageToPurchase: Package): String =
         packageToPurchase.product.id.substringBefore(":")

@@ -6,6 +6,12 @@
 > decisions conflict; the existing database column and AI enforcement flag do
 > not need renaming.
 
+> **Execution checkpoint (2026-08-30)**: The source implementation is complete
+> in the client and API working trees and its automated checks pass. Plan 003
+> now owns the remaining store-console setup, review-safe sandbox policy,
+> physical-device acceptance, submission, and production enablement. For those
+> activities, Plan 003 supersedes this plan's Steps 1, 7, and 8.
+
 > **Executor instructions**: Follow this plan step by step. Run every
 > verification command and confirm the expected result before moving to the
 > next step. If anything in the "STOP conditions" section occurs, stop and

@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Models\BodyProfile;
 use App\Models\SyncOutbox;
 use App\Models\SyncState;
 use App\Services\BuffCredentialStore;
@@ -16,6 +17,7 @@ class HandleInertiaRequests extends Middleware
     {
         $credentials = app(BuffCredentialStore::class);
         $syncState = SyncState::query()->first();
+        $age = BodyProfile::query()->whereKey(BodyProfile::ID)->value('age');
 
         return [
             ...parent::share($request),
@@ -25,6 +27,7 @@ class HandleInertiaRequests extends Middleware
             ],
             'buff' => [
                 'account' => $credentials->account(),
+                'ad_audience' => $age !== null && (int) $age >= 18 ? 'adult' : 'teen',
                 'needs_sign_in' => $credentials->token() === null,
                 'can_resume' => $credentials->refreshToken() !== null,
                 'has_local_account' => $syncState !== null,
