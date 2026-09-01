@@ -1,0 +1,31 @@
+{
+  "figma": {
+    "fileKey": "WtlTyc3gBspdheiiUn4NeH",
+    "url": "https://www.figma.com/design/WtlTyc3gBspdheiiUn4NeH"
+  },
+  "capture": {
+    "browser": "Dia",
+    "device": "iPhone 16 Pro Max",
+    "viewport": "1320x2868",
+    "appearance": "light",
+    "scrollbar": "hidden"
+  },
+  "apple": {
+    "size": "1320x2868",
+    "files": [
+      "exports/apple/01-today-1320x2868.png",
+      "exports/apple/02-add-1320x2868.png",
+      "exports/apple/03-weekly-1320x2868.png",
+      "exports/apple/04-progress-1320x2868.png"
+    ]
+  },
+  "googlePlay": {
+    "size": "1080x1920",
+    "files": [
+      "exports/google-play/01-today-1080x1920.png",
+      "exports/google-play/02-add-1080x1920.png",
+      "exports/google-play/03-weekly-1080x1920.png",
+      "exports/google-play/04-progress-1080x1920.png"
+    ]
+  }
+}

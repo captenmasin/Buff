@@ -30,6 +30,7 @@ export interface SubscriptionPackage {
 }
 
 export interface NativeSubscriptionEvent {
+    app_user_id?: string;
     category?: string;
     entitled?: boolean;
     message?: string;
@@ -39,6 +40,8 @@ export interface NativeSubscriptionEvent {
 }
 
 export const subscriptionEvents = {
+    configurationCompleted: 'Buff\\InAppPurchases\\Events\\ConfigurationCompleted',
+    configurationFailed: 'Buff\\InAppPurchases\\Events\\ConfigurationFailed',
     offeringLoaded: 'Buff\\InAppPurchases\\Events\\OfferingLoaded',
     offeringFailed: 'Buff\\InAppPurchases\\Events\\OfferingFailed',
     purchaseCompleted: 'Buff\\InAppPurchases\\Events\\PurchaseCompleted',
@@ -186,9 +189,130 @@ export async function configureSubscriptions(account?: SubscriptionAccount | nul
         return {configured: false, platform, reason: 'missing_key'};
     }
 
-    await subscriptionsBridge.configure(apiKey, appUserId);
+    const nativeEvents = await import('#nativephp');
+    await completeSubscriptionConfiguration(
+        appUserId,
+        () => subscriptionsBridge.configure(apiKey, appUserId),
+        nativeEvents,
+    );
 
     return {configured: true, platform};
+}
+
+interface NativeConfigurationResult {
+    switching_account?: boolean;
+}
+
+interface NativeEventBridge {
+    On(eventName: string, callback: (payload: unknown, eventName: string) => void): void;
+    Off(eventName: string, callback: (payload: unknown, eventName: string) => void): void;
+}
+
+let subscriptionConfigurationTail: Promise<void> = Promise.resolve();
+
+export function completeSubscriptionConfiguration(
+    appUserId: string,
+    configure: () => Promise<unknown>,
+    nativeEvents: NativeEventBridge,
+    timeoutMs = 30_000,
+): Promise<void> {
+    const configuration = subscriptionConfigurationTail
+        .then(() => performSubscriptionConfiguration(appUserId, configure, nativeEvents, timeoutMs));
+
+    subscriptionConfigurationTail = configuration.catch(() => undefined);
+
+    return configuration;
+}
+
+function performSubscriptionConfiguration(
+    appUserId: string,
+    configure: () => Promise<unknown>,
+    nativeEvents: NativeEventBridge,
+    timeoutMs: number,
+): Promise<void> {
+    return new Promise((resolve, reject) => {
+        let bridgeCompleted = false;
+        let switchingAccount = false;
+        let accountSwitchOutcome: Error | true | null = null;
+        let settled = false;
+        let timeout: ReturnType<typeof setTimeout> | null = null;
+
+        const cleanup = () => {
+            if (timeout !== null) {
+                globalThis.clearTimeout(timeout);
+            }
+
+            nativeEvents.Off(subscriptionEvents.configurationCompleted, configurationCompleted);
+            nativeEvents.Off(subscriptionEvents.configurationFailed, configurationFailed);
+        };
+        const fail = (error: unknown) => {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            cleanup();
+            reject(error);
+        };
+        const finish = () => {
+            if (settled || !bridgeCompleted) {
+                return;
+            }
+
+            if (!switchingAccount) {
+                settled = true;
+                cleanup();
+                resolve();
+                return;
+            }
+
+            if (accountSwitchOutcome === null) {
+                return;
+            }
+
+            if (accountSwitchOutcome instanceof Error) {
+                fail(accountSwitchOutcome);
+                return;
+            }
+
+            settled = true;
+            cleanup();
+            resolve();
+        };
+        const isExpectedAccount = (payload: unknown): boolean =>
+            normalizeNativePayload(payload).app_user_id === appUserId;
+        function configurationCompleted(payload: unknown): void {
+            if (!isExpectedAccount(payload) || accountSwitchOutcome !== null) {
+                return;
+            }
+
+            accountSwitchOutcome = true;
+            finish();
+        }
+        function configurationFailed(payload: unknown): void {
+            if (!isExpectedAccount(payload) || accountSwitchOutcome !== null) {
+                return;
+            }
+
+            accountSwitchOutcome = new Error(nativeError(payload, 'Subscriptions could not switch accounts.').message);
+            finish();
+        }
+
+        nativeEvents.On(subscriptionEvents.configurationCompleted, configurationCompleted);
+        nativeEvents.On(subscriptionEvents.configurationFailed, configurationFailed);
+        timeout = globalThis.setTimeout(
+            () => fail(new Error('Subscriptions timed out while switching accounts.')),
+            timeoutMs,
+        );
+
+        void Promise.resolve()
+            .then(configure)
+            .then((result) => {
+                bridgeCompleted = true;
+                switchingAccount = (result as NativeConfigurationResult | null)?.switching_account === true;
+                finish();
+            }, fail);
+    });
 }
 
 export async function listenForSubscriptionEvents(

@@ -1,0 +1,11 @@
+{
+  "created": "2026-08-31",
+  "source": "Live local Buff application captured in Dia with temporary fictional meal, workout, and body-metric data.",
+  "restoration": "The original SQLite database was restored after capture.",
+  "composition": "Editable layouts and final renders were produced in Figma. Headlines and supporting copy are deterministic text layers; app screens are the Dia captures.",
+  "output": "All final PNGs are opaque 8-bit RGB without alpha.",
+  "specifications": {
+    "apple": "https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/",
+    "googlePlay": "https://support.google.com/googleplay/android-developer/answer/9866151?hl=en"
+  }
+}

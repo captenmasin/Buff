@@ -2,12 +2,14 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
+    completeSubscriptionConfiguration,
     isSubscriptionActive,
     managementUrl,
     nativeError,
     normalizeOffering,
     subscriptionPackageButtonLabel,
     subscriptionPlatform,
+    subscriptionEvents,
 } from '../resources/js/subscriptions.ts';
 
 test('derives access only from a future server expiry', () => {
@@ -83,6 +85,146 @@ test('reports an ordinary browser as unsupported', async () => {
     assert.equal(await subscriptionPlatform(), 'unsupported');
 });
 
+test('waits for the matching RevenueCat account switch completion event', async () => {
+    const nativeEvents = subscriptionEventHarness();
+    const appUserId = 'b00f09bc-1dc3-4aea-a3d8-c8e60acb2773';
+    let completed = false;
+    const configuration = completeSubscriptionConfiguration(
+        appUserId,
+        async () => {
+            assert.equal(nativeEvents.listenerCount(), 2);
+
+            return {started: true, switching_account: true};
+        },
+        nativeEvents,
+    ).then(() => {
+        completed = true;
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+    assert.equal(completed, false);
+
+    nativeEvents.emit(subscriptionEvents.configurationCompleted, {app_user_id: 'e7123f23-fd65-41df-8141-d0ce315ec267'});
+    await Promise.resolve();
+    assert.equal(completed, false);
+
+    nativeEvents.emit(subscriptionEvents.configurationCompleted, {app_user_id: appUserId});
+    await configuration;
+    assert.equal(completed, true);
+    assert.equal(nativeEvents.listenerCount(), 0);
+});
+
+test('keeps first-time and same-account RevenueCat configuration synchronous', async () => {
+    const nativeEvents = subscriptionEventHarness();
+
+    await completeSubscriptionConfiguration(
+        'b00f09bc-1dc3-4aea-a3d8-c8e60acb2773',
+        async () => ({configured: true, switching_account: false}),
+        nativeEvents,
+    );
+
+    assert.equal(nativeEvents.listenerCount(), 0);
+});
+
+test('rejects and cleans up when the matching RevenueCat account switch fails', async () => {
+    const nativeEvents = subscriptionEventHarness();
+    const appUserId = 'b00f09bc-1dc3-4aea-a3d8-c8e60acb2773';
+    let configurationStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        configurationStarted = resolve;
+    });
+    const configuration = completeSubscriptionConfiguration(
+        appUserId,
+        async () => {
+            configurationStarted();
+
+            return {started: true, switching_account: true};
+        },
+        nativeEvents,
+    );
+
+    await started;
+    nativeEvents.emit(subscriptionEvents.configurationFailed, {
+        app_user_id: appUserId,
+        category: 'identity',
+        message: 'RevenueCat rejected the account switch.',
+    });
+
+    await assert.rejects(configuration, /RevenueCat rejected the account switch\./);
+    assert.equal(nativeEvents.listenerCount(), 0);
+});
+
+test('serializes RevenueCat account switches so the latest invocation finishes last', async () => {
+    const nativeEvents = subscriptionEventHarness();
+    const firstAppUserId = 'b00f09bc-1dc3-4aea-a3d8-c8e60acb2773';
+    const secondAppUserId = 'e7123f23-fd65-41df-8141-d0ce315ec267';
+    const started: string[] = [];
+    let firstStarted!: () => void;
+    let secondStarted!: () => void;
+    const waitForFirst = new Promise<void>((resolve) => {
+        firstStarted = resolve;
+    });
+    const waitForSecond = new Promise<void>((resolve) => {
+        secondStarted = resolve;
+    });
+    const first = completeSubscriptionConfiguration(
+        firstAppUserId,
+        async () => {
+            started.push(firstAppUserId);
+            firstStarted();
+
+            return {started: true, switching_account: true};
+        },
+        nativeEvents,
+    );
+    const second = completeSubscriptionConfiguration(
+        secondAppUserId,
+        async () => {
+            started.push(secondAppUserId);
+            secondStarted();
+
+            return {started: true, switching_account: true};
+        },
+        nativeEvents,
+    );
+
+    await waitForFirst;
+    assert.deepEqual(started, [firstAppUserId]);
+
+    nativeEvents.emit(subscriptionEvents.configurationCompleted, {app_user_id: firstAppUserId});
+    await first;
+    await waitForSecond;
+    assert.deepEqual(started, [firstAppUserId, secondAppUserId]);
+
+    nativeEvents.emit(subscriptionEvents.configurationCompleted, {app_user_id: secondAppUserId});
+    await second;
+    assert.equal(nativeEvents.listenerCount(), 0);
+});
+
+test('times out and cleans up when RevenueCat sends no account switch event', async () => {
+    const nativeEvents = subscriptionEventHarness();
+    let configurationStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+        configurationStarted = resolve;
+    });
+    const configuration = completeSubscriptionConfiguration(
+        'b00f09bc-1dc3-4aea-a3d8-c8e60acb2773',
+        async () => {
+            configurationStarted();
+
+            return {started: true, switching_account: true};
+        },
+        nativeEvents,
+        1,
+    );
+    const timedOut = assert.rejects(configuration, /timed out while switching accounts/);
+
+    await started;
+    await timedOut;
+    assert.equal(nativeEvents.listenerCount(), 0);
+});
+
 test('removes every registered native listener', () => {
     const source = readFileSync(new URL('../resources/js/subscriptions.ts', import.meta.url), 'utf8');
 
@@ -109,3 +251,26 @@ test('keeps unlock server-authoritative and renders the required store controls'
     assert.match(add, /subscription_required/);
     assert.match(add, /View Buff\+/);
 });
+
+function subscriptionEventHarness() {
+    type Listener = (payload: unknown, eventName: string) => void;
+    const listeners = new Map<string, Set<Listener>>();
+
+    return {
+        On(eventName: string, listener: Listener): void {
+            const eventListeners = listeners.get(eventName) ?? new Set<Listener>();
+
+            eventListeners.add(listener);
+            listeners.set(eventName, eventListeners);
+        },
+        Off(eventName: string, listener: Listener): void {
+            listeners.get(eventName)?.delete(listener);
+        },
+        emit(eventName: string, payload: unknown): void {
+            listeners.get(eventName)?.forEach((listener) => listener(payload, eventName));
+        },
+        listenerCount(): number {
+            return [...listeners.values()].reduce((count, eventListeners) => count + eventListeners.size, 0);
+        },
+    };
+}

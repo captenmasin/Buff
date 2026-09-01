@@ -2,6 +2,8 @@ import Foundation
 import RevenueCat
 
 private enum SubscriptionEvent {
+    static let configurationCompleted = "Buff\\InAppPurchases\\Events\\ConfigurationCompleted"
+    static let configurationFailed = "Buff\\InAppPurchases\\Events\\ConfigurationFailed"
     static let offeringLoaded = "Buff\\InAppPurchases\\Events\\OfferingLoaded"
     static let offeringFailed = "Buff\\InAppPurchases\\Events\\OfferingFailed"
     static let purchaseCompleted = "Buff\\InAppPurchases\\Events\\PurchaseCompleted"
@@ -43,12 +45,23 @@ enum SubscriptionsFunctions {
             Task { @MainActor in
                 do {
                     _ = try await Purchases.shared.logIn(appUserID)
+                    SubscriptionPayload.dispatch(
+                        SubscriptionEvent.configurationCompleted,
+                        ["app_user_id": appUserID]
+                    )
                 } catch {
-                    NSLog("Buff subscriptions: account switch failed: %@", error.localizedDescription)
+                    SubscriptionPayload.dispatch(
+                        SubscriptionEvent.configurationFailed,
+                        [
+                            "app_user_id": appUserID,
+                            "category": "identity",
+                            "message": error.localizedDescription,
+                        ]
+                    )
                 }
             }
 
-            return BridgeResponse.success(data: ["configured": true, "switching_account": true])
+            return BridgeResponse.success(data: ["started": true, "switching_account": true])
         }
     }
 

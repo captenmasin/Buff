@@ -5,7 +5,7 @@
         {
             "name": "Subscriptions.Configure",
             "android": "com.buff.inapppurchases.SubscriptionsFunctions.Configure",
-            "android_params": ["context"],
+            "android_params": ["activity"],
             "ios": "SubscriptionsFunctions.Configure",
             "description": "Configure RevenueCat for a signed-in Buff account."
         },
@@ -59,6 +59,8 @@
         }
     },
     "events": [
+        "Buff\\InAppPurchases\\Events\\ConfigurationCompleted",
+        "Buff\\InAppPurchases\\Events\\ConfigurationFailed",
         "Buff\\InAppPurchases\\Events\\OfferingLoaded",
         "Buff\\InAppPurchases\\Events\\OfferingFailed",
         "Buff\\InAppPurchases\\Events\\PurchaseCompleted",

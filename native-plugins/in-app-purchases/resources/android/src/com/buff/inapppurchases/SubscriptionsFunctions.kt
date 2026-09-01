@@ -32,6 +32,8 @@ import java.util.Locale
 import java.util.UUID
 
 private object SubscriptionEvent {
+    const val CONFIGURATION_COMPLETED = "Buff\\InAppPurchases\\Events\\ConfigurationCompleted"
+    const val CONFIGURATION_FAILED = "Buff\\InAppPurchases\\Events\\ConfigurationFailed"
     const val OFFERING_LOADED = "Buff\\InAppPurchases\\Events\\OfferingLoaded"
     const val OFFERING_FAILED = "Buff\\InAppPurchases\\Events\\OfferingFailed"
     const val PURCHASE_COMPLETED = "Buff\\InAppPurchases\\Events\\PurchaseCompleted"
@@ -47,7 +49,7 @@ private object SubscriptionState {
 }
 
 object SubscriptionsFunctions {
-    class Configure(private val context: Context) : BridgeFunction {
+    class Configure(private val activity: FragmentActivity) : BridgeFunction {
         override fun execute(parameters: Map<String, Any>): Map<String, Any> {
             val apiKey = parameters["api_key"] as? String
             if (apiKey == null || !Regex("^(goog|test)_[A-Za-z0-9]+$").matches(apiKey)) {
@@ -61,7 +63,7 @@ object SubscriptionsFunctions {
 
             if (!Purchases.isConfigured) {
                 Purchases.configure(
-                    PurchasesConfiguration.Builder(context, apiKey)
+                    PurchasesConfiguration.Builder(activity, apiKey)
                         .appUserID(appUserID)
                         .build(),
                 )
@@ -76,12 +78,28 @@ object SubscriptionsFunctions {
             CoroutineScope(Dispatchers.Main).launch {
                 Purchases.sharedInstance.logInWith(
                     appUserID = appUserID,
-                    onSuccess = { _, _ -> },
-                    onError = { },
+                    onSuccess = { _, _ ->
+                        SubscriptionPayload.dispatch(
+                            activity,
+                            SubscriptionEvent.CONFIGURATION_COMPLETED,
+                            mapOf("app_user_id" to appUserID),
+                        )
+                    },
+                    onError = { error ->
+                        SubscriptionPayload.dispatch(
+                            activity,
+                            SubscriptionEvent.CONFIGURATION_FAILED,
+                            mapOf(
+                                "app_user_id" to appUserID,
+                                "category" to "identity",
+                                "message" to error.message,
+                            ),
+                        )
+                    },
                 )
             }
 
-            return BridgeResponse.success(mapOf("configured" to true, "switching_account" to true))
+            return BridgeResponse.success(mapOf("started" to true, "switching_account" to true))
         }
     }
 
