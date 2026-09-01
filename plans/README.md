@@ -8,9 +8,9 @@ starting, honor its STOP conditions, and update the row when done.
 
 | Plan | Title | Priority | Effort | Depends on | Status |
 |------|-------|----------|--------|------------|--------|
-| 001 | Put AI meal analysis behind production iOS and Android subscriptions | P1 | L | — | IN PROGRESS — source implementation complete; launch remains |
-| 003 | Launch Buff+ subscriptions safely on iOS and Android | P1 | M | 001 | TODO |
-| 002 | Show AdMob banners only to non-Buff+ users | P1 | L | 003 | TODO |
+| 001 | Put AI meal analysis behind production iOS and Android subscriptions | P1 | L | — | IN PROGRESS — source complete; Plan 003 launch remains |
+| 003 | Launch Buff+ subscriptions safely on iOS and Android | P1 | M | 001 | IN PROGRESS — source prerequisites complete; operator launch remains |
+| 002 | Show AdMob banners only to non-Buff+ users | P1 | L | 003 | IN PROGRESS — source complete; privacy, device, and release work remains |
 
 Status values: TODO | IN PROGRESS | DONE | BLOCKED (with one-line reason) |
 REJECTED (with one-line rationale — finding fixed independently or approach
@@ -24,12 +24,14 @@ abandoned)
   before Plan 001 can be marked DONE.
 - Plan 003 configures RevenueCat and both stores, preserves a restricted Apple
   App Review sandbox path, runs physical-device acceptance, releases both apps,
-  and only then enables server enforcement.
+  and only then enables server enforcement. Its source prerequisites are
+  complete; the remaining work is operator-owned launch execution.
 - Plan 002 spans the same repositories and uses Plan 001's authoritative
   RevenueCat refresh. It supersedes Plan 001's entitlement-name decision:
   configure and use `buff_plus` before releasing either plan. It follows Plan
-  003 so ads cannot depend on an unlaunched paid entitlement. AdMob remains off
-  until the privacy/account/device checklist in Plan 002 passes.
+  003 so ads cannot depend on an unlaunched paid entitlement. Its source is
+  complete, but AdMob remains off until the external privacy/account/device and
+  release checklist in Plan 002 passes.
 
 ## Findings considered and rejected
 

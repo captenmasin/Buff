@@ -21,9 +21,9 @@ Run first:
 
 ```sh
 git status --short
-git diff --stat 8646fba -- app/Http/Middleware/HandleInertiaRequests.php app/Providers/NativeServiceProvider.php config native-plugins/in-app-purchases resources/css/app.css resources/js/Layouts/AppShell.vue resources/js/Pages/Settings.vue resources/js/subscriptions.ts routes tests composer.json composer.lock package.json pnpm-lock.yaml .env.example
+git diff --stat 7fb4a31..HEAD -- app/Http/Middleware/HandleInertiaRequests.php app/Providers/NativeServiceProvider.php config native-plugins/admob native-plugins/in-app-purchases resources/css/app.css resources/js/ads.ts resources/js/Layouts/AppShell.vue resources/js/Pages/Settings.vue resources/js/subscriptions.ts routes tests composer.json composer.lock package.json pnpm-lock.yaml .env.example plans
 git -C ../buff-server status --short
-git -C ../buff-server diff --stat 989de27 -- app config database routes tests composer.json composer.lock .env.example
+git -C ../buff-server diff --stat 1ab03ea..HEAD -- app config database routes tests composer.json composer.lock .env.example
 ```
 
 If either command reports an in-scope change, compare this plan with the live
@@ -33,12 +33,29 @@ is a STOP condition.
 
 ## Status
 
+- **Status**: IN PROGRESS — source complete; external privacy, device, and release work remains
 - **Priority**: P1
 - **Effort**: L — approximately 6–9 engineering days plus AdMob/store review time
 - **Risk**: HIGH — native SDK lifecycle, advertising consent, age treatment, and paid access state
 - **Depends on**: Plan 001's working RevenueCat purchase/restore and server projection flow
 - **Category**: direction
 - **Planned at**: client commit `8646fba`, server commit `989de27`, 2026-08-30
+- **Reconciled at**: client commit `7fb4a31`, API commit `1ab03ea`, 2026-09-01
+
+## Source checkpoint — 2026-09-01
+
+- [x] The `buff_plus` entitlement cutover is implemented in both repositories.
+- [x] The AdMob plugin, fail-closed coordinator, audience policy, consent UI,
+  banner integration, and automated source coverage are implemented.
+- [x] The public privacy policy and `app-ads.txt` are published.
+- [x] The Google Play Data Safety questionnaire accurately declares Buff's
+  collected data and AdMob's shared approximate location, app interactions,
+  diagnostics, and device IDs. It was submitted for review on 2026-09-01.
+
+The bundled Play review also includes the authorized full rollout and track
+resume for the closed-test AdMob release. The remaining AdMob/store
+configuration, current native builds, device QA, live IDs, and staged release
+remain external gates. The user owns native rebuilding and device QA.
 
 ## Fixed product contract
 

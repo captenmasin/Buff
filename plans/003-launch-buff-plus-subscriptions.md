@@ -16,26 +16,29 @@
 >
 > ```sh
 > # Client
-> git diff --stat 3eafa2f..HEAD -- config/nativephp.php resources/js/subscriptions.ts resources/js/Pages/Settings/Subscription.vue native-plugins/in-app-purchases tests plans
+> git diff --stat 7fb4a31..HEAD -- config/nativephp.php resources/js/subscriptions.ts resources/js/Pages/Settings/Subscription.vue native-plugins/in-app-purchases tests plans
 > git diff --stat -- config/nativephp.php resources/js/subscriptions.ts resources/js/Pages/Settings/Subscription.vue native-plugins/in-app-purchases tests plans
 >
 > # API
-> git -C ../buff-server diff --stat 989de27..HEAD -- app/Services/RevenueCatService.php app/Http/Controllers/Api/V1/RevenueCatWebhookController.php config/buff.php config/services.php routes/api.php tests
-> git -C ../buff-server diff --stat -- app/Services/RevenueCatService.php app/Http/Controllers/Api/V1/RevenueCatWebhookController.php config/buff.php config/services.php routes/api.php tests
+> git -C ../buff-server diff --stat 1ab03ea..HEAD -- app/Services/RevenueCatService.php app/Http/Controllers/Api/V1/RevenueCatWebhookController.php app/Jobs/RefreshRevenueCatEntitlement.php app/Providers/AppServiceProvider.php config/buff.php config/services.php routes/api.php tests
+> git -C ../buff-server diff --stat -- app/Services/RevenueCatService.php app/Http/Controllers/Api/V1/RevenueCatWebhookController.php app/Jobs/RefreshRevenueCatEntitlement.php app/Providers/AppServiceProvider.php config/buff.php config/services.php routes/api.php tests
 > ```
 >
-> The working-tree changes described in "Current state" are expected until the
-> operator commits them. Any other material subscription-flow change is a STOP
-> condition until this plan is reconciled with the live code.
+> The source state below is reconciled through client `7fb4a31` and API
+> `1ab03ea`, plus the current uncommitted webhook no-throttle fix. Any later
+> material subscription-flow change is a STOP condition until this plan is
+> reconciled again.
 
 ## Status
 
+- **Status**: IN PROGRESS — source prerequisites complete; operator launch work remains
 - **Priority**: P1
 - **Effort**: M — approximately 2–4 operator days plus store review time
 - **Risk**: HIGH — real money, store review, server-side access control
 - **Depends on**: `plans/001-production-ios-android-subscriptions.md`
 - **Category**: direction
 - **Planned at**: client commit `3eafa2f`, API commit `989de27`, 2026-08-30
+- **Reconciled at**: client commit `7fb4a31`, API commit `1ab03ea`, 2026-09-01
 
 ## Why this matters
 
@@ -60,8 +63,8 @@ does not alter subscription data.
   version code from `NATIVEPHP_APP_VERSION` and
   `NATIVEPHP_APP_VERSION_CODE`.
 - `.env.example` fixes the app identifier as `com.spacemancodes.buff`; the
-  operator's current ignored `.env` uses release version `1.0.0` and code `11`.
-  Code 11 must be increased if either store has already consumed it.
+  operator's current ignored `.env` uses release version `1.0.0` and code `12`.
+  Code 12 must be increased if either store has already consumed it.
 - `native-plugins/in-app-purchases/nativephp.json` declares RevenueCat for iOS
   and Android, the iOS In-App Purchase capability, Android Billing permission,
   and purchase/restore/customer-info bridge functions.
@@ -73,9 +76,13 @@ does not alter subscription data.
 
 - `resources/js/subscriptions.ts` identifies the active package by the exact
   server `product_id`, preventing monthly and annual from both appearing active.
+- RevenueCat account changes wait for matching completion/failure events,
+  serialize concurrent switches, and time out safely.
 - The release build must use the platform-specific `appl_...` and `goog_...`
   RevenueCat public SDK keys. A Test Store key must never enter either submitted
   binary.
+- Store screenshot assets are committed under `artifacts/store-screenshots`;
+  console upload remains unverified.
 
 ### API: `/Users/mason/Sites/buff-server`
 
@@ -84,30 +91,29 @@ does not alter subscription data.
   database column and rollout switch.
 - `POST /api/v1/webhooks/revenuecat` requires the exact configured
   Authorization value plus RevenueCat's timestamped HMAC signature, then queues
-  an authoritative subscriber refresh.
-- `RevenueCatService` currently rejects a sandbox subscription whenever
-  `APP_ENV=production`, even if `REVENUECAT_ALLOW_SANDBOX_ENTITLEMENTS=true`:
-
-  ```php
-  $isSandbox && (app()->isProduction()
-      || ! config('buff.subscriptions.allow_sandbox_entitlements'))
-  ```
-
-  Step 1 replaces this with a controlled flag because Apple reviewers can
-  receive sandbox receipts. RevenueCat's sandbox App User ID allowlist is the
-  trust boundary during review; after launch the API flag returns to false.
+  an authoritative subscriber refresh. The route has no application throttle,
+  so every valid signed delivery queues and returns HTTP 200.
+- Webhook `environment` may be absent or null; entitlement truth still comes
+  from the queued authoritative subscriber fetch.
+- `RevenueCatService` accepts sandbox projection only when
+  `REVENUECAT_ALLOW_SANDBOX_ENTITLEMENTS=true`, including in production. The
+  default remains false and both production flag states are covered by tests.
+  RevenueCat's App User ID allowlist is the trust boundary during review; after
+  launch the API flag returns to false.
+- A later valid RevenueCat grace-period expiry extends projected access.
 - The production webhook remains production-events-only throughout review.
   Review purchases are confirmed by the authenticated refresh endpoint; they
   do not require sandbox webhook delivery into production.
-- The latest verification checkpoint passed:
-  - API: 182 tests, 1,322 assertions.
-  - Client: 268 tests, 2,108 assertions.
-  - Frontend: 102 tests.
-  - Type checking, Pint, diff checks, and NativePHP plugin validation passed.
+- The 2026-09-01 verification checkpoint passed:
+  - API: 188 tests, 1,453 assertions.
+  - Client: 277 tests, 2,183 assertions.
+  - Frontend: 127 tests.
+  - Type checking, Vite build, Pint, diff checks, and NativePHP plugin
+    validation passed.
 
 ### Outstanding operator work
 
-1. Make sandbox handling review-safe without granting general sandbox access.
+1. Restrict RevenueCat Sandbox Testing Access to named QA/review App User IDs.
 2. Create/activate the Apple and Google products and annual trial.
 3. Connect both stores to RevenueCat and configure `buff_plus`, offerings,
    credentials, webhooks, restore behavior, and Google RTDN.
@@ -120,7 +126,7 @@ does not alter subscription data.
 | Repository | Purpose | Command | Expected on success |
 |---|---|---|---|
 | `Buff` | Full PHP tests | `composer run test` | exit 0; all pass |
-| `Buff` | Frontend tests | `pnpm test:frontend` | exit 0; 102 or more pass |
+| `Buff` | Frontend tests | `pnpm test:frontend` | exit 0; 127 or more pass |
 | `Buff` | Type check | `pnpm type-check` | exit 0, no errors |
 | `Buff` | Plugin validation | `php artisan native:plugin:validate --no-interaction` | exit 0; in-app-purchases valid |
 | `buff-server` | Focused billing tests | `php artisan test --compact tests/Feature/SubscriptionTest.php tests/Feature/RevenueCatWebhookTest.php tests/Feature/MealAnalysisTest.php tests/Feature/McpDraftAndMediaToolsTest.php` | all pass |
@@ -205,27 +211,29 @@ secret store. Do not place credentials on the command line or commit them.
 
 ## Steps
 
-### Step 1: Make Apple review sandbox confirmation safe
+### Step 1: Finish Apple review sandbox controls
 
 Apple development/TestFlight purchases use sandbox, and a production-signed app
 may receive a test receipt during App Review. Preserve the default-deny policy
 while allowing only the operator-controlled review/test accounts:
 
-1. In `../buff-server/app/Services/RevenueCatService.php`, remove only the
-   unconditional `app()->isProduction()` rejection. A sandbox entitlement must
-   be accepted only when
-   `config('buff.subscriptions.allow_sandbox_entitlements')` is true.
-2. In `../buff-server/tests/Feature/SubscriptionTest.php`, replace the current
-   "production always rejects" assertion with both required cases:
-   - sandbox is rejected when the flag is false, including production;
-   - sandbox is accepted when the flag is true, including production.
-3. In RevenueCat **Project settings → General → Sandbox Testing Access**, select
+Source checkpoint:
+
+- [x] `RevenueCatService` accepts sandbox only when
+  `config('buff.subscriptions.allow_sandbox_entitlements')` is true, including
+  production.
+- [x] Feature tests cover rejection and acceptance for both production flag
+  states.
+
+Remaining operator steps:
+
+1. In RevenueCat **Project settings → General → Sandbox Testing Access**, select
    **Allowed App User IDs only**.
-4. Create dedicated Buff QA and App Review accounts. Record their server-issued
+2. Create dedicated Buff QA and App Review accounts. Record their server-issued
    `revenuecat_app_user_id` UUIDs in the secret manager and add only those UUIDs
    to RevenueCat's allowlist. Put review login credentials only in App Store
    Connect's private App Review Information.
-5. Use these server phases:
+3. Use these server phases:
 
    | Phase | `APP_ENV` | Sandbox flag | AI enforcement |
    |---|---|---:|---:|
@@ -233,7 +241,7 @@ while allowing only the operator-controlled review/test accounts:
    | Production during TestFlight/App Review | `production` | `true` | `false` |
    | Production after both apps are live | `production` | `false` | `true` |
 
-6. Keep the production RevenueCat webhook subscribed to production events only.
+4. Keep the production RevenueCat webhook subscribed to production events only.
    The review purchase becomes visible through authenticated API refresh.
 
 **Verify**:
@@ -466,7 +474,8 @@ After the 48-hour monitoring gate passes:
 
 1. Mark Plan 001 `DONE` because its source and launch conditions are complete.
 2. Mark Plan 003 `DONE`.
-3. Leave Plan 002 `TODO` until its separate AdMob work is executed.
+3. Leave Plan 002 `IN PROGRESS` until its external AdMob/device/release gates
+   pass.
 
 **Verify**:
 
@@ -528,7 +537,8 @@ All must hold:
   purchase/restore/manage smoke tests.
 - [ ] Production ends with sandbox acceptance false and AI enforcement true.
 - [ ] The first 48 hours complete without an unresolved billing incident.
-- [ ] Plans 001 and 003 are marked DONE; Plan 002 remains independent.
+- [ ] Plans 001 and 003 are marked DONE; Plan 002 remains independently IN
+  PROGRESS until its external gates pass.
 
 ## STOP conditions
 
