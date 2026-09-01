@@ -21,6 +21,7 @@ class InstallNativeShellIntegrationsCommand extends NativePluginHookCommand
 
         if ($this->isIos()) {
             $this->installIosIcon();
+            $this->installIosPrivacyManifest();
             $this->installIosRefresh();
             $this->installIosRootPathNormalization();
             $this->installIosShortcuts();
@@ -42,6 +43,14 @@ class InstallNativeShellIntegrationsCommand extends NativePluginHookCommand
 
         $this->delete($destination);
         $this->copyDirectory($source, $destination);
+    }
+
+    private function installIosPrivacyManifest(): void
+    {
+        $this->copyFile(
+            $this->pluginPath().'/resources/ios/PrivacyInfo.xcprivacy',
+            $this->buildPath().'/NativePHP/PrivacyInfo.xcprivacy',
+        );
     }
 
     private function installIosRefresh(): void

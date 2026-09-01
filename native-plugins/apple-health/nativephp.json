@@ -25,7 +25,7 @@
         "min_version": "18.0",
         "init_function": "AppleHealthPlugin.startObserving",
         "info_plist": {
-            "NSHealthShareUsageDescription": "Buff reads your workouts from Apple Health to add exercise calories to your daily log. Workout data stays on this device.",
+            "NSHealthShareUsageDescription": "Buff reads your workouts from Apple Health to add exercise calories to your daily log and sync them to your Buff account.",
             "NSHealthUpdateUsageDescription": "Buff uses Apple Health only to read your workouts for your daily exercise calories. Buff does not save or update data in Apple Health."
         },
         "entitlements": {

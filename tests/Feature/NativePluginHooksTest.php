@@ -82,6 +82,11 @@ it('keeps valid orientation defaults for both native platforms', function (): vo
         ->and(config('nativephp.orientation.android.portrait'))->toBeTrue();
 });
 
+it('declares why Buff needs the iOS camera', function (): void {
+    expect(config('nativephp.permissions.NSCameraUsageDescription'))
+        ->toBe('Buff uses the camera to scan food barcodes and take meal and progress photos.');
+});
+
 it('installs the iOS shell integrations', function (): void {
     $files = new Filesystem;
     $buildPath = storage_path('framework/testing/nativephp-ios-'.uniqid());
@@ -92,6 +97,7 @@ it('installs the iOS shell integrations', function (): void {
     $simulatorInfoPlistPath = $buildPath.'/NativePHP-simulator-Info.plist';
     $xcodeProjectPath = $buildPath.'/NativePHP.xcodeproj/project.pbxproj';
     $appIconPath = $buildPath.'/NativePHP/AppIcon.icon';
+    $privacyManifestPath = $buildPath.'/NativePHP/PrivacyInfo.xcprivacy';
 
     $files->ensureDirectoryExists(dirname($appDelegatePath));
     $files->copy(
@@ -149,6 +155,17 @@ it('installs the iOS shell integrations', function (): void {
             ->toBe($files->get(public_path('icon.icon/icon.json')))
             ->and($files->get($appIconPath.'/Assets/Vector.svg'))
             ->toBe($files->get(public_path('icon.icon/Assets/Vector.svg')))
+            ->and($files->get($privacyManifestPath))
+            ->toContain(
+                '<key>NSPrivacyTracking</key>',
+                '<false/>',
+                'NSPrivacyAccessedAPICategoryFileTimestamp',
+                'C617.1',
+                'NSPrivacyAccessedAPICategoryDiskSpace',
+                'E174.1',
+                'NSPrivacyAccessedAPICategoryUserDefaults',
+                'CA92.1',
+            )
             ->and(substr_count(
                 $files->get($xcodeProjectPath),
                 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;',

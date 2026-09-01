@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {AdmobApi, BannerResult, ConsentResult, Policy, TrackingStatus} from '../native-plugins/admob/resources/js/admob.js';
-import {createAdCoordinator, hideAppShellBanner, isAdRoute, type AdAudience} from '../resources/js/ads.ts';
+import {
+    adPrivacyOptionsRequired,
+    createAdCoordinator,
+    hideAppShellBanner,
+    isAdRoute,
+    showAdPrivacyOptions,
+    type AdAudience,
+} from '../resources/js/ads.ts';
 
 const nonEntitled = {data: {subscription: {entitled: false}}};
 
@@ -66,6 +73,7 @@ function fakeAdmob(options: {
                 return 'not_required';
             },
             async showPrivacyOptionsForm() {
+                calls.push('ump:privacy');
                 return {ok: true};
             },
         },
@@ -188,6 +196,18 @@ test('the master switch stops before policy, consent, or SDK initialization', as
     await state.coordinator.reconcile(state.input);
 
     assert.deepEqual(admob.calls, ['enabled', 'hide']);
+});
+
+test('the master switch stops privacy controls before consent work', async () => {
+    const admob = fakeAdmob({enabled: false});
+    const dependencies = {
+        platform: async () => 'ios' as const,
+        loadBridge: async () => admob.api,
+    };
+
+    assert.equal(await adPrivacyOptionsRequired('adult', dependencies), false);
+    assert.equal(await showAdPrivacyOptions(dependencies), false);
+    assert.deepEqual(admob.calls, ['enabled', 'enabled']);
 });
 
 test('a visible banner is hidden while fresh eligibility is pending', async () => {

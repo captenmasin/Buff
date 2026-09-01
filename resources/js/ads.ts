@@ -314,14 +314,25 @@ export function createAdCoordinator(dependencies: AdCoordinatorDependencies) {
     return {reconcile, beforeNavigation, destroy};
 }
 
-export async function adPrivacyOptionsRequired(audience: AdAudience): Promise<boolean> {
+export async function adPrivacyOptionsRequired(
+    audience: AdAudience,
+    dependencies: Pick<AdCoordinatorDependencies, 'platform' | 'loadBridge'> = {},
+): Promise<boolean> {
+    const platform = dependencies.platform ?? subscriptionPlatform;
+    const bridgeLoader = dependencies.loadBridge ?? loadAdmob;
+
     try {
-        if (await subscriptionPlatform() === 'unsupported') {
+        if (await platform() === 'unsupported') {
             return false;
         }
 
         return await serializeNativeOperation(async () => {
-            const bridge = await loadAdmob();
+            const bridge = await bridgeLoader();
+
+            if (!await bridge.enabled()) {
+                return false;
+            }
+
             const underAge = audience !== 'adult';
             const configured = await bridge.configurePolicy({
                 underAgeOfConsent: underAge,
@@ -342,15 +353,26 @@ export async function adPrivacyOptionsRequired(audience: AdAudience): Promise<bo
     }
 }
 
-export async function showAdPrivacyOptions(): Promise<boolean> {
+export async function showAdPrivacyOptions(
+    dependencies: Pick<AdCoordinatorDependencies, 'platform' | 'loadBridge'> = {},
+): Promise<boolean> {
+    const platform = dependencies.platform ?? subscriptionPlatform;
+    const bridgeLoader = dependencies.loadBridge ?? loadAdmob;
+
     try {
-        if (await subscriptionPlatform() === 'unsupported') {
+        if (await platform() === 'unsupported') {
             return false;
         }
 
-        return await serializeNativeOperation(async () => (
-            await (await loadAdmob()).ump.showPrivacyOptionsForm()
-        ).ok);
+        return await serializeNativeOperation(async () => {
+            const bridge = await bridgeLoader();
+
+            if (!await bridge.enabled()) {
+                return false;
+            }
+
+            return (await bridge.ump.showPrivacyOptionsForm()).ok;
+        });
     } catch {
         return false;
     }

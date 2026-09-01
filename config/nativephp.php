@@ -67,6 +67,10 @@ return [
 
     'deeplink_host' => env('NATIVEPHP_DEEPLINK_HOST'),
 
+    'permissions' => [
+        'NSCameraUsageDescription' => 'Buff uses the camera to scan food barcodes and take meal and progress photos.',
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Start URL

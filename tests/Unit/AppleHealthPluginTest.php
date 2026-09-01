@@ -16,6 +16,8 @@ it('uses HealthKit and the NativePHP ephemeral runtime for Apple Health imports'
         ->toContain('AppleHealth.SyncNow')
         ->toContain('com.apple.developer.healthkit')
         ->toContain('NSHealthShareUsageDescription')
+        ->toContain('sync them to your Buff account')
+        ->not->toContain('stays on this device')
         ->toContain('NSHealthUpdateUsageDescription')
         ->toContain('AppleHealthPlugin.startObserving')
         ->not->toContain('"background_modes"')
