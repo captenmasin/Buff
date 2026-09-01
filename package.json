@@ -29,7 +29,7 @@
         "@inertiajs/core": "^3.7.0",
         "@inertiajs/vue3": "^3.7.0",
         "@internationalized/date": "^3.12.3",
-        "@lucide/vue": "^1.38.0",
+        "@lucide/vue": "^1.39.0",
         "@unovis/ts": "^1.6.7",
         "@unovis/vue": "^1.6.7",
         "@vitejs/plugin-vue": "^6.0.8",
