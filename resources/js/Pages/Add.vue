@@ -4,6 +4,7 @@ import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue';
 import { Camera, Pencil, Dumbbell, LoaderCircle, Plus, ScanBarcode, Search, Utensils, History, X, ChevronLeft } from '@lucide/vue';
 import { formatDisplayDate } from '../dateFormat';
+import {foodSearchUrl, responseErrorMessage} from '../foodRequests';
 import { hapticImpact } from '../haptics';
 import { resizePhoto } from '../photoResize';
 import { photoDataUrl } from '../photoDataUrl';
@@ -45,6 +46,7 @@ interface FoodProduct {
 interface PreviousMeal {
     type: 'previous_meal';
     id: string;
+    source_type: string;
     name: string;
     brand?: string | null;
     image_url?: string | null;
@@ -210,6 +212,7 @@ const portionOptions = ref<PortionOption[]>([]);
 const selectedPortionKey = ref('');
 const manualBarcodeOpen = ref(false);
 const foodSearch = ref('');
+const foodSearchError = ref('');
 const foodSearchLoading = ref(false);
 const foodSearchResults = ref<FoodSearchResult[]>([]);
 const selectedPreviousMeal = ref<PreviousMeal | null>(null);
@@ -289,7 +292,9 @@ const barcodePortionMacros = computed(() => {
 });
 
 const previousMealHasPortion = computed(() => {
-    return selectedPreviousMeal.value?.portion_quantity !== null && selectedPreviousMeal.value?.portion_quantity !== undefined;
+    return selectedPreviousMeal.value?.portion_quantity !== null
+        && selectedPreviousMeal.value?.portion_quantity !== undefined
+        && selectedPreviousMeal.value?.portion_unit !== null;
 });
 
 const previousMealCalories = computed(() => {
@@ -408,6 +413,18 @@ function formatMacro(value: number) {
     return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
+function previousMealPortionLabel(meal: PreviousMeal): string {
+    if (meal.portion_quantity === null) {
+        return '';
+    }
+
+    const quantity = formatMacro(Number(meal.portion_quantity));
+
+    return meal.source_type === 'recipe'
+        ? `${quantity} serving${Number(meal.portion_quantity) === 1 ? '' : 's'}`
+        : `${quantity}${meal.portion_unit ?? ''}`;
+}
+
 function portionOptionLabel(option: PortionOption) {
     return option.label || `${option.quantity}${option.unit}`;
 }
@@ -434,8 +451,7 @@ async function lookup(scannedBarcode: string | null = null) {
         }
     } catch (error) {
         product.value = null;
-        const errors = axios.isAxiosError(error) ? error.response?.data?.errors : null;
-        lookupError.value = errors?.barcode?.[0] || 'Could not look up that barcode. Add it as custom food instead.';
+        lookupError.value = responseErrorMessage(error, 'barcode', 'Could not look up that barcode. Add it as custom food instead.');
     } finally {
         lookupLoading.value = false;
     }
@@ -443,14 +459,33 @@ async function lookup(scannedBarcode: string | null = null) {
 
 function queueFoodSearch() {
     window.clearTimeout(foodSearchTimer);
-    foodSearchTimer = window.setTimeout(() => {
-        searchFoodProducts();
-    }, 250);
-}
-
-async function searchFoodProducts() {
     const query = foodSearch.value.trim();
     const requestId = ++foodSearchRequestId;
+
+    foodSearchError.value = '';
+
+    if (query.length < 2) {
+        foodSearchResults.value = [];
+        foodSearchLoading.value = false;
+
+        return;
+    }
+
+    foodSearchLoading.value = true;
+    foodSearchTimer = window.setTimeout(() => void searchFoodProducts(query, requestId), 250);
+}
+
+function retryFoodSearch(): void {
+    window.clearTimeout(foodSearchTimer);
+
+    const query = foodSearch.value.trim();
+    const requestId = ++foodSearchRequestId;
+
+    void searchFoodProducts(query, requestId);
+}
+
+async function searchFoodProducts(query: string, requestId: number): Promise<void> {
+    foodSearchError.value = '';
 
     if (query.length < 2) {
         foodSearchResults.value = [];
@@ -461,16 +496,15 @@ async function searchFoodProducts() {
     foodSearchLoading.value = true;
 
     try {
-        const { data } = await axios.get('/food-products/search', {
-            params: { q: query },
-        });
+        const {data} = await axios.get(foodSearchUrl(query, navigator.language));
 
         if (requestId === foodSearchRequestId) {
             foodSearchResults.value = data.products || [];
         }
-    } catch {
+    } catch (error) {
         if (requestId === foodSearchRequestId) {
             foodSearchResults.value = [];
+            foodSearchError.value = responseErrorMessage(error, 'q', 'Food search is unavailable. Check your connection and try again.');
         }
     } finally {
         if (requestId === foodSearchRequestId) {
@@ -480,6 +514,7 @@ async function searchFoodProducts() {
 }
 
 function selectFoodProduct(foodProduct: FoodProduct) {
+    barcodeMealForm.clearErrors();
     selectedPreviousMeal.value = null;
     product.value = foodProduct;
     portionOptions.value = [
@@ -676,6 +711,7 @@ function addPreviousMeal() {
 }
 
 function closeFoodAddSheet() {
+    barcodeMealForm.clearErrors();
     selectedPreviousMeal.value = null;
     previousMealPortionQuantity.value = null;
     previousMealPortionUnit.value = 'g';
@@ -693,7 +729,7 @@ function addCustomMeal() {
             carbs_g: Number(data.carbs_g || 0),
             fat_g: Number(data.fat_g || 0),
         }))
-        .post('/meals/custom');
+        .post('/meals/custom', { preserveScroll: 'errors' });
 }
 
 async function selectPhotos(event: Event) {
@@ -1125,7 +1161,7 @@ onUnmounted(() => {
         </div>
 
         <Card v-if="mode === 'food'">
-            <form role="search" class="relative" @submit.prevent="searchFoodProducts">
+            <form role="search" class="relative" @submit.prevent="retryFoodSearch">
                 <Search :size="18" class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
                 <Input
                     v-model="foodSearch"
@@ -1167,6 +1203,11 @@ onUnmounted(() => {
                 Searching...
             </div>
 
+            <div v-else-if="foodSearchError" class="mt-4 rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
+                <p>{{ foodSearchError }}</p>
+                <Button type="button" variant="ghost" class="mt-2" @click="retryFoodSearch">Retry</Button>
+            </div>
+
             <div v-else-if="foodSearchResults.length" class="mt-4 grid gap-2">
                 <Button
                     v-for="result in foodSearchResults"
@@ -1201,7 +1242,7 @@ onUnmounted(() => {
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ entry.name }}</span>
                             <span class="block truncate text-sm text-muted-foreground">
-                                <span v-if="entry.portion_quantity">{{ entry.portion_quantity }}{{ entry.portion_unit }}</span>
+                            <span v-if="entry.portion_quantity">{{ previousMealPortionLabel(entry) }}</span>
                             </span>
                         </span>
                     </Button>
@@ -1211,6 +1252,8 @@ onUnmounted(() => {
             <div v-else-if="foodSearchQuery.length >= 2 && !foodSearchLoading" class="mt-4 rounded-xl bg-muted p-3 text-sm text-muted-foreground">
                 No products found.
             </div>
+
+            <p v-else-if="foodSearchQuery.length === 1" class="mt-4 text-sm text-muted-foreground">Enter one more character to search.</p>
         </Card>
 
         <AppSheet
@@ -1238,7 +1281,7 @@ onUnmounted(() => {
                         <p id="food-add-title" class="truncate text-lg font-semibold text-foreground">{{ selectedPreviousMeal?.name || product?.name || 'Add food' }}</p>
                         <p class="truncate text-base text-muted-foreground">{{ selectedPreviousMeal?.brand || product?.brand || (selectedPreviousMeal ? 'Previous item' : 'Saved product') }}</p>
                         <p v-if="selectedPreviousMeal" class="mt-1 text-sm text-foreground">
-                            {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ formatMacro(Number(selectedPreviousMeal.portion_quantity)) }}{{ selectedPreviousMeal.portion_unit }}</span> · P {{ formatMacro(Number(selectedPreviousMeal.protein_g)) }}g · C {{ formatMacro(Number(selectedPreviousMeal.carbs_g)) }}g · F {{ formatMacro(Number(selectedPreviousMeal.fat_g)) }}g
+                            {{ selectedPreviousMeal.calories }} kcal<span v-if="selectedPreviousMeal.portion_quantity"> · {{ previousMealPortionLabel(selectedPreviousMeal) }}</span> · P {{ formatMacro(Number(selectedPreviousMeal.protein_g)) }}g · C {{ formatMacro(Number(selectedPreviousMeal.carbs_g)) }}g · F {{ formatMacro(Number(selectedPreviousMeal.fat_g)) }}g
                         </p>
                         <p v-else-if="product" class="mt-1 text-sm text-foreground">
                             {{ product.calories_per_100 }} kcal · P {{ formatMacro(Number(product.protein_per_100)) }}g · C {{ formatMacro(Number(product.carbs_per_100)) }}g · F {{ formatMacro(Number(product.fat_per_100)) }}g / 100{{ product.nutrition_unit || 'g' }}
@@ -1253,8 +1296,9 @@ onUnmounted(() => {
                             :key="`${option.quantity}-${option.unit}-${index}`"
                             type="button"
                             class="h-auto shrink-0 px-4 py-1.5 text-lg"
-                            :variant="selectedPortionKey === String(index) ? 'default' : 'surface'"
-                            @click="selectPortion(option, index)"
+                        :variant="selectedPortionKey === String(index) ? 'default' : 'surface'"
+                        :aria-pressed="selectedPortionKey === String(index)"
+                        @click="selectPortion(option, index)"
                         >
                             {{ portionOptionLabel(option) }}
                         </Button>
@@ -1266,10 +1310,11 @@ onUnmounted(() => {
                         min="0.1"
                         step="0.1"
                         class="py-2.5 text-lg"
+                        aria-label="Portion quantity"
                         @input="selectedPortionKey = ''"
                     />
                     <Select v-model="activeFoodPortionUnit">
-                        <SelectTrigger class="py-2.5 text-lg">
+                        <SelectTrigger class="py-2.5 text-lg" aria-label="Portion unit">
                             <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -1277,6 +1322,10 @@ onUnmounted(() => {
                         </SelectContent>
                     </Select>
                 </div>
+
+                <p v-if="!selectedPreviousMeal && Object.values(barcodeMealForm.errors)[0]" class="text-sm text-destructive" role="alert">
+                    {{ Object.values(barcodeMealForm.errors)[0] }}
+                </p>
 
                 <MealTypePicker v-model="selectedMealType" :meal-types="mealTypes" @update:model-value="setMealType" />
 
@@ -1342,6 +1391,7 @@ onUnmounted(() => {
                         v-model="customMealForm.name"
                         type="text"
                         class="mt-1"
+                        @update:model-value="customMealForm.clearErrors('name')"
                     />
                     <span v-if="customMealForm.errors.name" class="mt-1 block text-sm text-destructive">{{ customMealForm.errors.name }}</span>
                 </label>
@@ -1355,13 +1405,14 @@ onUnmounted(() => {
                             min="0.1"
                             step="0.1"
                             class="mt-1 text-right font-semibold"
+                            @update:model-value="customMealForm.clearErrors('portion_quantity')"
                         />
                         <span v-if="customMealForm.errors.portion_quantity" class="mt-1 block text-sm text-destructive">{{ customMealForm.errors.portion_quantity }}</span>
                     </label>
 
                     <label>
                         <span class="field-label">Unit</span>
-                        <Select v-model="customMealForm.portion_unit" class="mt-1">
+                        <Select v-model="customMealForm.portion_unit" class="mt-1" @update:model-value="customMealForm.clearErrors('portion_unit')">
                             <SelectTrigger class="px-2 font-semibold">
                                 <SelectValue />
                             </SelectTrigger>
@@ -1384,7 +1435,9 @@ onUnmounted(() => {
                             step="0.1"
                             placeholder="0"
                             class="mt-1 px-2 text-right font-semibold"
+                            @update:model-value="customMealForm.clearErrors(field[0])"
                         />
+                        <span v-if="customMealForm.errors[field[0]]" class="mt-1 block text-sm text-destructive" role="alert">{{ customMealForm.errors[field[0]] }}</span>
                     </label>
                 </div>
 
@@ -1458,7 +1511,9 @@ onUnmounted(() => {
                     <Input
                         v-model="workoutForm.title"
                         type="text"
+                        maxlength="120"
                         class="mt-1"
+                        @update:model-value="workoutForm.clearErrors('title')"
                     />
                     <span v-if="workoutForm.errors.title" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.title }}</span>
                 </label>
@@ -1470,9 +1525,11 @@ onUnmounted(() => {
                             v-model.number="workoutForm.calories_burned"
                             type="number"
                             min="1"
+                            max="10000"
                             step="1"
                             placeholder="0"
                             class="mt-1 text-right font-semibold"
+                            @update:model-value="workoutForm.clearErrors('calories_burned')"
                         />
                         <span v-if="workoutForm.errors.calories_burned" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.calories_burned }}</span>
                     </label>
@@ -1483,6 +1540,7 @@ onUnmounted(() => {
                             v-model="workoutForm.time"
                             type="time"
                             class="mt-1 font-semibold"
+                            @update:model-value="workoutForm.clearErrors('time')"
                         />
                         <span v-if="workoutForm.errors.time" class="mt-1 block text-sm text-destructive">{{ workoutForm.errors.time }}</span>
                     </label>

@@ -15,6 +15,7 @@ import {
     normalizeOffering,
     subscriptionPackageButtonLabel,
     subscriptionNative,
+    subscriptionPlatform,
     type SubscriptionAccount,
     type SubscriptionPackage,
     type SubscriptionPlatform,
@@ -33,11 +34,14 @@ const packages = ref<SubscriptionPackage[]>([]);
 const busy = ref<string | null>(null);
 const refreshing = ref(false);
 const statusMessage = ref('');
-const errorMessage = ref('');
+const storeErrorMessage = ref('');
+const refreshErrorMessage = ref('');
 let removeNativeListeners: (() => void) | null = null;
 
 const active = computed(() => isSubscriptionActive(account.value?.subscription?.expires_at));
 const manageUrl = computed(() => managementUrl(platform.value, account.value?.subscription?.management_url));
+const storeName = computed(() => platform.value === 'ios' ? 'App Store' : platform.value === 'android' ? 'Google Play' : 'mobile store');
+const errorMessage = computed(() => [storeErrorMessage.value, refreshErrorMessage.value].filter(Boolean).join(' '));
 const expiryLabel = computed(() => {
     const expiresAt = account.value?.subscription?.expires_at;
 
@@ -52,7 +56,7 @@ async function refreshServer(silent = false): Promise<boolean | null> {
     refreshing.value = true;
 
     if (!silent) {
-        errorMessage.value = '';
+        refreshErrorMessage.value = '';
     }
 
     try {
@@ -66,7 +70,7 @@ async function refreshServer(silent = false): Promise<boolean | null> {
         return isSubscriptionActive(account.value?.subscription?.expires_at);
     } catch (error) {
         if (!silent) {
-            errorMessage.value = axios.isAxiosError(error)
+            refreshErrorMessage.value = axios.isAxiosError(error)
                 ? error.response?.data?.message || 'Subscription status could not be refreshed.'
                 : 'Subscription status could not be refreshed.';
         }
@@ -93,13 +97,15 @@ async function confirmWithServer(action: 'purchase' | 'restore'): Promise<void> 
 
 async function startNativeSubscriptions(): Promise<void> {
     try {
-        const configuration = await configureSubscriptions(account.value);
-        platform.value = configuration.platform;
+        platform.value = await subscriptionPlatform();
+        const configuration = await configureSubscriptions(account.value, platform.value);
         platformResolved.value = true;
 
         if (!configuration.configured) {
             if (configuration.reason === 'missing_key') {
-                errorMessage.value = 'Subscriptions are not configured in this build.';
+                storeErrorMessage.value = `This build cannot connect to ${storeName.value} subscriptions. Update Buff or contact Buff Support.`;
+            } else if (configuration.reason === 'missing_account') {
+                storeErrorMessage.value = `Buff could not link ${storeName.value} purchases to this account. Sign out and back in, then contact Buff Support if it continues.`;
             }
 
             return;
@@ -108,10 +114,13 @@ async function startNativeSubscriptions(): Promise<void> {
         removeNativeListeners = await listenForSubscriptionEvents({
             offeringLoaded: (payload) => {
                 packages.value = normalizeOffering(payload);
+                storeErrorMessage.value = '';
                 busy.value = null;
             },
             offeringFailed: (payload) => {
-                errorMessage.value = nativeError(payload, 'Subscription options are temporarily unavailable.').message;
+                const error = nativeError(payload, `${storeName.value} subscription options are temporarily unavailable.`).message;
+
+                storeErrorMessage.value = `${error} Check your connection, then leave and return to this page. If it continues, contact Buff Support.`;
                 busy.value = null;
             },
             purchaseCompleted: () => void confirmWithServer('purchase'),
@@ -124,12 +133,12 @@ async function startNativeSubscriptions(): Promise<void> {
                 statusMessage.value = 'Payment is pending. Buff+ will unlock after the store confirms it.';
             },
             purchaseFailed: (payload) => {
-                errorMessage.value = nativeError(payload, 'The purchase could not be completed.').message;
+                storeErrorMessage.value = nativeError(payload, 'The purchase could not be completed.').message;
                 busy.value = null;
             },
             restoreCompleted: () => void confirmWithServer('restore'),
             restoreFailed: (payload) => {
-                errorMessage.value = nativeError(payload, 'Purchases could not be restored.').message;
+                storeErrorMessage.value = nativeError(payload, 'Purchases could not be restored.').message;
                 busy.value = null;
             },
         });
@@ -138,7 +147,7 @@ async function startNativeSubscriptions(): Promise<void> {
     } catch {
         platformResolved.value = true;
         busy.value = null;
-        errorMessage.value = 'Subscriptions are temporarily unavailable.';
+        storeErrorMessage.value = `Could not set up ${storeName.value} subscriptions on this device. Check your connection, then leave and return to this page. If it continues, contact Buff Support.`;
     }
 }
 
@@ -148,14 +157,14 @@ async function purchase(subscriptionPackage: SubscriptionPackage): Promise<void>
     }
 
     busy.value = subscriptionPackage.packageIdentifier;
-    errorMessage.value = '';
+    storeErrorMessage.value = '';
     statusMessage.value = '';
 
     try {
         await subscriptionNative.purchase(subscriptionPackage.packageIdentifier);
     } catch {
         busy.value = null;
-        errorMessage.value = 'The purchase could not be started.';
+        storeErrorMessage.value = 'The purchase could not be started.';
     }
 }
 
@@ -165,14 +174,14 @@ async function restorePurchases(): Promise<void> {
     }
 
     busy.value = 'restore';
-    errorMessage.value = '';
+    storeErrorMessage.value = '';
     statusMessage.value = '';
 
     try {
         await subscriptionNative.restore();
     } catch {
         busy.value = null;
-        errorMessage.value = 'Restore could not be started.';
+        storeErrorMessage.value = 'Restore could not be started.';
     }
 }
 

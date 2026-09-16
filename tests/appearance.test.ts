@@ -12,6 +12,13 @@ test('reduces motion when requested by the user or their device', () => {
     assert.equal(shouldReduceMotion(false, true), true);
 });
 
+test('rechecks the Android system motion setting when the app resumes', () => {
+    const appShellSource = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
+
+    assert.match(appShellSource, /import \{applyReducedMotion} from '\.\.\/appearance'/);
+    assert.match(appShellSource, /async function syncOnResume\(\) \{\s+applyReducedMotion\(\)/);
+});
+
 test('uses a dark grey page fill in dark mode', () => {
     const styles = readFileSync(new URL('../resources/css/app.css', import.meta.url), 'utf8');
 
@@ -26,4 +33,12 @@ test('matches the site segmented-control styling for theme and roundup choices',
     assert.doesNotMatch(appearancePageSource, /bg-primary-container text-primary-container-foreground/);
     assert.equal(weeklyModeSelector.match(/bg-card text-foreground shadow-sm hover:bg-card/g)?.length, 2);
     assert.doesNotMatch(weeklyModeSelector, /bg-primary-container text-primary-container-foreground/);
+});
+
+test('labels weekly targets, selected days, and range errors accurately', () => {
+    assert.match(weeklyPageSource, /kcal period target/);
+    assert.match(weeklyPageSource, /Targets use your current goal and update when that goal changes\./);
+    assert.match(weeklyPageSource, /:aria-current="day\.is_selected \? 'date' : undefined"/);
+    assert.match(weeklyPageSource, /page\.props\.errors\?\.start_date/);
+    assert.match(weeklyPageSource, /page\.props\.errors\?\.end_date/);
 });

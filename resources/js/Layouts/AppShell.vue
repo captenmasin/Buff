@@ -9,8 +9,10 @@ import AppSheet from '../Components/AppSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
 import {createAdCoordinator, type AdAudience} from '../ads';
+import {applyReducedMotion} from '../appearance';
 import { publicAssetUrl } from '../publicAssetUrl';
 import {configureSubscriptions, isSubscriptionActive, type SubscriptionAccount} from '../subscriptions';
+import {buffSyncStatus, type BuffSyncState} from '../syncStatus';
 
 const page = usePage<{
     summary?: { date: string };
@@ -19,6 +21,7 @@ const page = usePage<{
         needs_sign_in: boolean;
         account?: SubscriptionAccount | null;
         ad_audience?: AdAudience;
+        sync?: BuffSyncState | null;
     };
 }>();
 const addDrawerOpen = ref(false);
@@ -30,9 +33,12 @@ const mobileNavContent = ref<HTMLElement | null>(null);
 const mobileNavOffset = ref<number | null>(null);
 let removeFlashToastListener: (() => void) | null = null;
 let removeAdBeforeListener: (() => void) | null = null;
+let removeHistoryNavigationListener: (() => void) | null = null;
 let mobileNavObserver: ResizeObserver | null = null;
+let adOverlayObserver: MutationObserver | null = null;
 let layoutFrame: number | null = null;
-let syncInProgress = false;
+const syncInProgress = ref(false);
+let adOverlayOpen = false;
 const adCoordinator = createAdCoordinator({
     setBannerHeight: (height) => {
         adBannerHeight.value = height;
@@ -50,6 +56,7 @@ const path = computed(() => new URL(page.url, window.location.origin).pathname);
 
 const isSettingsSubpage = computed(() => path.value.startsWith('/settings/'));
 const subscriptionActive = computed(() => isSubscriptionActive(page.props.buff.account?.subscription?.expires_at));
+const syncStatus = computed(() => buffSyncStatus(page.props.buff.sync, syncInProgress.value));
 
 function isActive(match: string) {
     if (match === '/') {
@@ -184,6 +191,26 @@ function updateMobileNavOffset() {
             : null;
 }
 
+function syncAdOverlayVisibility() {
+    const nextOverlayOpen = document.querySelector(
+        '[data-slot="sheet-overlay"], [data-slot="dialog-overlay"], [data-slot="alert-dialog-overlay"], [data-native-overlay]',
+    ) !== null;
+
+    if (nextOverlayOpen === adOverlayOpen) {
+        return;
+    }
+
+    adOverlayOpen = nextOverlayOpen;
+
+    if (adOverlayOpen) {
+        void adCoordinator.beforeNavigation('/overlay');
+
+        return;
+    }
+
+    void reconcileAds();
+}
+
 async function reconcileAds(
     account = page.props.buff.needs_sign_in === false ? page.props.buff.account : null,
     url = page.url,
@@ -193,7 +220,7 @@ async function reconcileAds(
     updateMobileNavOffset();
     await adCoordinator.reconcile({
         account,
-        url: addDrawerOpen.value ? '/add' : url,
+        url: addDrawerOpen.value || adOverlayOpen ? '/overlay' : url,
         audience,
         bottomOffset: mobileNavOffset.value,
     });
@@ -211,13 +238,14 @@ function handleViewportChange() {
 }
 
 async function syncOnResume() {
+    applyReducedMotion();
     void reconcileAds();
 
-    if (page.props.buff.needs_sign_in || !navigator.onLine || syncInProgress) {
+    if (page.props.buff.needs_sign_in || !navigator.onLine || syncInProgress.value) {
         return;
     }
 
-    syncInProgress = true;
+    syncInProgress.value = true;
 
     try {
         await axios.post('/sync/resume');
@@ -226,7 +254,7 @@ async function syncOnResume() {
     } catch {
         router.reload({only: ['buff']});
     } finally {
-        syncInProgress = false;
+        syncInProgress.value = false;
     }
 }
 
@@ -260,6 +288,9 @@ async function showFlashToast(message?: string) {
 onMounted(() => {
     window.addEventListener('popstate', handlePopState);
     window.__buffHandleAndroidBack = handleNativeAndroidBack;
+    adOverlayObserver = new MutationObserver(syncAdOverlayVisibility);
+    adOverlayObserver.observe(document.body, {childList: true, subtree: true});
+    syncAdOverlayVisibility();
     syncOnResume();
     window.addEventListener('focus', syncOnResume);
     window.addEventListener('online', syncOnResume);
@@ -277,6 +308,14 @@ onMounted(() => {
 
     removeAdBeforeListener = router.on('before', (event) => {
         void adCoordinator.beforeNavigation(String(event.detail.visit.url));
+    });
+
+    removeHistoryNavigationListener = router.on('navigate', (event) => {
+        if (event.detail.visitId !== undefined) {
+            return;
+        }
+
+        router.reload({only: ['buff', 'flash'], preserveErrors: true});
     });
 
     removeFlashToastListener = router.on('success', (event) => {
@@ -305,6 +344,8 @@ onUnmounted(() => {
     clearFallbackToast();
     mobileNavObserver?.disconnect();
     mobileNavObserver = null;
+    adOverlayObserver?.disconnect();
+    adOverlayObserver = null;
 
     if (layoutFrame !== null) {
         window.cancelAnimationFrame(layoutFrame);
@@ -323,6 +364,11 @@ onUnmounted(() => {
     if (removeAdBeforeListener) {
         removeAdBeforeListener();
         removeAdBeforeListener = null;
+    }
+
+    if (removeHistoryNavigationListener) {
+        removeHistoryNavigationListener();
+        removeHistoryNavigationListener = null;
     }
 
     void adCoordinator.destroy();
@@ -350,6 +396,7 @@ onUnmounted(() => {
                     :as="Link"
                     :href="item.href"
                     :variant="isActive(item.match) ? 'secondary' : 'ghost'"
+                    :aria-current="isActive(item.match) ? 'page' : undefined"
                     class="h-11 justify-start rounded-xl px-3 text-sm"
                 >
                     <component :is="item.icon" :size="19" stroke-width="2.2" />
@@ -369,6 +416,25 @@ onUnmounted(() => {
         </aside>
 
         <main class="app-main mx-auto w-full max-w-md flex-1 px-4 sm:max-w-3xl sm:px-6 lg:max-w-5xl lg:px-8">
+            <div
+                v-if="syncStatus && syncStatus.kind === 'failed'"
+                class="mb-3 flex items-center justify-between gap-3 rounded-xl border border-border bg-card px-3 py-2 text-sm"
+                :class="syncStatus.kind === 'failed' ? 'text-destructive' : 'text-muted-foreground'"
+                :role="syncStatus.kind === 'failed' ? 'alert' : 'status'"
+                aria-live="polite"
+            >
+                <span>{{ syncStatus.detail }}</span>
+                <Button
+                    v-if="syncStatus.retry"
+                    type="button"
+                    size="sm"
+                    variant="surface"
+                    :disabled="syncInProgress"
+                    @click="syncOnResume"
+                >
+                    Retry sync
+                </Button>
+            </div>
             <slot />
         </main>
 
@@ -416,6 +482,7 @@ onUnmounted(() => {
                     :href="navItems[0].href"
                     size="nav"
                     :variant="isActive(navItems[0].match) ? 'default' : 'ghost'"
+                    :aria-current="isActive(navItems[0].match) ? 'page' : undefined"
                     :class="['flex rounded-xl font-normal', isActive(navItems[0].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[0].icon" :size="20" stroke-width="2.2" />
@@ -427,6 +494,7 @@ onUnmounted(() => {
                     :href="navItems[1].href"
                     size="nav"
                     :variant="isActive(navItems[1].match) ? 'default' : 'ghost'"
+                    :aria-current="isActive(navItems[1].match) ? 'page' : undefined"
                     :class="['flex rounded-xl font-normal', isActive(navItems[1].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[1].icon" :size="20" stroke-width="2.2" />
@@ -448,6 +516,7 @@ onUnmounted(() => {
                     :href="navItems[2].href"
                     size="nav"
                     :variant="isActive(navItems[2].match) ? 'default' : 'ghost'"
+                    :aria-current="isActive(navItems[2].match) ? 'page' : undefined"
                     :class="['flex rounded-xl font-normal', isActive(navItems[2].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[2].icon" :size="20" stroke-width="2.2" />
@@ -459,6 +528,7 @@ onUnmounted(() => {
                     :href="navItems[3].href"
                     size="nav"
                     :variant="isActive(navItems[3].match) ? 'default' : 'ghost'"
+                    :aria-current="isActive(navItems[3].match) ? 'page' : undefined"
                     :class="['flex rounded-xl font-normal', isActive(navItems[3].match) ? 'bg-primary text-brand-night' : '']"
                 >
                     <component :is="navItems[3].icon" :size="20" stroke-width="2.2" />

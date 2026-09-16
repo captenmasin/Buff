@@ -13,6 +13,10 @@
             {
                 "name": "android.hardware.camera",
                 "required": false
+            },
+            {
+                "name": "android.hardware.camera.autofocus",
+                "required": false
             }
         ]
     },

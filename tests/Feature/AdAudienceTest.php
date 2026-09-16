@@ -19,5 +19,6 @@ it('shares only the advertising age band', function (?int $age, string $expected
 })->with([
     'missing age is teen-safe' => [null, 'teen'],
     'age 17 is teen-safe' => [17, 'teen'],
-    'age 18 is adult' => [18, 'adult'],
+    'age 18 is teen-safe' => [18, 'teen'],
+    'age 19 is adult' => [19, 'adult'],
 ]);

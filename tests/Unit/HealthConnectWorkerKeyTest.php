@@ -5,7 +5,10 @@ it('uses the NativePHP background environment instead of cloning its setup', fun
 
     expect($worker)
         ->toContain('LaravelEnvironment(applicationContext).initializeForBackground()')
-        ->toContain('output.contains("BUFF_HEALTH_CONNECT_IMPORT_OK")')
+        ->toContain('private const val IMPORT_SUCCESS_MARKER = "BUFF_HEALTH_CONNECT_IMPORT_OK"')
+        ->toContain('"health-connect:import --payload=${file.absolutePath} --result=${resultFile.absolutePath}"')
+        ->toContain('resultFile.readText() != IMPORT_SUCCESS_MARKER')
+        ->not->toContain('output.contains("BUFF_HEALTH_CONNECT_IMPORT_OK")')
         ->not->toContain('appKeyFile.writeText')
         ->not->toContain('migrate --force');
 });
@@ -34,7 +37,7 @@ it('revokes permissions and exposes a health connect disconnect control', functi
         ->and($settings)
         ->toContain("healthImport.value?.prefix === '/health-connect'")
         ->toContain('healthImport.value.state.foreground_granted === true')
-        ->toContain('const nextState = {message: null, ...data, ...(data.native || {})};')
+        ->toContain('const nextState = {message: null, last_error: null, ...data, ...(data.native || {})};')
         ->toContain("axios.delete('/health-connect')")
         ->toContain('Disconnect Health Connect');
 
@@ -68,9 +71,10 @@ it('schedules Health Connect through the generic background worker', function ()
         ->and($backgroundWorker)
         ->toContain('LaravelEnvironment(context).initializeForBackground()')
         ->toContain('registerContextOnlyBridgeFunctions(context)')
-        ->toContain('"background-task:run $taskId"')
+        ->toContain('"background-task:run --task=$taskId --result=${resultFile.absolutePath}"')
         ->toContain('bridge.nativeEphemeralArtisan(command)')
-        ->toContain('SUCCESS_PREFIX + taskId')
+        ->toContain('resultFile.readText() != SUCCESS_PREFIX + taskId')
+        ->not->toContain('output.contains(SUCCESS_PREFIX + taskId)')
         ->toContain('OneTimeWorkRequestBuilder<ScheduledTaskWorker>()')
         ->toContain('setInitialDelay(task.intervalMinutes, TimeUnit.MINUTES)')
         ->toContain('ExistingWorkPolicy.KEEP')
@@ -84,4 +88,36 @@ it('schedules Health Connect through the generic background worker', function ()
         ->and($backgroundProvider)
         ->toContain("nativephp_call('BackgroundTasks.Register'")
         ->toContain('->registrations()');
+});
+
+it('keeps health settings polling queued work and exposes request failures', function (): void {
+    $settings = file_get_contents(__DIR__.'/../../resources/js/Pages/Settings/Health.vue');
+
+    expect($settings)
+        ->toContain("['permission_requested', 'sync_queued'].includes(healthImport.value?.state.status ?? '')")
+        ->toContain('void refreshHealthConnectStatusAndPoll()')
+        ->toContain("last_error: `Could not \${isSync ? 'sync' : 'connect'}")
+        ->toContain("last_error: 'Could not disconnect Health Connect.'")
+        ->toContain(":role=\"healthImport?.state.last_error ? 'alert' : undefined\"");
+});
+
+it('offers Health Connect access recovery after permission lockout', function (): void {
+    $manifest = file_get_contents(__DIR__.'/../../native-plugins/health-connect/nativephp.json');
+    $functions = file_get_contents(__DIR__.'/../../native-plugins/health-connect/resources/android/src/com/buff/healthconnect/HealthConnectFunctions.kt');
+    $settings = file_get_contents(__DIR__.'/../../resources/js/Pages/Settings/Health.vue');
+
+    expect($manifest)
+        ->toContain('HealthConnect.ManageAccess')
+        ->and($functions)
+        ->toContain('android.health.connect.action.MANAGE_HEALTH_PERMISSIONS')
+        ->toContain('Intent.EXTRA_PACKAGE_NAME')
+        ->toContain('HealthConnectClient.ACTION_HEALTH_CONNECT_SETTINGS')
+        ->toContain('withContext(Dispatchers.Main.immediate)')
+        ->toContain('"manage_access_opened" to false')
+        ->toContain('"last_error" to "Could not open Health Connect access settings.')
+        ->and($settings)
+        ->toContain("axios.post('/health-connect/manage-access')")
+        ->toContain('Manage Health Connect access')
+        ->toContain('If Connect no longer shows a permission prompt')
+        ->toContain('Could not open Health Connect access settings.');
 });

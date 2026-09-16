@@ -36,6 +36,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.time.ZonedDateTime
 import java.util.UUID
 import java.util.concurrent.TimeUnit
@@ -60,7 +61,6 @@ private const val MEAL_NOTIFICATION_CHANNEL_ID = "meal-reminders"
 private const val DEVICE_NOTIFICATION_CHANNEL_ID = "notifications"
 private const val NOTIFICATION_PERMISSION_REQUEST_CODE = 1002
 private const val NOTIFICATION_PERMISSION_REQUESTED_KEY = "notification-permission-requested"
-private const val MEAL_REMINDER_MAX_RETRIES = 3
 private val TASK_ID_PATTERN = Regex("^[a-f0-9]{64}$")
 private val MEAL_IDS = setOf("breakfast", "lunch", "dinner")
 private val MEAL_TIME_PATTERN = Regex("^([01]\\d|2[0-3]):[0-5]\\d$")
@@ -321,12 +321,17 @@ class ScheduledTaskWorker(
             return@withContext Result.success()
         }
 
+        val resultFile = File(
+            applicationContext.cacheDir,
+            "buff-background-task-${UUID.randomUUID()}.result"
+        )
         val result = try {
+            resultFile.delete()
             val output = runBackgroundArtisan(
                 applicationContext,
-                "background-task:run $taskId"
+                "background-task:run --task=$taskId --result=${resultFile.absolutePath}"
             )
-            if (!output.contains(SUCCESS_PREFIX + taskId)) {
+            if (!resultFile.exists() || resultFile.readText() != SUCCESS_PREFIX + taskId) {
                 throw IllegalStateException(output.trim().ifEmpty {
                     "Background command did not report success."
                 })
@@ -337,6 +342,8 @@ class ScheduledTaskWorker(
         } catch (error: Exception) {
             Log.e("BuffBackgroundTasks", "Background task failed", error)
             if (intervalMinutes < 15) Result.success() else Result.retry()
+        } finally {
+            resultFile.delete()
         }
 
         if (intervalMinutes < 15 && isTaskRegistered(applicationContext, taskId)) {
@@ -417,23 +424,34 @@ class MealReminderWorker(
         if (canNotify) {
             try {
                 val localDate = ZonedDateTime.now().toLocalDate()
-                val output = runBackgroundArtisan(
-                    applicationContext,
-                    "meal-reminder:check --meal=$mealId --date=$localDate"
+                val resultFile = File(
+                    applicationContext.cacheDir,
+                    "buff-meal-reminder-${UUID.randomUUID()}.result"
                 )
 
-                when {
-                    output.contains(MEAL_DUE_PREFIX + mealId) -> showMealReminder(applicationContext, mealId)
-                    !output.contains(MEAL_LOGGED_PREFIX + mealId) -> throw IllegalStateException(
-                        output.trim().ifEmpty { "Meal reminder check returned no result." }
+                try {
+                    resultFile.delete()
+                    runBackgroundArtisan(
+                        applicationContext,
+                        "meal-reminder:check --meal=$mealId --date=$localDate --result=${resultFile.absolutePath}"
                     )
+
+                    val result = if (resultFile.exists()) resultFile.readText() else ""
+
+                    when (result) {
+                        MEAL_DUE_PREFIX + mealId -> showMealReminder(applicationContext, mealId)
+                        MEAL_LOGGED_PREFIX + mealId -> Unit
+                        else -> throw IllegalStateException(
+                            result.trim().ifEmpty { "Meal reminder check returned no result." }
+                        )
+                    }
+                } finally {
+                    resultFile.delete()
                 }
             } catch (error: Exception) {
                 Log.e("BuffMealReminders", "Could not check the $mealId reminder", error)
 
-                if (runAttemptCount < MEAL_REMINDER_MAX_RETRIES) {
-                    return@withContext Result.retry()
-                }
+                return@withContext Result.retry()
             }
         }
 

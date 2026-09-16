@@ -7,6 +7,7 @@ use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use App\Models\HealthConnectIgnoredWorkout;
 use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\SyncedModel;
@@ -20,6 +21,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Throwable;
 
 class BuffSyncService
@@ -157,56 +159,62 @@ class BuffSyncService
         $remindersChanged = false;
 
         $applied = Model::withoutEvents(function () use ($state, $deviceId, $data, $sentByRecord, &$remindersChanged): bool {
-            return DB::transaction(function () use ($state, $deviceId, $data, $sentByRecord, &$remindersChanged): bool {
-                $currentState = SyncState::query()
-                    ->whereKey($state->getKey())
-                    ->where('device_id', $deviceId)
-                    ->lockForUpdate()
-                    ->first();
+            Schema::disableForeignKeyConstraints();
 
-                if ($currentState === null) {
-                    return false;
-                }
+            try {
+                return DB::transaction(function () use ($state, $deviceId, $data, $sentByRecord, &$remindersChanged): bool {
+                    $currentState = SyncState::query()
+                        ->whereKey($state->getKey())
+                        ->where('device_id', $deviceId)
+                        ->lockForUpdate()
+                        ->first();
 
-                foreach ($data['acknowledged'] as $acknowledgement) {
-                    if (! is_array($acknowledgement)) {
-                        continue;
+                    if ($currentState === null) {
+                        return false;
                     }
 
-                    $key = ($acknowledgement['type'] ?? '').':'.($acknowledgement['id'] ?? '');
-                    $snapshot = $sentByRecord->get($key);
-                    $accepted = ($acknowledgement['accepted'] ?? null) === true;
-                    $serverRecord = $acknowledgement['server_record'] ?? null;
+                    foreach ($data['acknowledged'] as $acknowledgement) {
+                        if (! is_array($acknowledgement)) {
+                            continue;
+                        }
 
-                    if (! $accepted && (! is_array($serverRecord) || ! $this->validRemoteChange($serverRecord))) {
-                        continue;
+                        $key = ($acknowledgement['type'] ?? '').':'.($acknowledgement['id'] ?? '');
+                        $snapshot = $sentByRecord->get($key);
+                        $accepted = ($acknowledgement['accepted'] ?? null) === true;
+                        $serverRecord = $acknowledgement['server_record'] ?? null;
+
+                        if (! $accepted && (! is_array($serverRecord) || ! $this->validRemoteChange($serverRecord))) {
+                            continue;
+                        }
+
+                        if (! $snapshot instanceof SyncOutbox || ! $this->deleteMatchingOutbox($snapshot)) {
+                            continue;
+                        }
+
+                        if (! $accepted) {
+                            $remindersChanged = $this->applyRemote($serverRecord) || $remindersChanged;
+                        }
                     }
 
-                    if (! $snapshot instanceof SyncOutbox || ! $this->deleteMatchingOutbox($snapshot)) {
-                        continue;
+                    foreach ($this->orderedRemoteChanges($data['changes']) as $change) {
+                        if (! is_array($change) || ! $this->validRemoteChange($change) || ! $this->remoteWinsPendingChange($change, $deviceId)) {
+                            continue;
+                        }
+
+                        $remindersChanged = $this->applyRemote($change) || $remindersChanged;
                     }
 
-                    if (! $accepted) {
-                        $remindersChanged = $this->applyRemote($serverRecord) || $remindersChanged;
-                    }
-                }
+                    $currentState->update([
+                        'cursor' => (int) $data['cursor'],
+                        'last_succeeded_at' => Date::now(),
+                        'last_error' => null,
+                    ]);
 
-                foreach ($data['changes'] as $change) {
-                    if (! is_array($change) || ! $this->validRemoteChange($change) || ! $this->remoteWinsPendingChange($change, $deviceId)) {
-                        continue;
-                    }
-
-                    $remindersChanged = $this->applyRemote($change) || $remindersChanged;
-                }
-
-                $currentState->update([
-                    'cursor' => (int) $data['cursor'],
-                    'last_succeeded_at' => Date::now(),
-                    'last_error' => null,
-                ]);
-
-                return true;
-            });
+                    return true;
+                });
+            } finally {
+                Schema::enableForeignKeyConstraints();
+            }
         });
 
         if ($applied && $remindersChanged) {
@@ -295,19 +303,16 @@ class BuffSyncService
             ->where('record_id', $id)
             ->first();
 
-        if ($pending === null
-            && $type === 'body_metrics'
-            && ($change['deleted'] ?? false) === false
-            && is_array($change['data'] ?? null)
-            && is_string($change['data']['date'] ?? null)) {
-            $localIds = BodyMetric::query()
-                ->whereDate('date', $change['data']['date'])
-                ->pluck('id');
-            $pending = SyncOutbox::query()
-                ->where('record_type', $type)
-                ->whereIn('record_id', $localIds)
-                ->latest('client_updated_at')
-                ->first();
+        if ($pending === null) {
+            $localIds = $this->localIdsForNaturalKey($change);
+
+            if ($localIds !== []) {
+                $pending = SyncOutbox::query()
+                    ->where('record_type', $type)
+                    ->whereIn('record_id', $localIds)
+                    ->latest('client_updated_at')
+                    ->first();
+            }
         }
 
         if ($pending === null) {
@@ -366,22 +371,7 @@ class BuffSyncService
             }
         }
 
-        if ($model === null
-            && $modelClass === BodyMetric::class
-            && is_string($change['data']['date'] ?? null)) {
-            $model = BodyMetric::query()
-                ->whereDate('date', $change['data']['date'])
-                ->latest('updated_at')
-                ->first();
-
-            if ($model !== null) {
-                PendingBodyMetricPhotoUpload::query()
-                    ->where('body_metric_id', $model->getKey())
-                    ->update(['body_metric_id' => $id]);
-            }
-        }
-
-        $model ??= new $modelClass;
+        $model = $this->localModelForRemote($modelClass, $id, $change['data'], $model);
         $model->setAttribute($model->getKeyName(), $id);
         $model->forceFill(Arr::only($change['data'], $fields));
         $model->timestamps = false;
@@ -396,6 +386,95 @@ class BuffSyncService
         $model->timestamps = true;
 
         return $modelClass === AppPreference::class;
+    }
+
+    /**
+     * @param  array<int, mixed>  $changes
+     * @return Collection<int, mixed>
+     */
+    private function orderedRemoteChanges(array $changes): Collection
+    {
+        return collect($changes)->sortBy(fn (mixed $change): int => is_array($change)
+            ? $this->applyOrder((string) ($change['type'] ?? ''))
+            : 5)->values();
+    }
+
+    private function applyOrder(string $type): int
+    {
+        return match ($type) {
+            'recipes' => 0,
+            'meal_entries' => 10,
+            default => 5,
+        };
+    }
+
+    /**
+     * @param  class-string<SyncedModel>  $modelClass
+     * @param  array<string, mixed>  $data
+     */
+    private function localModelForRemote(string $modelClass, string $id, array $data, ?SyncedModel $model): SyncedModel
+    {
+        $occupant = $this->modelForNaturalKey($modelClass, $data);
+
+        if ($occupant !== null && ($model === null || $occupant->isNot($model))) {
+            if ($modelClass === BodyMetric::class) {
+                PendingBodyMetricPhotoUpload::query()
+                    ->whereIn('body_metric_id', array_values(array_filter([$model?->getKey(), $occupant->getKey()])))
+                    ->update(['body_metric_id' => $id]);
+            }
+
+            if ($model !== null) {
+                $model->delete();
+            }
+
+            return $occupant;
+        }
+
+        return $model ?? new $modelClass;
+    }
+
+    /**
+     * @param  class-string<SyncedModel>  $modelClass
+     * @param  array<string, mixed>  $data
+     */
+    private function modelForNaturalKey(string $modelClass, array $data): ?SyncedModel
+    {
+        if ($modelClass === BodyMetric::class && is_string($data['date'] ?? null)) {
+            return BodyMetric::query()
+                ->whereDate('date', $data['date'])
+                ->latest('updated_at')
+                ->first();
+        }
+
+        if ($modelClass === HealthConnectIgnoredWorkout::class
+            && is_string($data['source_type'] ?? null)
+            && is_string($data['external_id'] ?? null)) {
+            return HealthConnectIgnoredWorkout::query()
+                ->where('source_type', $data['source_type'])
+                ->where('external_id', $data['external_id'])
+                ->first();
+        }
+
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $change
+     * @return list<string>
+     */
+    private function localIdsForNaturalKey(array $change): array
+    {
+        $type = $change['type'] ?? null;
+        $data = $change['data'] ?? null;
+
+        if (! is_string($type) || ($change['deleted'] ?? false) === true || ! is_array($data)) {
+            return [];
+        }
+
+        $modelClass = $this->modelFor($type);
+        $occupant = $modelClass === null ? null : $this->modelForNaturalKey($modelClass, $data);
+
+        return $occupant === null ? [] : [(string) $occupant->getKey()];
     }
 
     /** @return class-string<SyncedModel>|null */

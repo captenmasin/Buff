@@ -49,7 +49,7 @@ class GoalController extends Controller
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
-            'target_weight_kg' => ['present', 'nullable', 'numeric', 'min:1', 'max:1000'],
+            'target_weight_kg' => ['present', 'nullable', 'numeric', 'min:20', 'max:1000'],
             'target_body_fat_percent' => ['present', 'nullable', 'numeric', 'min:1', 'max:80'],
         ]);
 

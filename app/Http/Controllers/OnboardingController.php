@@ -58,10 +58,10 @@ class OnboardingController extends Controller
     {
         $validated = $request->validate([
             ...BodyProfile::rules(),
-            'current_weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
+            'current_weight_kg' => ['required', 'numeric', 'min:20', 'max:1000'],
             'goal' => ['required', Rule::in(['lose', 'maintain', 'gain'])],
             'weekly_goal_kg' => [
-                Rule::requiredIf(fn (): bool => $request->integer('age') >= 18 && $request->string('goal')->toString() !== 'maintain'),
+                Rule::requiredIf(fn (): bool => $request->integer('age') > 18 && $request->string('goal')->toString() !== 'maintain'),
                 'nullable',
                 'numeric',
                 'min:0.05',
@@ -96,7 +96,7 @@ class OnboardingController extends Controller
             'personalized' => true,
             'teen_maintenance_only' => $estimate['teen_maintenance_only'],
             'notice' => $estimate['teen_maintenance_only']
-                ? 'For ages 13–17, Buff recommends maintenance calories only. Ask a parent or guardian and a qualified health professional about weight-change goals.'
+                ? 'For ages 13–18, Buff recommends maintenance calories only. Ask a parent or guardian and a qualified health professional about weight-change goals.'
                 : 'This is a starting estimate. Track your progress and adjust it in Goals as needed.',
         ]);
     }
@@ -109,8 +109,8 @@ class OnboardingController extends Controller
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             ...BodyProfile::rules(),
-            'current_weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
-            'target_weight_kg' => ['nullable', 'numeric', 'min:1', 'max:1000'],
+            'current_weight_kg' => ['required', 'numeric', 'min:20', 'max:1000'],
+            'target_weight_kg' => ['nullable', 'numeric', 'min:20', 'max:1000'],
             'target_body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
             'weight_unit' => ['required', Rule::in(AppPreference::WEIGHT_UNITS)],
             'height_unit' => ['required', Rule::in(AppPreference::HEIGHT_UNITS)],

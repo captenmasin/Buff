@@ -2,7 +2,10 @@
 
 namespace Buff\NativeRefresh\Commands;
 
+use Dotenv\Dotenv;
 use Native\Mobile\Plugins\Commands\NativePluginHookCommand;
+use RuntimeException;
+use ZipArchive;
 
 class InstallNativeShellIntegrationsCommand extends NativePluginHookCommand
 {
@@ -13,22 +16,139 @@ class InstallNativeShellIntegrationsCommand extends NativePluginHookCommand
     public function handle(): int
     {
         if ($this->isAndroid()) {
+            $this->syncAndroidBuildMetadata();
             $this->installAndroidRefresh();
+            $this->installAndroidRequestCapture();
             $this->installAndroidBackHandler();
             $this->installAndroidDeepLinkScheme();
             $this->installAndroidAddShortcut();
         }
 
         if ($this->isIos()) {
+            $this->syncIosBuildMetadata();
             $this->installIosIcon();
             $this->installIosPrivacyManifest();
             $this->installIosRefresh();
+            $this->installIosToastPosition();
             $this->installIosRootPathNormalization();
             $this->installIosShortcuts();
             $this->installIosSimulatorEntitlements();
         }
 
         return self::SUCCESS;
+    }
+
+    private function syncAndroidBuildMetadata(): void
+    {
+        $assetsPath = $this->buildPath().'/app/src/main/assets';
+        $bundlePath = $assetsPath.'/laravel_bundle.zip';
+
+        if (! is_file($bundlePath)) {
+            return;
+        }
+
+        $bundle = new ZipArchive;
+
+        if ($bundle->open($bundlePath) !== true) {
+            throw new RuntimeException('Could not read the Android Laravel bundle version.');
+        }
+
+        $bundledEnvironment = $bundle->getFromName('.env');
+        $bundle->close();
+
+        if ($bundledEnvironment === false) {
+            throw new RuntimeException('The Android Laravel bundle is missing its environment configuration.');
+        }
+
+        $environment = Dotenv::parse($bundledEnvironment);
+        $version = (string) ($environment['NATIVEPHP_APP_VERSION'] ?? config('nativephp.version'));
+        $versionCode = (string) ($environment['NATIVEPHP_APP_VERSION_CODE'] ?? config('nativephp.version_code'));
+
+        if ($version === '' || ! ctype_digit($versionCode) || (int) $versionCode < 1) {
+            throw new RuntimeException('NATIVEPHP_APP_VERSION and NATIVEPHP_APP_VERSION_CODE must be valid before building Android.');
+        }
+
+        $versionCode = (int) $versionCode;
+        config([
+            'nativephp.version' => $version,
+            'nativephp.version_code' => $versionCode,
+        ]);
+
+        $this->patchFile(
+            $this->buildPath().'/app/build.gradle.kts',
+            fn (string $content): string => preg_replace(
+                [
+                    '/versionCode\s*=\s*(?:\d+|REPLACEMECODE)/',
+                    '/versionName\s*=\s*(?:".*?"|"REPLACEME")/',
+                ],
+                [
+                    "versionCode = {$versionCode}",
+                    "versionName = \"{$version}\"",
+                ],
+                $content,
+            ) ?? $content,
+        );
+
+        $bundleMetadataPath = $assetsPath.'/bundle_meta.json';
+
+        if (is_file($bundleMetadataPath)) {
+            $metadata = json_decode((string) file_get_contents($bundleMetadataPath), true, flags: JSON_THROW_ON_ERROR);
+            $metadata['version'] = $version;
+            $metadata['version_code'] = (string) $versionCode;
+            file_put_contents($bundleMetadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+        }
+
+        $bundleVersion = $version === 'DEBUG' ? 'DEBUG' : "{$version}b{$versionCode}";
+
+        if ($bundle->open($bundlePath) !== true || ! $bundle->addFromString('.version', "{$bundleVersion}\n") || ! $bundle->close()) {
+            throw new RuntimeException('Could not reconcile the Android Laravel bundle version.');
+        }
+    }
+
+    private function syncIosBuildMetadata(): void
+    {
+        $assetsPath = $this->buildPath().'/NativePHP';
+        $bundlePath = $assetsPath.'/app.zip';
+
+        if (! is_file($bundlePath)) {
+            return;
+        }
+
+        $project = (string) file_get_contents($this->buildPath().'/NativePHP.xcodeproj/project.pbxproj');
+
+        if (! preg_match('/MARKETING_VERSION = "?([A-Za-z0-9.]+)"?;/', $project, $versionMatch)
+            || ! preg_match('/CURRENT_PROJECT_VERSION = ([1-9][0-9]*);/', $project, $codeMatch)) {
+            throw new RuntimeException('Could not read the iOS Xcode release version.');
+        }
+
+        $version = $versionMatch[1];
+        $versionCode = (int) $codeMatch[1];
+        $bundle = new ZipArchive;
+
+        if ($bundle->open($bundlePath) !== true) {
+            throw new RuntimeException('Could not read the iOS Laravel bundle version.');
+        }
+
+        $environment = $bundle->getFromName('.env');
+
+        if ($environment === false) {
+            $bundle->close();
+            throw new RuntimeException('The iOS Laravel bundle is missing its environment configuration.');
+        }
+
+        $environment = preg_replace('/^NATIVEPHP_APP_VERSION(?:_CODE)?=.*\R?/m', '', $environment);
+        $environment = rtrim($environment)."\nNATIVEPHP_APP_VERSION={$version}\nNATIVEPHP_APP_VERSION_CODE={$versionCode}\n";
+
+        if (! $bundle->addFromString('.env', $environment) || ! $bundle->close()) {
+            throw new RuntimeException('Could not reconcile the iOS Laravel bundle version.');
+        }
+
+        $metadataPath = $assetsPath.'/bundle_meta.json';
+        $metadata = json_decode((string) file_get_contents($metadataPath), true, flags: JSON_THROW_ON_ERROR);
+        $metadata['version'] = $version;
+        $metadata['version_code'] = $versionCode;
+        file_put_contents($metadataPath, json_encode($metadata, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR)."\n");
+        file_put_contents($assetsPath.'/bundled.version', $version === 'DEBUG' ? 'DEBUG' : "{$version}b{$versionCode}");
     }
 
     private function installIosIcon(): void
@@ -114,6 +234,26 @@ SWIFT."\n",
                     $content,
                 );
             }
+        );
+    }
+
+    private function installIosToastPosition(): void
+    {
+        $this->patchFile(
+            $this->buildPath().'/NativePHP/Components/Toast.swift',
+            fn (string $content): string => str_replace(
+                [
+                    '// Position toast at bottom, respecting safe area',
+                    'let yPosition = window.frame.height - safeAreaInsets.bottom - toastHeight - 100',
+                    'toastLabel.backgroundColor = UIColor.black.withAlphaComponent(0.6)',
+                ],
+                [
+                    '// Keep confirmations clear of bottom banners and navigation.',
+                    'let yPosition = safeAreaInsets.top + 16',
+                    'toastLabel.backgroundColor = .darkGray',
+                ],
+                $content,
+            ),
         );
     }
 
@@ -324,6 +464,47 @@ PLIST;
         $this->info('Installed Android native pull-to-refresh.');
     }
 
+    private function installAndroidRequestCapture(): void
+    {
+        $this->patchFile(
+            $this->buildPath().'/app/src/main/java/com/nativephp/mobile/network/WebViewManager.kt',
+            function (string $content): string {
+                if (str_contains($content, 'private fun nativeJavaScript(): String')) {
+                    return $content;
+                }
+
+                $replacements = [
+                    "        setupJavaScriptInterfaces()\n" => <<<'KOTLIN'
+        setupJavaScriptInterfaces()
+        if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            androidx.webkit.WebViewCompat.addDocumentStartJavaScript(
+                webView, nativeJavaScript(), setOf("http://127.0.0.1")
+            )
+        }
+KOTLIN."\n",
+                    "                injectJavaScript(view)\n" => <<<'KOTLIN'
+                if (!androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    injectJavaScript(view)
+                }
+KOTLIN."\n",
+                    "    private fun injectJavaScript(view: WebView) {\n        val jsCode = \"\"\"" => '    private fun nativeJavaScript(): String = """',
+                    'observer.observe(document.body, {' => 'observer.observe(document, {',
+                    '        view.evaluateJavascript(jsCode) { result ->' => "    private fun injectJavaScript(view: WebView) {\n        view.evaluateJavascript(nativeJavaScript()) { result ->",
+                ];
+
+                foreach ($replacements as $before => $after) {
+                    if (substr_count($content, $before) !== 1) {
+                        throw new RuntimeException('NativePHP Android request capture changed; review the document-start integration before building.');
+                    }
+
+                    $content = str_replace($before, $after, $content);
+                }
+
+                return $content;
+            },
+        );
+    }
+
     private function installAndroidBackHandler(): void
     {
         $this->patchFile(
@@ -396,7 +577,11 @@ KOTLIN,
             function (string $content): string {
                 $metadata = "            <meta-data\n                android:name=\"android.app.shortcuts\"\n                android:resource=\"@xml/shortcuts\" />\n";
 
-                $content = str_replace($metadata, '', $content);
+                $content = preg_replace(
+                    '/\s*<meta-data\b[^>]*android:name="android\.app\.shortcuts"[^>]*\/>/',
+                    '',
+                    $content,
+                ) ?? $content;
 
                 return preg_replace(
                     '/(<activity\b[^>]*android:name="\.ui\.MainActivity"[\s\S]*?)(\s*<\/activity>)/',

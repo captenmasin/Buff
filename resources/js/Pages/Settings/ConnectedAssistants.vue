@@ -94,14 +94,7 @@ function revoke(connection: Connection) {
             {{ revocationForm.errors.connection }}
         </p>
 
-        <section v-if="!error" class="space-y-3" aria-labelledby="authorized-assistants-heading">
-<!--            <div>-->
-<!--                <h2 id="authorized-assistants-heading" class="text-base font-semibold text-foreground">Authorized assistants</h2>-->
-<!--                <p class="mt-1 text-sm leading-6 text-muted-foreground">-->
-<!--                    Revoking access blocks Buff immediately, but does not remove Buff from the assistant's local configuration.-->
-<!--                </p>-->
-<!--            </div>-->
-
+        <section v-if="!error" class="space-y-3" aria-label="Authorized assistants">
             <TransitionGroup
                 tag="div"
                 class="grid gap-3 md:grid-cols-2"

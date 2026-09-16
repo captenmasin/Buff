@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {
     completeSubscriptionConfiguration,
+    configureSubscriptions,
     isSubscriptionActive,
     managementUrl,
     nativeError,
@@ -83,6 +84,29 @@ test('uses the provider management URL before platform fallbacks', () => {
 
 test('reports an ordinary browser as unsupported', async () => {
     assert.equal(await subscriptionPlatform(), 'unsupported');
+});
+
+test('selects the store from the running native platform, never the asset build mode', async (context) => {
+    const {System} = await import('#nativephp');
+    const isIos = context.mock.method(System, 'isIos', async () => false);
+    context.mock.method(System, 'isAndroid', async () => true);
+
+    assert.equal(await subscriptionPlatform(), 'android');
+    isIos.mock.mockImplementation(async () => true);
+    assert.equal(await subscriptionPlatform(), 'ios');
+
+    const source = readFileSync(new URL('../resources/js/subscriptions.ts', import.meta.url), 'utf8');
+    const platformDetection = source.split('export async function subscriptionPlatform()')[1]
+        .split('export async function configureSubscriptions(')[0];
+    assert.doesNotMatch(platformDetection, /MODE/);
+});
+
+test('uses a resolved native platform even when store setup cannot start', async () => {
+    assert.deepEqual(await configureSubscriptions(null, 'android'), {
+        configured: false,
+        platform: 'android',
+        reason: 'missing_account',
+    });
 });
 
 test('waits for the matching RevenueCat account switch completion event', async () => {
@@ -250,6 +274,18 @@ test('keeps unlock server-authoritative and renders the required store controls'
     assert.match(page, /https:\/\/usebuff\.app\/support\//);
     assert.match(add, /subscription_required/);
     assert.match(add, /View Buff\+/);
+});
+
+test('keeps native store setup errors actionable across entitlement refreshes', () => {
+    const page = readFileSync(new URL('../resources/js/Pages/Settings/Subscription.vue', import.meta.url), 'utf8');
+
+    assert.match(page, /platform\.value = await subscriptionPlatform\(\);[\s\S]*configureSubscriptions\(account\.value, platform\.value\)/);
+    assert.match(page, /const storeErrorMessage = ref\(''\)/);
+    assert.match(page, /const refreshErrorMessage = ref\(''\)/);
+    assert.match(page, /refreshErrorMessage\.value = ''/);
+    assert.doesNotMatch(page, /async function refreshServer[\s\S]*?storeErrorMessage\.value = ''[\s\S]*?async function confirmWithServer/);
+    assert.match(page, /Could not set up \$\{storeName\.value\} subscriptions on this device/);
+    assert.match(page, /contact Buff Support/);
 });
 
 function subscriptionEventHarness() {

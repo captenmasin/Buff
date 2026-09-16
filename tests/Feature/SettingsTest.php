@@ -336,6 +336,7 @@ it('normalizes malformed imported meal reminders', function (): void {
 
 it('only marks a meal reminder due when that meal is not logged', function (): void {
     $date = today();
+    $resultPath = storage_path('framework/testing/meal-reminder-'.uniqid().'.result');
 
     MealEntry::query()->create([
         'date' => $date->copy()->subDay(),
@@ -348,9 +349,15 @@ it('only marks a meal reminder due when that meal is not logged', function (): v
         'fat_g' => 5,
     ]);
 
-    $this->artisan('meal-reminder:check', ['--meal' => 'breakfast', '--date' => $date->toDateString()])
+    $this->artisan('meal-reminder:check', [
+        '--meal' => 'breakfast',
+        '--date' => $date->toDateString(),
+        '--result' => $resultPath,
+    ])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_DUE:breakfast')
         ->assertSuccessful();
+
+    expect(file_get_contents($resultPath))->toBe('BUFF_MEAL_REMINDER_DUE:breakfast');
 
     MealEntry::query()->create([
         'date' => $date,
@@ -363,11 +370,19 @@ it('only marks a meal reminder due when that meal is not logged', function (): v
         'fat_g' => 5,
     ]);
 
-    $this->artisan('meal-reminder:check', ['--meal' => 'breakfast', '--date' => $date->toDateString()])
+    $this->artisan('meal-reminder:check', [
+        '--meal' => 'breakfast',
+        '--date' => $date->toDateString(),
+        '--result' => $resultPath,
+    ])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_LOGGED:breakfast')
         ->assertSuccessful();
+
+    expect(file_get_contents($resultPath))->toBe('BUFF_MEAL_REMINDER_LOGGED:breakfast');
 
     $this->artisan('meal-reminder:check', ['--meal' => 'lunch', '--date' => $date->toDateString()])
         ->expectsOutputToContain('BUFF_MEAL_REMINDER_DUE:lunch')
         ->assertSuccessful();
+
+    unlink($resultPath);
 });

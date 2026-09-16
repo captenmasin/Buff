@@ -87,7 +87,7 @@ const title = computed(() => ({
     verify: 'Check your email',
 }[props.screen]));
 const registerSteps: RegisterStep[] = ['name', 'method', 'email', 'password'];
-const registrationProgress = computed(() => ((registerSteps.indexOf(registerStep.value) + 1) / 14) * 100);
+const registrationProgress = computed(() => ((registerSteps.indexOf(registerStep.value) + 1) / registerSteps.length) * 100);
 const registrationNextLabel = computed(() => registerStep.value === 'password' ? 'Create account' : 'Next');
 const registrationNextDisabled = computed(() => {
     if (registerStep.value === 'name') {
@@ -265,6 +265,10 @@ function submitRegistration() {
 }
 
 function nextRegisterStep() {
+    if (registrationNextDisabled.value || registerForm.processing) {
+        return;
+    }
+
     registerForm.clearErrors();
 
     if (registerStep.value === 'name') {
@@ -477,16 +481,16 @@ async function signInWith(provider: SocialProvider) {
                             </div>
                         </form>
                     </Card>
-<!--                    <Button-->
-<!--                        v-if="hasDeviceData"-->
-<!--                        type="button"-->
-<!--                        variant="destructive"-->
-<!--                        class="w-full"-->
-<!--                        :disabled="clearDataForm.processing"-->
-<!--                        @click="clearDataError = ''; clearDataConfirmOpen = true"-->
-<!--                    >-->
-<!--                        Clear device data-->
-<!--                    </Button>-->
+                    <Button
+                        v-if="hasDeviceData"
+                        type="button"
+                        variant="destructive"
+                        class="w-full"
+                        :disabled="clearDataForm.processing"
+                        @click="clearDataError = ''; clearDataConfirmOpen = true"
+                    >
+                        Clear device data
+                    </Button>
                 </template>
 
                 <Card v-else-if="screen === 'forgot'">
@@ -549,16 +553,16 @@ async function signInWith(provider: SocialProvider) {
             @cancel="cancelSwitch"
             @confirm="confirmSwitch"
         />
-<!--        <ConfirmSheet-->
-<!--            :open="clearDataConfirmOpen"-->
-<!--            title="Clear device data?"-->
-<!--            message="This permanently removes local health data from this device. Anything already synced stays in your account."-->
-<!--            confirm-label="Clear data"-->
-<!--            :processing="clearDataForm.processing"-->
-<!--            processing-label="Clearing data…"-->
-<!--            :error="clearDataError"-->
-<!--            @cancel="clearDataError = ''; clearDataConfirmOpen = false"-->
-<!--            @confirm="confirmClearData"-->
-<!--        />-->
+        <ConfirmSheet
+            :open="clearDataConfirmOpen"
+            title="Clear device data?"
+            message="This permanently removes local health data from this device. Anything already synced stays in your account."
+            confirm-label="Clear data"
+            :processing="clearDataForm.processing"
+            processing-label="Clearing data…"
+            :error="clearDataError"
+            @cancel="clearDataError = ''; clearDataConfirmOpen = false"
+            @confirm="confirmClearData"
+        />
     </div>
 </template>

@@ -74,6 +74,45 @@ it('uses the most recent weight when the weight field is empty', function (): vo
     ]);
 });
 
+it('rejects weights below the cloud minimum without changing existing measurements', function (): void {
+    $metric = BodyMetric::query()->create(['date' => '2026-05-19', 'weight_kg' => 18]);
+    SyncOutbox::query()->delete();
+
+    $this->post('/progress/body-metrics', [
+        'date' => '2026-05-19',
+        'weight_kg' => 19.99,
+    ])->assertSessionHasErrors(['weight_kg' => 'The weight kg field must be at least 20.']);
+
+    expect((float) $metric->fresh()->weight_kg)->toBe(18.0);
+    $this->assertDatabaseEmpty('sync_outboxes');
+});
+
+it('accepts a weight at the cloud minimum', function (): void {
+    $this->post('/progress/body-metrics', [
+        'date' => '2026-05-19',
+        'weight_kg' => 20,
+    ])->assertRedirect('/progress?range=90')->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('body_metrics', ['weight_kg' => 20]);
+});
+
+it('rejects future body metric dates', function (): void {
+    Date::setTestNow('2026-05-19');
+
+    try {
+        $this->post('/progress/body-metrics', [
+            'date' => '2026-05-20',
+            'weight_kg' => 82.4,
+        ])->assertSessionHasErrors([
+            'date' => 'The date field must be a date before or equal to today.',
+        ]);
+
+        $this->assertDatabaseEmpty('body_metrics');
+    } finally {
+        Date::setTestNow();
+    }
+});
+
 it('enforces one body metric per date at the database boundary', function (): void {
     BodyMetric::query()->create([
         'date' => '2026-05-19',
@@ -224,6 +263,27 @@ it('filters progress history by calendar range', function (): void {
         );
 
     Date::setTestNow();
+});
+
+it('loads a complete progress check-in by date', function (): void {
+    BodyMetric::query()->create([
+        'date' => '2026-08-19',
+        'weight_kg' => 81.4,
+        'body_fat_percent' => 18.2,
+        'chest_cm' => 101.5,
+        'notes' => 'Historical check-in',
+    ]);
+
+    $this->getJson('/progress/body-metrics/by-date?date=2026-08-19')
+        ->assertOk()
+        ->assertJsonPath('metric.weight_kg', 81.4)
+        ->assertJsonPath('metric.body_fat_percent', 18.2)
+        ->assertJsonPath('metric.chest_cm', 101.5)
+        ->assertJsonPath('metric.notes', 'Historical check-in');
+
+    $this->getJson('/progress/body-metrics/by-date?date=2026-08-18')
+        ->assertOk()
+        ->assertJsonPath('metric', null);
 });
 
 it('passes body profile and goals to progress', function (): void {

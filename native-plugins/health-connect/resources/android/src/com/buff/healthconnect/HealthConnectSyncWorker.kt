@@ -20,6 +20,8 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
+private const val IMPORT_SUCCESS_MARKER = "BUFF_HEALTH_CONNECT_IMPORT_OK"
+
 class HealthConnectSyncWorker(
     appContext: Context,
     workerParams: WorkerParameters
@@ -41,14 +43,16 @@ class HealthConnectSyncWorker(
         return try {
             val payload = readPayload()
             val file = File(applicationContext.cacheDir, "buff-health-connect-${System.currentTimeMillis()}.json")
+            val resultFile = File("${file.absolutePath}.result")
             file.writeText(payload.toString())
 
             LaravelEnvironment(applicationContext).initializeForBackground()
             try {
-                val output = runImportCommand(file)
+                val output = runImportCommand(file, resultFile)
                 Log.d("BuffHealthConnect", "Import output: ${output.take(300)}")
             } finally {
                 file.delete()
+                resultFile.delete()
             }
 
             Result.success()
@@ -58,7 +62,7 @@ class HealthConnectSyncWorker(
         }
     }
 
-    private fun runImportCommand(file: File): String {
+    private fun runImportCommand(file: File, resultFile: File): String {
         val bridge = PHPBridge(applicationContext)
         val bootstrap = "${bridge.getLaravelPath()}/vendor/nativephp/mobile/bootstrap/android/persistent.php"
 
@@ -67,9 +71,12 @@ class HealthConnectSyncWorker(
         }
 
         return try {
-            val output = bridge.nativeEphemeralArtisan("health-connect:import --payload=${file.absolutePath}")
+            resultFile.delete()
+            val output = bridge.nativeEphemeralArtisan(
+                "health-connect:import --payload=${file.absolutePath} --result=${resultFile.absolutePath}"
+            )
 
-            if (!output.contains("BUFF_HEALTH_CONNECT_IMPORT_OK")) {
+            if (!resultFile.exists() || resultFile.readText() != IMPORT_SUCCESS_MARKER) {
                 throw IllegalStateException(output.trim().ifEmpty {
                     "Health Connect import did not report success."
                 })

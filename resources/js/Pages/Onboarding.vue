@@ -130,8 +130,9 @@ const heightFeet = ref<NumericInput>(initialImperialHeight.feet);
 const heightInches = ref<NumericInput>(initialImperialHeight.inches);
 const currentWeightDisplay = ref<NumericInput>(form.current_weight_kg === '' ? '' : (weightFromKg(Number(form.current_weight_kg), form.weight_unit) ?? ''));
 const targetWeightDisplay = ref<NumericInput>(form.target_weight_kg === '' ? '' : (weightFromKg(Number(form.target_weight_kg), form.weight_unit) ?? ''));
+let syncingDisplayUnits = false;
 
-const isTeen = computed(() => form.age !== '' && Number(form.age) >= 13 && Number(form.age) < 18);
+const isTeen = computed(() => form.age !== '' && Number(form.age) >= 13 && Number(form.age) <= 18);
 const activeSteps = computed<SetupStep[]>(() => {
     const steps: SetupStep[] = ['age', 'sex', 'height', 'current_weight', 'activity', 'goal'];
 
@@ -151,8 +152,21 @@ const phase = computed(() => {
     return currentStep.value === 'plan' ? 'Your plan' : 'Your goal';
 });
 const nextLabel = computed(() => currentStep.value === 'plan' ? 'Start Buff' : 'Next');
+const currentWeightMinimum = computed(() => weightFromKg(20, form.weight_unit) ?? 20);
+const targetWeightMinimum = computed(() => weightFromKg(20, form.weight_unit) ?? 20);
+const weightMaximum = computed(() => weightFromKg(1000, form.weight_unit) ?? 1000);
+const currentWeightIsValid = computed(() => {
+    const weight = Number(form.current_weight_kg);
+
+    return form.current_weight_kg !== '' && Number.isFinite(weight) && weight >= 20 && weight <= 1000;
+});
+const targetWeightIsWithinBounds = computed(() => {
+    const weight = Number(form.target_weight_kg);
+
+    return form.target_weight_kg !== '' && Number.isFinite(weight) && weight >= 20 && weight <= 1000;
+});
 const selectedTargetIsValid = computed(() => {
-    if (form.target_weight_kg === '' || form.current_weight_kg === '') {
+    if (!targetWeightIsWithinBounds.value || !currentWeightIsValid.value) {
         return false;
     }
 
@@ -170,7 +184,7 @@ const nextDisabled = computed(() => {
     }
 
     if (currentStep.value === 'current_weight') {
-        return form.current_weight_kg === '' || Number(form.current_weight_kg) < 1 || Number(form.current_weight_kg) > 1000;
+        return !currentWeightIsValid.value;
     }
 
     if (currentStep.value === 'goal') {
@@ -221,6 +235,7 @@ function optionClasses(selected: boolean): string {
 }
 
 function setHeightUnit(unit: HeightUnit): void {
+    syncingDisplayUnits = true;
     form.height_unit = unit;
     heightDisplay.value = form.height_cm === '' ? '' : (heightFromCm(Number(form.height_cm), unit) ?? '');
 
@@ -229,12 +244,16 @@ function setHeightUnit(unit: HeightUnit): void {
         heightFeet.value = imperial.feet;
         heightInches.value = imperial.inches;
     }
+
+    syncingDisplayUnits = false;
 }
 
 function setWeightUnit(unit: WeightUnit): void {
+    syncingDisplayUnits = true;
     form.weight_unit = unit;
     currentWeightDisplay.value = form.current_weight_kg === '' ? '' : (weightFromKg(Number(form.current_weight_kg), unit) ?? '');
     targetWeightDisplay.value = form.target_weight_kg === '' ? '' : (weightFromKg(Number(form.target_weight_kg), unit) ?? '');
+    syncingDisplayUnits = false;
 }
 
 function selectGoal(goal: Goal): void {
@@ -323,19 +342,31 @@ function previousStep(): void {
 }
 
 watch(heightDisplay, (value) => {
+    if (syncingDisplayUnits) {
+        return;
+    }
+
     form.height_cm = heightToCm(value, form.height_unit);
-});
+}, { flush: 'sync' });
 watch([heightFeet, heightInches], ([feet, inches]) => {
-    if (form.height_unit === 'in') {
+    if (form.height_unit === 'in' && !syncingDisplayUnits) {
         heightDisplay.value = inchesFromFeetAndInches(feet, inches);
     }
-});
+}, { flush: 'sync' });
 watch(currentWeightDisplay, (value) => {
+    if (syncingDisplayUnits) {
+        return;
+    }
+
     form.current_weight_kg = weightToKg(value, form.weight_unit);
-});
+}, { flush: 'sync' });
 watch(targetWeightDisplay, (value) => {
+    if (syncingDisplayUnits) {
+        return;
+    }
+
     form.target_weight_kg = weightToKg(value, form.weight_unit);
-});
+}, { flush: 'sync' });
 watch(isTeen, (teen) => {
     if (teen) {
         form.target_weight_kg = '';
@@ -453,7 +484,8 @@ onMounted(() => {
                         </div>
                         <label class="block">
                             <span class="field-label">Current {{ form.weight_unit }}</span>
-                            <Input v-model="currentWeightDisplay" type="number" inputmode="decimal" min="1" step="0.1" autofocus class="mt-2 h-16 rounded-xl px-4 text-lg" :aria-invalid="Boolean(form.errors.current_weight_kg)" @keyup.enter="nextStep" />
+                            <Input v-model="currentWeightDisplay" type="number" inputmode="decimal" :min="currentWeightMinimum" :max="weightMaximum" step="0.1" autofocus class="mt-2 h-16 rounded-xl px-4 text-lg" :aria-invalid="Boolean(form.errors.current_weight_kg) || (currentWeightDisplay !== '' && !currentWeightIsValid)" @keyup.enter="nextStep" />
+                            <span v-if="currentWeightDisplay !== '' && !currentWeightIsValid" class="mt-2 block text-sm text-destructive">Current weight must be between {{ currentWeightMinimum }} and {{ weightMaximum }} {{ form.weight_unit }}.</span>
                             <span v-if="form.errors.current_weight_kg" class="mt-2 block text-sm text-destructive">{{ form.errors.current_weight_kg }}</span>
                         </label>
                     </template>
@@ -490,8 +522,9 @@ onMounted(() => {
                         </header>
                         <label class="block">
                             <span class="field-label">Target {{ form.weight_unit }}</span>
-                            <Input v-model="targetWeightDisplay" type="number" inputmode="decimal" min="1" step="0.1" autofocus class="mt-2 h-16 rounded-xl px-4 text-lg" :aria-invalid="!selectedTargetIsValid && targetWeightDisplay !== ''" @keyup.enter="nextStep" />
-                            <span v-if="targetWeightDisplay !== '' && !selectedTargetIsValid" class="mt-2 block text-sm text-destructive">Target weight must be {{ form.goal === 'lose' ? 'below' : 'above' }} your current weight.</span>
+                            <Input v-model="targetWeightDisplay" type="number" inputmode="decimal" :min="targetWeightMinimum" :max="weightMaximum" step="0.1" autofocus class="mt-2 h-16 rounded-xl px-4 text-lg" :aria-invalid="Boolean(form.errors.target_weight_kg) || (targetWeightDisplay !== '' && !selectedTargetIsValid)" @keyup.enter="nextStep" />
+                            <span v-if="targetWeightDisplay !== '' && !targetWeightIsWithinBounds" class="mt-2 block text-sm text-destructive">Target weight must be between {{ targetWeightMinimum }} and {{ weightMaximum }} {{ form.weight_unit }}.</span>
+                            <span v-else-if="targetWeightDisplay !== '' && !selectedTargetIsValid" class="mt-2 block text-sm text-destructive">Target weight must be {{ form.goal === 'lose' ? 'below' : 'above' }} your current weight.</span>
                             <span v-if="form.errors.target_weight_kg" class="mt-2 block text-sm text-destructive">{{ form.errors.target_weight_kg }}</span>
                         </label>
                     </template>

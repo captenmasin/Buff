@@ -14,8 +14,8 @@ class HealthConnectWorkoutImporter
     {
         return DB::transaction(function () use ($payload, $sourceType): array {
             $syncedAt = $this->dateTime($payload['synced_at'] ?? null) ?? now();
-            $windowStart = $this->dateTime($payload['window_start'] ?? null) ?? now()->subDays(30);
-            $windowEnd = $this->dateTime($payload['window_end'] ?? null) ?? now();
+            $windowStart = ($this->dateTime($payload['window_start'] ?? null) ?? now()->subDays(30))->utc();
+            $windowEnd = ($this->dateTime($payload['window_end'] ?? null) ?? now())->utc();
             $records = collect($payload['records'] ?? []);
             $ignoredIds = HealthConnectIgnoredWorkout::query()
                 ->where('source_type', $sourceType)
@@ -34,13 +34,14 @@ class HealthConnectWorkoutImporter
                     continue;
                 }
 
-                $startedAt = $this->dateTime($record['started_at'] ?? null);
-                $endedAt = $this->dateTime($record['ended_at'] ?? null);
+                $loggedAt = $this->dateTime($record['started_at'] ?? null);
 
-                if (! $startedAt) {
+                if (! $loggedAt) {
                     continue;
                 }
 
+                $startedAt = $loggedAt->copy()->utc();
+                $endedAt = $this->dateTime($record['ended_at'] ?? null)?->utc();
                 $importedIds[] = $externalId;
                 $title = trim((string) ($record['title'] ?? '')) ?: $defaultTitle;
 
@@ -50,10 +51,10 @@ class HealthConnectWorkoutImporter
                         'external_id' => $externalId,
                     ],
                     [
-                        'date' => $record['date'] ?? $startedAt->toDateString(),
+                        'date' => $record['date'] ?? $loggedAt->toDateString(),
                         'title' => $title,
                         'calories_burned' => $calories,
-                        'logged_at' => $startedAt,
+                        'logged_at' => $loggedAt,
                         'external_source' => $record['source_name'] ?? null,
                         'external_source_package' => $record['source_package'] ?? null,
                         'started_at' => $startedAt,

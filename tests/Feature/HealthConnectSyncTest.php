@@ -64,3 +64,35 @@ it('revokes native health connect permissions', function (): void {
         ['HealthConnect.Status', '[]'],
     ]);
 });
+
+it('opens native health connect access settings', function (): void {
+    $calls = [];
+
+    app()->instance(HealthConnectBridge::class, new HealthConnectBridge(
+        function (string $method, string $payload) use (&$calls): string {
+            $calls[] = [$method, $payload];
+
+            return json_encode([
+                'data' => [
+                    'supported' => true,
+                    'available' => true,
+                    'status' => 'permission_required',
+                    ...($method === 'HealthConnect.ManageAccess' ? [
+                        'manage_access_opened' => true,
+                        'message' => "Update Buff's Health Connect access, then return to Buff.",
+                    ] : []),
+                ],
+            ], JSON_THROW_ON_ERROR);
+        },
+    ));
+
+    $this->postJson('/health-connect/manage-access')
+        ->assertSuccessful()
+        ->assertJsonPath('native.manage_access_opened', true)
+        ->assertJsonPath('native.message', "Update Buff's Health Connect access, then return to Buff.");
+
+    expect($calls)->toBe([
+        ['HealthConnect.ManageAccess', '[]'],
+        ['HealthConnect.Status', '[]'],
+    ]);
+});

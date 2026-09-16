@@ -127,10 +127,47 @@ test('allowlists only the three exact top-level routes', () => {
     assert.equal(isAdRoute('/'), true);
     assert.equal(isAdRoute('/goals?tab=macros'), true);
     assert.equal(isAdRoute('/progress'), true);
+    assert.equal(isAdRoute('/add?mode=food&scan=1'), false);
     assert.equal(isAdRoute('/goals/edit'), false);
     assert.equal(isAdRoute('/settings'), false);
     assert.equal(isAdRoute('/account/login'), false);
     assert.equal(isAdRoute('/account/register'), false);
+});
+
+test('a fresh excluded route actively hides a stale native banner', async () => {
+    const state = harness();
+
+    await state.coordinator.reconcile({...state.input, url: '/add?mode=food&scan=1'});
+
+    assert.equal(state.bridgeLoads(), 1);
+    assert.deepEqual(state.admob.calls, ['hide']);
+    assert.equal(state.heights.at(-1), 0);
+});
+
+test('leaving an eligible route cancels reconciliation still waiting for the native platform', async () => {
+    for (const leave of ['navigation', 'reconcile', 'destroy'] as const) {
+        const admob = fakeAdmob();
+        const nativePlatform = Promise.withResolvers<'android'>();
+        const coordinator = createAdCoordinator({
+            platform: () => nativePlatform.promise,
+            loadBridge: async () => admob.api,
+            refreshSubscription: async () => nonEntitled,
+            setBannerHeight: () => {},
+        });
+        const input = {account: {id: 'account-1'}, url: '/progress', audience: 'adult' as const, bottomOffset: 64};
+        const pending = coordinator.reconcile(input);
+        await new Promise((resolve) => setImmediate(resolve));
+        const leaving = leave === 'navigation'
+            ? coordinator.beforeNavigation('/add?mode=food&scan=1')
+            : leave === 'reconcile'
+                ? coordinator.reconcile({...input, url: '/add'})
+                : coordinator.destroy();
+
+        nativePlatform.resolve('android');
+        await Promise.all([pending, leaving]);
+
+        assert.equal(admob.calls.includes('show'), false, leave);
+    }
 });
 
 test('auth screens can hide a stale native banner without loading AdMob on web', async () => {

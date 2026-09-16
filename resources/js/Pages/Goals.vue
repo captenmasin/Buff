@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import Card from '../Components/Card.vue';
 import DailyTargetsEditor from '../Components/DailyTargetsEditor.vue';
 import PageHeader from '../Components/PageHeader.vue';
@@ -28,6 +28,13 @@ const form = useForm({
     fat_g: props.goal.fat_g,
     target_weight_kg: weightFromKg(props.goal.target_weight_kg, props.preferences.weight_unit) ?? '',
     target_body_fat_percent: props.goal.target_body_fat_percent ?? '',
+});
+const targetWeightMinimum = weightFromKg(20, props.preferences.weight_unit) ?? 20;
+const targetWeightMaximum = weightFromKg(1000, props.preferences.weight_unit) ?? 1000;
+const targetWeightIsValid = computed(() => {
+    const weight = Number(form.target_weight_kg);
+
+    return form.target_weight_kg === '' || (Number.isFinite(weight) && weight >= targetWeightMinimum && weight <= targetWeightMaximum);
 });
 
 function save(): void {
@@ -62,8 +69,9 @@ function save(): void {
                 <div class="grid grid-cols-2 gap-3">
                     <label>
                         <span class="field-label">Target {{ preferences.weight_unit }}</span>
-                        <Input v-model="form.target_weight_kg" type="number" min="1" step="0.1" class="mt-1" />
-                        <span v-if="form.errors.target_weight_kg" class="text-sm text-destructive">{{ form.errors.target_weight_kg }}</span>
+                        <Input v-model="form.target_weight_kg" type="number" :min="targetWeightMinimum" :max="targetWeightMaximum" step="0.1" class="mt-1" :aria-invalid="Boolean(form.errors.target_weight_kg) || !targetWeightIsValid" />
+                        <span v-if="form.target_weight_kg !== '' && !targetWeightIsValid" class="text-sm text-destructive">Target weight must be between {{ targetWeightMinimum }} and {{ targetWeightMaximum }} {{ preferences.weight_unit }}.</span>
+                        <span v-else-if="form.errors.target_weight_kg" class="text-sm text-destructive">{{ form.errors.target_weight_kg }}</span>
                     </label>
                     <label>
                         <span class="field-label">Target body fat %</span>
@@ -75,7 +83,7 @@ function save(): void {
             <Button
                 class="w-full"
                 size="lg"
-                :disabled="!targetsValid || !form.isDirty"
+                :disabled="!targetsValid || !targetWeightIsValid || !form.isDirty"
                 :loading="form.processing"
                 loading-label="Saving goals…"
             >

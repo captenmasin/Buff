@@ -98,9 +98,15 @@ return [
     'cleanup_env_keys' => [
         'APP_KEY',
         'APP_PREVIOUS_KEYS',
+        'ANDROID_KEY*',
+        'APP_STORE_API_*',
         'AWS_*',
         'GITHUB_*',
         'DO_SPACES_*',
+        'GOOGLE_SERVICE_*',
+        'IOS_*',
+        'NATIVEPHP_DEVELOPMENT_TEAM',
+        '*_PASSWORD',
         '*_SECRET',
         'DB_PASSWORD',
         'DB_USERNAME',
@@ -118,6 +124,8 @@ return [
     */
 
     'cleanup_exclude_files' => [
+        'credentials',
+        'public/hot',
         'storage/app/private',
         'storage/framework/sessions',
         'storage/framework/cache',

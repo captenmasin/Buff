@@ -9,6 +9,7 @@ use App\Models\DailyGoal;
 use App\Services\BodyMetricPhotoUploader;
 use App\Services\EnergyEstimator;
 use App\Services\WeightTrendService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -100,8 +101,8 @@ class ProgressController extends Controller
         }
 
         $validated = $request->validate([
-            'date' => ['required', 'date'],
-            'weight_kg' => ['required', 'numeric', 'min:1', 'max:1000'],
+            'date' => ['required', 'date', 'before_or_equal:today'],
+            'weight_kg' => ['required', 'numeric', 'min:20', 'max:1000'],
             'body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
             'chest_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
             'waist_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
@@ -126,6 +127,21 @@ class ProgressController extends Controller
         );
 
         return $this->redirectToProgress($request)->with('message', 'Progress updated.');
+    }
+
+    public function byDate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'date' => ['required', 'date', 'before_or_equal:today'],
+        ]);
+
+        $metric = BodyMetric::query()
+            ->whereDate('date', Carbon::parse($validated['date'])->toDateString())
+            ->first();
+
+        return response()->json([
+            'metric' => $metric ? $this->metricPayload($metric) : null,
+        ]);
     }
 
     public function destroy(Request $request, BodyMetric $bodyMetric, BodyMetricPhotoUploader $photos): RedirectResponse

@@ -751,10 +751,13 @@ it('continues social registration into onboarding', function (): void {
         ->assertRedirect('/onboarding');
 });
 
-it('returns failed social registration to the registration flow', function (): void {
-    $this->get('/account/social/callback?flow=register&error=Sign-in+was+cancelled.')
-        ->assertRedirect('/account/register')
-        ->assertSessionHas('message', 'Sign-in was cancelled.');
+it('returns failed social callbacks to the correct flow without exposing error text', function (string $query, string $route): void {
+    $this->get('/account/social/callback?'.$query.'error=Provider+returned+sensitive+diagnostic')
+        ->assertRedirect($route)
+        ->assertSessionHas('message', 'Social sign-in could not be completed.');
 
     Http::assertNothingSent();
-});
+})->with([
+    'login' => ['', '/account/login'],
+    'registration' => ['flow=register&', '/account/register'],
+]);

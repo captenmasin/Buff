@@ -6,9 +6,11 @@ import axios from 'axios';
 import { createApp, h } from 'vue';
 import AppShell from './Layouts/AppShell.vue';
 import { applyAppearance, applyReducedMotion, watchSystemAppearance, watchSystemReducedMotion } from './appearance';
+import { enforceAxiosStatus } from './axiosStatus';
 
 axios.defaults.headers.common['X-Requested-With'] = 'XMLHttpRequest';
 axios.defaults.headers.common['X-CSRF-TOKEN'] = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+axios.interceptors.response.use(enforceAxiosStatus);
 http.setClient(axiosAdapter(axios));
 applyAppearance();
 applyReducedMotion();

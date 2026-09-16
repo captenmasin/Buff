@@ -19,3 +19,11 @@ test('lets users reveal every password field without submitting its form', () =>
     assert.ok(passwordFields.length > 0);
     assert.ok(passwordFields.every(([field]) => /\bid=/.test(field)));
 });
+
+test('keeps input focus on pointer reveal without intercepting keyboard activation', () => {
+    const revealButton = passwordInputSource.match(/<button\b[\s\S]*?>/)?.[0] ?? '';
+
+    assert.match(revealButton, /@pointerdown\.prevent(?:\s|>)/);
+    assert.match(revealButton, /@click="passwordVisible = !passwordVisible"/);
+    assert.doesNotMatch(revealButton, /tabindex="-1"|@key(?:down|up)|@click\.prevent|\.focus\(/);
+});

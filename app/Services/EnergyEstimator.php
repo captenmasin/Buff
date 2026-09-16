@@ -58,7 +58,7 @@ class EnergyEstimator
         }
 
         $years = (int) $age;
-        $teenMaintenanceOnly = $years < 18;
+        $teenMaintenanceOnly = $years <= 18;
         $adjustment = $teenMaintenanceOnly || $goal === 'maintain'
             ? 0
             : min(((float) $weeklyGoalKg * self::CALORIES_PER_KILOGRAM) / 7, $maintenance * 0.2);

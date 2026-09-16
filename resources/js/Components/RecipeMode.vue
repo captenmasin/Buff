@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import axios from 'axios';
-import { computed, ref } from 'vue';
+import { computed, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
-import { Plus, Search, Trash2, UtensilsCrossed } from '@lucide/vue';
+import { Pencil, Plus, Search, Trash2, UtensilsCrossed } from '@lucide/vue';
+import {foodSearchUrl, responseErrorMessage} from '../foodRequests';
 import Card from './Card.vue';
 import ConfirmSheet from './ConfirmSheet.vue';
 import MealTypePicker from './Add/MealTypePicker.vue';
@@ -59,14 +60,18 @@ const props = withDefaults(defineProps<{
 });
 
 const creating = ref(false);
+const editingRecipe = ref<Recipe | null>(null);
 const selectedRecipe = ref<Recipe | null>(null);
 const transitionDirection = ref<'forward' | 'back'>('forward');
 const pendingRecipeDelete = ref<Recipe | null>(null);
 const recipeDeleteError = ref('');
 const searchQuery = ref('');
 const searchResults = ref<FoodProduct[]>([]);
+const searchError = ref('');
 const searchLoading = ref(false);
+const customItemError = ref('');
 let searchRequest = 0;
+let searchTimer = 0;
 
 const recipeForm = useForm({
     date: props.date,
@@ -77,19 +82,12 @@ const recipeForm = useForm({
 
 const logForm = useForm({
     date: props.date,
-    meal_type: props.meal || 'breakfast',
+    meal_type: props.meal || smartMealType(),
     recipe_id: '',
     servings: 1,
 });
 
-const customItem = ref({
-    name: '',
-    portion_quantity: 100,
-    portion_unit: 'g' as 'g' | 'ml',
-    protein_g: 0,
-    carbs_g: 0,
-    fat_g: 0,
-});
+const customItem = ref(newCustomItem());
 
 const recipeTotals = computed(() => recipeForm.items.reduce((totals, item) => ({
     calories: totals.calories + item.calories,
@@ -117,13 +115,51 @@ function customCalories(): number {
     return Math.round((Number(customItem.value.protein_g) * 4) + (Number(customItem.value.carbs_g) * 4) + (Number(customItem.value.fat_g) * 9));
 }
 
+function newCustomItem(): Omit<RecipeItem, 'food_product_id' | 'calories'> {
+    return {
+        name: '',
+        portion_quantity: 100,
+        portion_unit: 'g',
+        protein_g: 0,
+        carbs_g: 0,
+        fat_g: 0,
+    };
+}
+
+function resetFoodSearch(): void {
+    window.clearTimeout(searchTimer);
+    searchTimer = 0;
+    searchRequest++;
+    searchQuery.value = '';
+    searchResults.value = [];
+    searchError.value = '';
+    searchLoading.value = false;
+}
+
+function resetRecipeEditor(): void {
+    recipeForm.resetAndClearErrors();
+    editingRecipe.value = null;
+    customItem.value = newCustomItem();
+    customItemError.value = '';
+    resetFoodSearch();
+}
+
 function startCreate(): void {
+    resetRecipeEditor();
     transitionDirection.value = 'forward';
     creating.value = true;
     selectedRecipe.value = null;
-    recipeForm.name = '';
-    recipeForm.servings = 1;
-    recipeForm.items = [];
+}
+
+function startEdit(recipe: Recipe): void {
+    resetRecipeEditor();
+    transitionDirection.value = 'forward';
+    creating.value = true;
+    selectedRecipe.value = null;
+    editingRecipe.value = recipe;
+    recipeForm.name = recipe.name;
+    recipeForm.servings = recipe.servings;
+    recipeForm.items = recipe.items.map((item) => ({...item}));
 }
 
 function startLog(recipe: Recipe): void {
@@ -132,31 +168,70 @@ function startLog(recipe: Recipe): void {
     creating.value = false;
     logForm.recipe_id = recipe.id;
     logForm.servings = recipe.servings;
-    logForm.meal_type = props.meal || 'breakfast';
+    logForm.meal_type = props.meal || smartMealType();
+    logForm.clearErrors();
 }
 
 function returnToRecipes(): void {
     transitionDirection.value = 'back';
     creating.value = false;
     selectedRecipe.value = null;
+    logForm.clearErrors();
+    resetRecipeEditor();
+}
+
+function smartMealType(): MealType {
+    const hour = new Date().getHours();
+
+    if (hour < 10) return 'breakfast';
+    if (hour < 14) return 'lunch';
+    if (hour < 20) return 'dinner';
+
+    return 'snacks';
 }
 
 function addCustomItem(): void {
-    if (!customItem.value.name) {
+    const name = customItem.value.name.trim();
+    const portionQuantity = customItem.value.portion_quantity;
+    const macroValues = [customItem.value.protein_g, customItem.value.carbs_g, customItem.value.fat_g];
+
+    customItemError.value = '';
+
+    if (!name) {
+        customItemError.value = 'Enter an ingredient name.';
+
+        return;
+    }
+
+    if (name.length > 120) {
+        customItemError.value = 'Ingredient names must be 120 characters or fewer.';
+
+        return;
+    }
+
+    if (!Number.isFinite(portionQuantity) || portionQuantity < 0.1 || portionQuantity > 10000) {
+        customItemError.value = 'Amount must be between 0.1 and 10,000 g or ml.';
+
+        return;
+    }
+
+    if (macroValues.some((value) => !Number.isFinite(value) || value < 0 || value > 1000)) {
+        customItemError.value = 'Protein, carbs, and fat must each be between 0 and 1,000 g.';
+
         return;
     }
 
     recipeForm.items.push({
-        name: customItem.value.name,
+        name,
         food_product_id: null,
-        portion_quantity: Number(customItem.value.portion_quantity),
+        portion_quantity: portionQuantity,
         portion_unit: customItem.value.portion_unit,
         calories: customCalories(),
-        protein_g: Number(customItem.value.protein_g),
-        carbs_g: Number(customItem.value.carbs_g),
-        fat_g: Number(customItem.value.fat_g),
+        protein_g: macroValues[0],
+        carbs_g: macroValues[1],
+        fat_g: macroValues[2],
     });
-    customItem.value = { name: '', portion_quantity: 100, portion_unit: 'g', protein_g: 0, carbs_g: 0, fat_g: 0 };
+    customItem.value = newCustomItem();
 }
 
 function addProduct(product: FoodProduct): void {
@@ -168,35 +243,71 @@ function addProduct(product: FoodProduct): void {
         portion_unit: unit,
         ...macrosFor(product.calories_per_100, product.protein_per_100, product.carbs_per_100, product.fat_per_100, 100),
     });
-    searchQuery.value = '';
-    searchResults.value = [];
+    resetFoodSearch();
 }
 
 function removeItem(index: number): void {
     recipeForm.items.splice(index, 1);
 }
 
-async function searchFoods(): Promise<void> {
+function recipeItemErrors(index: number): string[] {
+    const prefix = `items.${index}.`;
+
+    return Object.entries(recipeForm.errors)
+        .filter(([field]) => field.startsWith(prefix))
+        .map(([, error]) => error);
+}
+
+function queueFoodSearch(): void {
+    window.clearTimeout(searchTimer);
+
     const query = searchQuery.value.trim();
     const request = ++searchRequest;
+
+    searchError.value = '';
 
     if (query.length < 2) {
         searchResults.value = [];
         searchLoading.value = false;
+
+        return;
+    }
+
+    searchLoading.value = true;
+    searchTimer = window.setTimeout(() => void searchFoods(query, request), 250);
+}
+
+function retryFoodSearch(): void {
+    window.clearTimeout(searchTimer);
+
+    const query = searchQuery.value.trim();
+    const request = ++searchRequest;
+
+    void searchFoods(query, request);
+}
+
+async function searchFoods(query: string, request: number): Promise<void> {
+    searchError.value = '';
+
+    if (query.length < 2) {
+        searchResults.value = [];
+        searchLoading.value = false;
+
         return;
     }
 
     searchLoading.value = true;
 
     try {
-        const { data } = await axios.get('/food-products/search', { params: { q: query } });
+        const {data} = await axios.get(foodSearchUrl(query, navigator.language));
 
         if (request === searchRequest) {
             searchResults.value = (data.products || []).filter((result: { type?: string }) => result.type !== 'previous_meal');
         }
-    } catch {
+    } catch (error) {
         if (request === searchRequest) {
             searchResults.value = [];
+            searchError.value = responseErrorMessage(error, 'q', 'Food search is unavailable. Check your connection and try again.');
         }
     } finally {
         if (request === searchRequest) {
@@ -205,13 +316,24 @@ async function searchFoods(): Promise<void> {
     }
 }
 
+onUnmounted(() => {
+    window.clearTimeout(searchTimer);
+    searchRequest++;
+});
+
 function saveRecipe(): void {
-    recipeForm.post('/recipes', {
-        onSuccess: () => {
-            recipeForm.reset();
-            returnToRecipes();
-        },
-    });
+    const options = {
+        preserveScroll: true,
+        onSuccess: returnToRecipes,
+    };
+
+    if (editingRecipe.value) {
+        recipeForm.put(`/recipes/${editingRecipe.value.id}`, options);
+
+        return;
+    }
+
+    recipeForm.post('/recipes', options);
 }
 
 function logRecipe(): void {
@@ -273,7 +395,7 @@ function confirmRecipeDelete(): void {
         <Card v-if="creating" key="create" data-motion-transform>
             <div class="flex items-center gap-2">
                 <UtensilsCrossed :size="21" class="text-food" />
-                <h2 class="card-title">New recipe</h2>
+                <h2 class="card-title">{{ editingRecipe ? 'Edit recipe' : 'New recipe' }}</h2>
             </div>
             <form class="mt-4 space-y-3" @submit.prevent="saveRecipe">
                 <label class="block">
@@ -292,6 +414,9 @@ function confirmRecipeDelete(): void {
                         <div class="min-w-0 flex-1">
                             <p class="truncate font-medium">{{ item.name }}</p>
                             <p class="text-sm text-muted-foreground">{{ item.portion_quantity }}{{ item.portion_unit }} · {{ item.calories }} kcal</p>
+                            <div v-if="recipeItemErrors(index).length" class="mt-1 text-sm text-destructive" role="alert">
+                                <p v-for="error in recipeItemErrors(index)" :key="`${index}-${error}`">{{ error }}</p>
+                            </div>
                         </div>
                         <Button type="button" variant="ghost" size="icon" aria-label="Remove ingredient" @click="removeItem(index)">
                             <Trash2 :size="16" />
@@ -304,7 +429,7 @@ function confirmRecipeDelete(): void {
                     <span class="field-label">Add food</span>
                     <div class="relative mt-1">
                         <Search :size="16" class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                        <Input v-model="searchQuery" class="pl-9" placeholder="Search foods" @input="searchFoods" />
+                        <Input v-model="searchQuery" class="pl-9" placeholder="Search foods" @input="queueFoodSearch" />
                     </div>
                 </label>
                 <div v-if="searchResults.length" class="grid gap-2">
@@ -323,6 +448,11 @@ function confirmRecipeDelete(): void {
                     </Button>
                 </div>
                 <p v-else-if="searchLoading" class="text-sm text-muted-foreground">Searching…</p>
+                <div v-else-if="searchError" class="rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">
+                    <p>{{ searchError }}</p>
+                    <Button type="button" variant="ghost" class="mt-2" @click="retryFoodSearch">Retry</Button>
+                </div>
+                <p v-else-if="searchQuery.trim().length === 1" class="text-sm text-muted-foreground">Enter one more character to search.</p>
 
                 <div class="rounded-xl bg-muted/60 p-3">
                     <p class="field-label">Custom ingredient</p>
@@ -343,7 +473,8 @@ function confirmRecipeDelete(): void {
                             <Input v-model.number="customItem.carbs_g" type="number" min="0" step="0.1" placeholder="C" />
                             <Input v-model.number="customItem.fat_g" type="number" min="0" step="0.1" placeholder="F" />
                         </div>
-                        <Button type="button" variant="surface" :disabled="!customItem.name" @click="addCustomItem">
+                        <p v-if="customItemError" class="text-sm text-destructive" role="alert">{{ customItemError }}</p>
+                        <Button type="button" variant="surface" :disabled="!customItem.name.trim()" @click="addCustomItem">
                             <Plus :size="16" />
                             Add ingredient
                         </Button>
@@ -353,7 +484,9 @@ function confirmRecipeDelete(): void {
                 <p class="text-sm text-muted-foreground">{{ recipeTotals.calories }} kcal · P {{ recipeTotals.protein_g }}g · C {{ recipeTotals.carbs_g }}g · F {{ recipeTotals.fat_g }}g</p>
                 <div class="grid grid-cols-2 gap-2">
                     <Button type="button" variant="surface" @click="returnToRecipes">Cancel</Button>
-                    <Button :disabled="recipeForm.items.length === 0" :loading="recipeForm.processing" loading-label="Saving recipe…">Save recipe</Button>
+                    <Button :disabled="recipeForm.items.length === 0" :loading="recipeForm.processing" :loading-label="editingRecipe ? 'Updating recipe…' : 'Saving recipe…'">
+                        {{ editingRecipe ? 'Update recipe' : 'Save recipe' }}
+                    </Button>
                 </div>
             </form>
         </Card>
@@ -369,7 +502,10 @@ function confirmRecipeDelete(): void {
                 <span v-if="logForm.errors.meal_type" class="block text-sm text-destructive" role="alert">{{ logForm.errors.meal_type }}</span>
                 <label class="block">
                     <span class="field-label">Servings</span>
-                    <Input v-model.number="logForm.servings" type="number" min="0.1" step="0.1" class="mt-1" />
+                    <Input v-model.number="logForm.servings" type="number" min="0.1" max="100" step="0.1" required class="mt-1"
+                        @invalid.prevent="logForm.setError('servings', ($event.target as HTMLInputElement).validationMessage)"
+                        @update:model-value="logForm.clearErrors('servings')"
+                    />
                     <span v-if="logForm.errors.servings" class="mt-1 block text-sm text-destructive" role="alert">{{ logForm.errors.servings }}</span>
                 </label>
                 <div class="grid grid-cols-2 gap-2">
@@ -402,10 +538,13 @@ function confirmRecipeDelete(): void {
                     <Button type="button" variant="ghost" class="h-auto min-w-0 flex-1 justify-start overflow-hidden rounded-xl px-3 py-3 text-left" @click="startLog(recipe)">
                         <span class="min-w-0 flex-1 overflow-hidden">
                             <span class="block truncate font-semibold">{{ recipe.name }}</span>
-                            <span class="block truncate text-sm text-muted-foreground">{{ recipe.calories }} kcal · {{ recipe.items.length }} ingredients</span>
+                            <span class="block truncate text-sm text-muted-foreground">{{ recipe.calories }} kcal · {{ recipe.items.length }} ingredient{{ recipe.items.length === 1 ? '' : 's' }}</span>
                         </span>
                     </Button>
-                    <Button type="button" variant="ghost" size="icon" aria-label="Delete recipe" @click="requestRecipeDelete(recipe)">
+                    <Button type="button" variant="ghost" size="icon" :aria-label="`Edit ${recipe.name}`" @click="startEdit(recipe)">
+                        <Pencil :size="16" />
+                    </Button>
+                    <Button type="button" variant="ghost" size="icon" :aria-label="`Delete ${recipe.name}`" @click="requestRecipeDelete(recipe)">
                         <Trash2 :size="16" />
                     </Button>
                 </div>

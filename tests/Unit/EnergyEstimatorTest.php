@@ -53,3 +53,17 @@ it('uses adolescent energy requirements without a weight change adjustment', fun
         'teen_maintenance_only' => true,
     ]);
 });
+
+it('keeps weight change adjustments disabled through age eighteen', function (): void {
+    $estimator = new EnergyEstimator;
+
+    expect($estimator->dailyCalories(60, 170, 18, Sex::Female, ActivityLevel::Moderate, 'lose', 0.5))->toBe([
+        'maintenance_calories' => 2550,
+        'calories' => 2550,
+        'teen_maintenance_only' => true,
+    ])->and($estimator->dailyCalories(60, 170, 19, Sex::Female, ActivityLevel::Moderate, 'lose', 0.5))->toBe([
+        'maintenance_calories' => 2200,
+        'calories' => 1750,
+        'teen_maintenance_only' => false,
+    ]);
+});

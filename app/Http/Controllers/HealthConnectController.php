@@ -32,6 +32,16 @@ class HealthConnectController extends Controller
         ]);
     }
 
+    public function manageAccess(HealthConnectBridge $bridge): JsonResponse
+    {
+        $native = $bridge->call('HealthConnect.ManageAccess');
+
+        return response()->json([
+            ...$this->statusPayload($bridge),
+            'native' => $native,
+        ]);
+    }
+
     public function destroy(HealthConnectBridge $bridge): JsonResponse
     {
         $native = $bridge->call('HealthConnect.Disconnect');

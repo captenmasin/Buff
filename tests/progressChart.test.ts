@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { formatDisplayDate, parseLocalDate } from '../resources/js/dateFormat.ts';
-import { buildBodyFatChartData, buildGoalLine, buildWeightChartData, chartSummary, chartXDomain, chartYDomain, deltaTone } from '../resources/js/progressChart.ts';
+import { formatChartTickDate, formatDisplayDate, parseLocalDate } from '../resources/js/dateFormat.ts';
+import { buildBodyFatChartData, buildGoalLine, buildWeightChartData, chartSummary, chartTickFormatter, chartTickValues, chartXDomain, chartYDomain, deltaTone } from '../resources/js/progressChart.ts';
 
 const metrics = [
     { date: '2026-08-20', weight: 82.4, bodyFat: 18.2 },
@@ -30,6 +31,57 @@ test('uses timestamps for the selected window so Unovis can rescale on range cha
     assert.equal(thirty[1] - thirty[0], 29 * 24 * 60 * 60 * 1000);
     assert.ok(ninety[0] < thirty[0]);
     assert.equal(ninety[1], thirty[1]);
+});
+
+test('does not generate duplicate day ticks for short chart domains', () => {
+    assert.deepEqual(chartTickValues(chartXDomain('2026-08-31', '2026-08-31')).map(formatChartTickDate), ['31 Aug']);
+    assert.deepEqual(chartTickValues(chartXDomain('2026-08-30', '2026-08-31')).map(formatChartTickDate), ['30 Aug', '31 Aug']);
+    assert.deepEqual(chartTickValues(chartXDomain('2026-09-03', '2026-09-04')).map(formatChartTickDate), ['3 Sept', '4 Sept']);
+    assert.deepEqual(chartTickValues(chartXDomain('2026-09-02', '2026-09-04')).map(formatChartTickDate), ['2 Sept', '3 Sept', '4 Sept']);
+    assert.deepEqual(chartTickValues(chartXDomain('2026-08-01', '2026-08-31')).map(formatChartTickDate), ['1 Aug', '11 Aug', '21 Aug', '31 Aug']);
+});
+
+test('keeps date ticks at local midnight across short and long daylight-saving windows', () => {
+    const chartModule = new URL('../resources/js/progressChart.ts', import.meta.url).href;
+    const dateModule = new URL('../resources/js/dateFormat.ts', import.meta.url).href;
+    const result = execFileSync(process.execPath, ['--input-type=module', '-e', `
+        import { chartTickValues, chartXDomain } from ${JSON.stringify(chartModule)};
+        import { formatChartTickDate } from ${JSON.stringify(dateModule)};
+        const ranges = [
+            ['2026-03-29', '2026-03-30'],
+            ['2026-03-28', '2026-03-30'],
+            ['2026-10-24', '2026-10-26'],
+            ['2026-03-01', '2026-03-31'],
+        ];
+        console.log(JSON.stringify(ranges.map(([start, end]) => chartTickValues(chartXDomain(start, end))
+            .map(value => [formatChartTickDate(value), new Date(value).getHours()]))));
+    `], { env: { ...process.env, TZ: 'Europe/London' }, encoding: 'utf8' });
+
+    assert.deepEqual(JSON.parse(result), [
+        [['29 Mar', 0], ['30 Mar', 0]],
+        [['28 Mar', 0], ['29 Mar', 0], ['30 Mar', 0]],
+        [['24 Oct', 0], ['25 Oct', 0], ['26 Oct', 0]],
+        [['1 Mar', 0], ['11 Mar', 0], ['21 Mar', 0], ['31 Mar', 0]],
+    ]);
+});
+
+test('disambiguates years on cross-year axes while keeping within-year labels compact', () => {
+    const multiYear = chartXDomain('2021-01-01', '2024-01-01');
+    const newYear = chartXDomain('2026-12-31', '2027-01-01');
+    const withinYear = chartXDomain('2026-09-03', '2026-09-04');
+
+    assert.deepEqual(chartTickValues(multiYear).map(chartTickFormatter(multiYear)), ['1 Jan 2021', '1 Jan 2022', '1 Jan 2023', '1 Jan 2024']);
+    assert.deepEqual(chartTickValues(newYear).map(chartTickFormatter(newYear)), ['31 Dec 2026', '1 Jan 2027']);
+    assert.deepEqual(chartTickValues(withinYear).map(chartTickFormatter(withinYear)), ['3 Sept', '4 Sept']);
+});
+
+test('supplies explicit calendar ticks to the chart instead of an approximate numeric count', () => {
+    const source = readFileSync(new URL('../resources/js/Components/ProgressTrendChart.vue', import.meta.url), 'utf8');
+
+    assert.match(source, /const xTickValues = computed\(\(\) => chartTickValues\(props\.xDomain\)\)/);
+    assert.match(source, /<VisAxis\s+type="x"[^>]+:tick-values="xTickValues"/);
+    assert.match(source, /const xTickFormat = computed\(\(\) => chartTickFormatter\(props\.xDomain\)\)/);
+    assert.match(source, /<VisAxis\s+type="x"[^>]+:tick-format="xTickFormat"/);
 });
 
 test('keeps the weight series on calendar dates across the selected window', () => {

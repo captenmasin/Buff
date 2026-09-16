@@ -65,6 +65,8 @@ it('renders the weekly calorie and macro roundup on its own page', function (): 
             ->where('controls.date', '2026-05-19')
             ->where('controls.start_date', '2026-05-18')
             ->where('controls.end_date', '2026-05-24')
+            ->where('rejectedControls.start_date', null)
+            ->where('rejectedControls.end_date', null)
             ->where('roundup.start_date', '2026-05-18')
             ->where('roundup.end_date', '2026-05-24')
             ->where('roundup.calories', 6200)
@@ -151,6 +153,27 @@ it('limits custom roundups to 90 inclusive calendar dates', function (): void {
         ->assertRedirect('/weekly')
         ->assertSessionHasErrors('end_date');
 });
+
+it('returns rejected range values and their error without replacing the last valid summary', function (?string $startDate, string $endDate, string $field, string $error): void {
+    $this->from('/weekly?date=2026-10-15')
+        ->get("/weekly?start_date={$startDate}&end_date={$endDate}")
+        ->assertRedirect('/weekly?date=2026-10-15')
+        ->assertSessionHasErrors([$field => $error]);
+
+    $this->get('/weekly?date=2026-10-15')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('rejectedControls.start_date', $startDate)
+            ->where('rejectedControls.end_date', $endDate)
+            ->where('roundup.start_date', '2026-10-12')
+            ->where('roundup.end_date', '2026-10-18')
+            ->has('week', 7)
+        );
+})->with([
+    'reversed dates' => ['2026-10-19', '2026-10-18', 'end_date', 'The end date field must be a date after or equal to start date.'],
+    'more than 90 days' => ['2026-01-01', '2026-04-01', 'end_date', 'Choose a range of 90 days or less.'],
+    'missing start date' => [null, '2026-10-18', 'start_date', 'The start date field is required when end date is present.'],
+]);
 
 it('uses eat-back none for the weekly effective target', function (): void {
     AppPreference::current()->update(['eat_back' => 'none']);

@@ -15,6 +15,7 @@ withDefaults(defineProps<{
     <header class="flex min-h-11 items-center gap-1">
         <Link
             :href="backHref"
+            replace
             class="-ml-2 grid size-11 flex-none place-items-center rounded-full text-foreground"
             :aria-label="backLabel"
         >

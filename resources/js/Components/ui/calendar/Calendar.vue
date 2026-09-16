@@ -15,13 +15,15 @@ const props = withDefaults(defineProps<CalendarRootProps & { class?: HTMLAttribu
   modelValue: undefined,
   layout: undefined,
 })
-const emits = defineEmits<CalendarRootEmits>()
+const emits = defineEmits<CalendarRootEmits & { dayClick: [date: DateValue] }>()
 
 const delegatedProps = reactiveOmit(props, 'class', 'layout', 'placeholder')
 
 const placeholder = useVModel(props, 'placeholder', emits, {
   passive: true,
-  defaultValue: props.defaultPlaceholder ?? today(getLocalTimeZone()),
+  defaultValue: props.defaultPlaceholder
+    ?? (Array.isArray(props.modelValue) ? props.modelValue[0] : props.modelValue)
+    ?? today(getLocalTimeZone()),
 }) as Ref<DateValue>
 
 const formatter = useDateFormatter(props.locale ?? 'en')
@@ -50,6 +52,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           {{ formatter.custom(toDate(date), { month: 'short' }) }}
         </div>
         <NativeSelect
+          :model-value="date.month"
           class="text-xs h-8 pr-6 pl-2 text-transparent relative"
           @change="(e: Event) => {
             placeholder = placeholder.set({
@@ -57,7 +60,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
             })
           }"
         >
-          <NativeSelectOption v-for="(month) in createYear({ dateObj: date })" :key="month.toString()" :value="month.month" :selected="date.month === month.month">
+          <NativeSelectOption v-for="(month) in createYear({ dateObj: date })" :key="month.toString()" :value="month.month">
             {{ formatter.custom(toDate(month), { month: 'short' }) }}
           </NativeSelectOption>
         </NativeSelect>
@@ -72,6 +75,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           {{ formatter.custom(toDate(date), { year: 'numeric' }) }}
         </div>
         <NativeSelect
+          :model-value="date.year"
           class="text-xs h-8 pr-6 pl-2 text-transparent relative"
           @change="(e: Event) => {
             placeholder = placeholder.set({
@@ -79,7 +83,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
             })
           }"
         >
-          <NativeSelectOption v-for="(year) in yearRange" :key="year.toString()" :value="year.year" :selected="date.year === year.year">
+          <NativeSelectOption v-for="(year) in yearRange" :key="year.toString()" :value="year.year">
             {{ formatter.custom(toDate(year), { year: 'numeric' }) }}
           </NativeSelectOption>
         </NativeSelect>
@@ -150,6 +154,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
               <CalendarCellTrigger
                 :day="weekDate"
                 :month="month.value"
+                @click="emits('dayClick', weekDate)"
               />
             </CalendarCell>
           </CalendarGridRow>

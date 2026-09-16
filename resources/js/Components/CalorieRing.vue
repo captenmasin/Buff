@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
+import { calorieRingStrokeClass } from '../calorieRing';
 
 const props = withDefaults(defineProps<{
     consumed: number;
@@ -22,6 +23,7 @@ const progress = computed(() => {
     return Math.min(1, Math.max(0, props.consumed / props.goal));
 });
 const dashOffset = computed(() => circumference * (1 - progress.value));
+const strokeClass = computed(() => calorieRingStrokeClass(props.consumed, props.goal));
 </script>
 
 <template>
@@ -38,7 +40,8 @@ const dashOffset = computed(() => circumference * (1 - progress.value));
                     cy="56"
                     :r="radius"
                     fill="none"
-                    class="stroke-success transition-[stroke-dashoffset] duration-300 ease-out motion-reduce:transition-none"
+                    class="transition-[stroke-dashoffset,stroke] duration-300 ease-out motion-reduce:transition-none"
+                    :class="strokeClass"
                     stroke-width="8"
                     stroke-linecap="round"
                     :stroke-dasharray="circumference"

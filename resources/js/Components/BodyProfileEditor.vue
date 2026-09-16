@@ -5,7 +5,7 @@ import SelectContent from './ui/select/SelectContent.vue';
 import SelectItem from './ui/select/SelectItem.vue';
 import SelectTrigger from './ui/select/SelectTrigger.vue';
 import SelectValue from './ui/select/SelectValue.vue';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { activityLevelOptions, type ActivityLevel, type Sex, sexOptions } from '../bodyProfile';
 import { feetAndInchesFromInches, inchesFromFeetAndInches, type HeightUnit } from '../bodyUnits';
 
@@ -13,6 +13,19 @@ const age = defineModel<string | number>('age', { required: true });
 const sex = defineModel<string | Sex>('sex', { required: true });
 const height = defineModel<string | number>('height', { required: true });
 const activityLevel = defineModel<string | ActivityLevel>('activity_level', { required: true });
+const unsetSelection = '__unset__';
+const sexSelection = computed({
+    get: () => sex.value || unsetSelection,
+    set: (value: string) => {
+        sex.value = value === unsetSelection ? '' : value as Sex;
+    },
+});
+const activitySelection = computed({
+    get: () => activityLevel.value || unsetSelection,
+    set: (value: string) => {
+        activityLevel.value = value === unsetSelection ? '' : value as ActivityLevel;
+    },
+});
 const initialHeight = feetAndInchesFromInches(height.value);
 const heightFeet = ref<string | number>(initialHeight.feet);
 const heightInches = ref<string | number>(initialHeight.inches);
@@ -56,11 +69,12 @@ defineProps<{
             </label>
             <label>
                 <span class="field-label">Sex</span>
-                <Select v-model="sex" class="mt-1">
+                <Select v-model="sexSelection" class="mt-1">
                     <SelectTrigger>
                         <SelectValue placeholder="Optional" />
                     </SelectTrigger>
                     <SelectContent>
+                        <SelectItem :value="unsetSelection">Not set</SelectItem>
                         <SelectItem v-for="option in sexOptions" :key="option.value" :value="option.value">
                             {{ option.label }}
                         </SelectItem>
@@ -73,7 +87,7 @@ defineProps<{
             <div class="grid grid-cols-2 gap-3">
                 <label>
                     <span class="field-label">Feet</span>
-                    <Input v-model.number="heightFeet" type="number" min="1" step="1" class="mt-1" :aria-invalid="Boolean(errors?.height_cm)" />
+                    <Input v-model.number="heightFeet" type="number" min="1" max="8" step="1" class="mt-1" :aria-invalid="Boolean(errors?.height_cm)" />
                 </label>
                 <label>
                     <span class="field-label">Inches</span>
@@ -84,16 +98,17 @@ defineProps<{
         </div>
         <label v-else class="block">
             <span class="field-label">Height cm</span>
-            <Input v-model="height" type="number" min="1" step="0.1" class="mt-1" :aria-invalid="Boolean(errors?.height_cm)" />
+            <Input v-model="height" type="number" min="50" max="260" step="0.1" class="mt-1" :aria-invalid="Boolean(errors?.height_cm)" />
             <span v-if="errors?.height_cm" class="mt-1 block text-sm text-destructive">{{ errors.height_cm }}</span>
         </label>
         <label class="block">
             <span class="field-label">Activity</span>
-            <Select v-model="activityLevel" class="mt-1">
+            <Select v-model="activitySelection" class="mt-1">
                 <SelectTrigger>
                     <SelectValue placeholder="Typical week" />
                 </SelectTrigger>
                 <SelectContent>
+                    <SelectItem :value="unsetSelection">Not set</SelectItem>
                     <SelectItem v-for="option in activityLevelOptions" :key="option.value" :value="option.value">
                         {{ option.label }}
                         <template #description>

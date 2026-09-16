@@ -61,6 +61,16 @@ const progressWidth = computed(() => Math.min(100, Math.max(0, Number(props.macr
 function grams(value: number | string | null | undefined) {
     return `${Math.round(Number(value || 0))}g`;
 }
+
+function portionLabel(entry: MacroEntry): string {
+    if (entry.portion_quantity === null) {
+        return '';
+    }
+
+    return entry.portion_unit === null
+        ? `${entry.portion_quantity} serving${Number(entry.portion_quantity) === 1 ? '' : 's'}`
+        : `${entry.portion_quantity}${entry.portion_unit}`;
+}
 </script>
 
 <template>
@@ -108,7 +118,7 @@ function grams(value: number | string | null | undefined) {
                             <div class="min-w-0">
                                 <p class="truncate font-semibold">{{ entry.name }}</p>
                                 <p class="truncate text-xs text-muted-foreground">
-                                    {{ mealLabels[entry.meal_type] ?? entry.meal_type }}<span v-if="entry.portion_quantity"> · {{ entry.portion_quantity }}{{ entry.portion_unit }}</span>
+                                    {{ mealLabels[entry.meal_type] ?? entry.meal_type }}<span v-if="entry.portion_quantity"> · {{ portionLabel(entry) }}</span>
                                 </p>
                             </div>
                             <p class="flex-none text-lg font-semibold">{{ grams(entry[macro.key]) }}</p>

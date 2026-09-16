@@ -60,6 +60,22 @@ it('keeps teen recommendations at maintenance', function (): void {
         ->assertJsonPath('calories', 2550);
 });
 
+it('keeps eighteen year olds at maintenance without requiring a weekly pace', function (): void {
+    $this->postJson('/onboarding/plan', [
+        'age' => 18,
+        'sex' => 'female',
+        'height_cm' => 170,
+        'activity_level' => 'moderate',
+        'current_weight_kg' => 60,
+        'goal' => 'lose',
+    ])->assertOk()
+        ->assertJsonPath('personalized', true)
+        ->assertJsonPath('teen_maintenance_only', true)
+        ->assertJsonPath('maintenance_calories', 2550)
+        ->assertJsonPath('calories', 2550)
+        ->assertJsonPath('notice', 'For ages 13–18, Buff recommends maintenance calories only. Ask a parent or guardian and a qualified health professional about weight-change goals.');
+});
+
 it('falls back to editable defaults when profile data is incomplete', function (): void {
     $this->postJson('/onboarding/plan', [
         'current_weight_kg' => 80,
@@ -156,6 +172,61 @@ it('requires current weight during onboarding', function (): void {
     ])->assertSessionHasErrors('current_weight_kg');
 
     $this->assertDatabaseCount('body_metrics', 0);
+});
+
+it('rejects onboarding weights below the cloud minimum', function (string $path): void {
+    $this->postJson($path, [
+        'calories' => 2000,
+        'protein_g' => 150,
+        'carbs_g' => 200,
+        'fat_g' => 66.6667,
+        'current_weight_kg' => 19.99,
+        'goal' => 'maintain',
+        'weight_unit' => 'kg',
+        'height_unit' => 'cm',
+    ])->assertUnprocessable()->assertJsonPath('errors.current_weight_kg.0', 'The current weight kg field must be at least 20.');
+
+    $this->assertDatabaseEmpty('daily_goals');
+    $this->assertDatabaseEmpty('body_metrics');
+})->with(['/onboarding/plan', '/onboarding']);
+
+it('accepts the cloud minimum weight when estimating a plan', function (): void {
+    $this->postJson('/onboarding/plan', [
+        'current_weight_kg' => 20,
+        'goal' => 'maintain',
+    ])->assertOk()->assertJsonPath('personalized', false);
+});
+
+it('accepts the cloud minimum weight when completing onboarding', function (): void {
+    $this->post('/onboarding', [
+        'calories' => 2000,
+        'protein_g' => 150,
+        'carbs_g' => 200,
+        'fat_g' => 66.6667,
+        'current_weight_kg' => 20,
+        'weight_unit' => 'kg',
+        'height_unit' => 'cm',
+    ])->assertRedirect('/')->assertSessionHasNoErrors();
+
+    $this->assertDatabaseHas('body_metrics', ['weight_kg' => 20]);
+});
+
+it('rejects target weights below twenty kilograms', function (): void {
+    $this->post('/onboarding', [
+        'calories' => 2000,
+        'protein_g' => 150,
+        'carbs_g' => 200,
+        'fat_g' => 66.6667,
+        'current_weight_kg' => 90,
+        'target_weight_kg' => 19.9,
+        'weight_unit' => 'kg',
+        'height_unit' => 'cm',
+    ])->assertSessionHasErrors([
+        'target_weight_kg' => 'The target weight kg field must be at least 20.',
+    ]);
+
+    $this->assertDatabaseEmpty('daily_goals');
+    $this->assertDatabaseEmpty('body_metrics');
 });
 
 it('does not require a target weight', function (): void {

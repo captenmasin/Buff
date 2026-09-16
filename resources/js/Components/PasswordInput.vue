@@ -34,6 +34,7 @@ const passwordVisible = ref(false);
             class="absolute inset-y-0 right-0 grid w-12 place-items-center rounded-r-lg text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50"
             :aria-label="passwordVisible ? 'Hide password' : 'Show password'"
             :disabled="disabled"
+            @pointerdown.prevent
             @click="passwordVisible = !passwordVisible"
         >
             <EyeOff v-if="passwordVisible" :size="20" aria-hidden="true" />

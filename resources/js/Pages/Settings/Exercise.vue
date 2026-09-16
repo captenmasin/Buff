@@ -54,13 +54,15 @@ function saveEatBack(eatBack: EatBack) {
                         {{ saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Couldn’t save' : '' }}
                     </p>
                 </div>
-                <div class="grid gap-2">
+                <div class="grid gap-2" role="radiogroup" aria-label="Exercise calorie eat-back">
                     <Button
                         v-for="option in eatBackOptions"
                         :key="option.value"
                         type="button"
                         class="h-auto w-full min-w-0 justify-start whitespace-normal rounded-2xl px-4 py-3 text-left"
                         :variant="eatBackForm.eat_back === option.value ? 'default' : 'surface'"
+                        role="radio"
+                        :aria-checked="eatBackForm.eat_back === option.value"
                         @click="saveEatBack(option.value)"
                     >
                         <span class="min-w-0">

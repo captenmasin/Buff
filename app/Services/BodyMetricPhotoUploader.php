@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\BodyMetricPhotoPose;
+use App\BuffApiStatus;
 use App\Models\BodyMetric;
 use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\SyncOutbox;
@@ -23,16 +24,20 @@ class BodyMetricPhotoUploader
      */
     public function upload(BodyMetric $bodyMetric, array $photos, array $poses): BuffApiResult
     {
-        if ($this->metricPendingSync($bodyMetric->id)) {
-            $this->stage($bodyMetric, $photos, $poses);
+        if (! $this->metricPendingSync($bodyMetric->id)) {
+            $result = $this->api->uploadBodyMetricPhotos($bodyMetric->id, $photos, $poses);
 
-            return BuffApiResult::success([
-                'pending' => true,
-                'message' => 'Photos will upload after sync.',
-            ]);
+            if ($result->status !== BuffApiStatus::ConnectionFailed) {
+                return $result;
+            }
         }
 
-        return $this->api->uploadBodyMetricPhotos($bodyMetric->id, $photos, $poses);
+        $this->stage($bodyMetric, $photos, $poses);
+
+        return BuffApiResult::success([
+            'pending' => true,
+            'message' => 'Photos will upload after sync.',
+        ]);
     }
 
     public function flushPending(): void
@@ -73,19 +78,20 @@ class BodyMetricPhotoUploader
         PendingBodyMetricPhotoUpload::query()
             ->where('body_metric_id', $bodyMetric->id)
             ->oldest()
-            ->each(function (PendingBodyMetricPhotoUpload $pending) use (&$photos, $bodyMetric): void {
+            ->each(function (PendingBodyMetricPhotoUpload $pending) use (&$photos): void {
                 foreach ($pending->paths as $index => $path) {
                     if (! is_string($path) || ! Storage::disk('local')->exists($path)) {
                         continue;
                     }
 
                     $absolute = Storage::disk('local')->path($path);
+                    $mimeType = mime_content_type($absolute) ?: 'image/jpeg';
                     $pose = is_array($pending->poses) ? ($pending->poses[$index] ?? null) : null;
 
                     $photos[] = [
                         'id' => $pending->id.':'.$index,
-                        'url' => url("/progress/body-metrics/{$bodyMetric->id}/photos/pending/{$pending->id}/{$index}"),
-                        'mime_type' => mime_content_type($absolute) ?: 'image/jpeg',
+                        'url' => "data:{$mimeType};base64,".base64_encode(Storage::disk('local')->get($path)),
+                        'mime_type' => $mimeType,
                         'pose' => is_string($pose) ? $pose : null,
                         'pending' => true,
                     ];

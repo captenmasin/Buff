@@ -48,14 +48,14 @@ it('saves a goal when macro calories match', function (): void {
         'protein_g' => 170,
         'carbs_g' => 195,
         'fat_g' => 60,
-        'target_weight_kg' => 82,
+        'target_weight_kg' => 20,
         'target_body_fat_percent' => 15,
     ])->assertRedirect('/goals');
 
     $goal = DailyGoal::query()->first();
 
     expect($goal->macro_calories)->toBe(2000)
-        ->and((float) $goal->target_weight_kg)->toBe(82.0)
+        ->and((float) $goal->target_weight_kg)->toBe(20.0)
         ->and((float) $goal->target_body_fat_percent)->toBe(15.0);
 });
 
@@ -142,7 +142,7 @@ it('requires body target fields and bounds them', function (): void {
 
     $this->put('/goals', [
         ...$payload,
-        'target_weight_kg' => 0,
+        'target_weight_kg' => 19.9,
         'target_body_fat_percent' => 81,
     ])->assertSessionHasErrors(['target_weight_kg', 'target_body_fat_percent']);
 });

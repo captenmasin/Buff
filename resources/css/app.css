@@ -260,6 +260,16 @@ textarea {
     transition-property: color, background-color, border-color, box-shadow, opacity, transform;
 }
 
+#app::before {
+    content: '';
+    position: fixed;
+    inset: 0 0 auto;
+    z-index: 30;
+    height: env(safe-area-inset-top, 0px);
+    background: var(--background);
+    pointer-events: none;
+}
+
 .app-shell {
     min-height: 100dvh;
 }
@@ -563,14 +573,10 @@ html[data-reduce-motion] .app-shell [role='status'] {
 @layer base {
   * {
     @apply border-border outline-ring/50;
+    scrollbar-width: none;
     }
-  @media (hover: none), (pointer: coarse) {
-    * {
-        scrollbar-width: none;
-    }
-    *::-webkit-scrollbar {
-        display: none;
-    }
+  *::-webkit-scrollbar {
+    display: none;
     }
   body {
     @apply bg-background text-foreground;

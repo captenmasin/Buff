@@ -25,3 +25,14 @@ test('carries the preferred name through social registration', () => {
     assert.match(accountSource, /query\.set\('flow', 'register'\)/);
     assert.match(accountSource, /query\.set\('preferred_name', registerForm\.name\.trim\(\)\)/);
 });
+
+test('keeps registration progress and keyboard advancement behind the same validation', () => {
+    assert.match(accountSource, /\/ registerSteps\.length\) \* 100/);
+    assert.match(accountSource, /if \(registrationNextDisabled\.value \|\| registerForm\.processing\) \{\s+return;/);
+});
+
+test('offers confirmed local-device recovery from the signed-out account screen', () => {
+    assert.match(accountSource, /v-if="hasDeviceData"[\s\S]*Clear device data/);
+    assert.match(accountSource, /:open="clearDataConfirmOpen"[\s\S]*@confirm="confirmClearData"/);
+    assert.match(accountSource, /clearDataForm\.delete\('\/account\/local-data'/);
+});

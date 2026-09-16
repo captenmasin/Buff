@@ -2,8 +2,8 @@
 import { CurveType } from '@unovis/ts';
 import { VisAxis, VisLine, VisScatter, VisXYContainer } from '@unovis/vue';
 import { computed } from 'vue';
-import { formatChartTickDate, formatChartTooltipDate } from '../dateFormat';
-import { chartYDomain, type TrendChartRow } from '../progressChart';
+import { formatChartTooltipDate } from '../dateFormat';
+import { chartTickFormatter, chartTickValues, chartYDomain, type TrendChartRow } from '../progressChart';
 import {
     ChartContainer,
     ChartCrosshair,
@@ -44,6 +44,8 @@ const yDomain = computed(() => {
     return domain[0] === undefined ? undefined : domain;
 });
 const chartKey = computed(() => `${props.xDomain[0]}-${props.xDomain[1]}-${props.data.length}-${yDomain.value?.[0]}`);
+const xTickValues = computed(() => chartTickValues(props.xDomain));
+const xTickFormat = computed(() => chartTickFormatter(props.xDomain));
 const x = (row: TrendChartRow) => row.date.getTime();
 const yFor = (key: string) => (row: TrendChartRow) => {
     const value = row[key as keyof TrendChartRow];
@@ -129,9 +131,9 @@ function formatYTick(value: number | Date): string {
                 :tick-line="false"
                 :domain-line="false"
                 :grid-line="false"
-                :num-ticks="4"
+                :tick-values="xTickValues"
                 :tick-text-font-size="'11px'"
-                :tick-format="formatChartTickDate"
+                :tick-format="xTickFormat"
             />
             <VisAxis
                 type="y"

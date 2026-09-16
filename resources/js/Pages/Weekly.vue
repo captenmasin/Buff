@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { Head, Link, router } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { DateValue } from '@internationalized/date';
 import { parseDate } from '@internationalized/date';
 import { ChevronLeft } from '@lucide/vue';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 import Card from '../Components/Card.vue';
 import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import PageHeader from '../Components/PageHeader.vue';
@@ -58,24 +58,30 @@ const props = defineProps<{
         start_date: string;
         end_date: string;
     };
+    rejectedControls: {
+        start_date?: string | null;
+        end_date?: string | null;
+    };
     week: WeekDay[];
     roundup: WeekRoundup;
     insights: WeekInsight[];
 }>();
+const page = usePage<{errors?: Record<string, string>}>();
 
-const selectedMode = ref<'week' | 'range'>(props.mode);
+const hasRangeError = Boolean(page.props.errors?.start_date || page.props.errors?.end_date);
+const selectedMode = ref<'week' | 'range'>(hasRangeError ? 'range' : props.mode);
 const weekDate = ref(props.controls.date);
-const startDate = ref(props.controls.start_date);
-const endDate = ref(props.controls.end_date);
+const startDate = ref(hasRangeError ? (props.rejectedControls.start_date ?? '') : props.controls.start_date);
+const endDate = ref(hasRangeError ? (props.rejectedControls.end_date ?? '') : props.controls.end_date);
 
-const macroCards = [
+const macroCards = computed(() => [
     { label: 'Protein', consumed: props.roundup.protein_g, goal: props.roundup.protein_goal_g, color: 'bg-protein' },
     { label: 'Carbs', consumed: props.roundup.carbs_g, goal: props.roundup.carbs_goal_g, color: 'bg-carbs' },
     { label: 'Fat', consumed: props.roundup.fat_g, goal: props.roundup.fat_goal_g, color: 'bg-fat' },
-];
+]);
 
-const heroCalories = props.roundup.average_calories ?? props.roundup.calories;
-const heroTarget = props.roundup.average_target ?? props.roundup.effective_target;
+const heroCalories = computed(() => props.roundup.average_calories ?? props.roundup.calories);
+const heroTarget = computed(() => props.roundup.average_target ?? props.roundup.effective_target);
 
 function progress(consumed: number, goal?: number | null) {
     if (!goal) return 0;
@@ -177,10 +183,12 @@ function applySelection() {
                     <label>
                         <span class="field-label">Start</span>
                         <Input v-model="startDate" type="date" class="mt-1" />
+                        <span v-if="page.props.errors?.start_date" class="mt-1 block text-sm text-destructive" role="alert">{{ page.props.errors.start_date }}</span>
                     </label>
                     <label>
                         <span class="field-label">End</span>
                         <Input v-model="endDate" type="date" class="mt-1" />
+                        <span v-if="page.props.errors?.end_date" class="mt-1 block text-sm text-destructive" role="alert">{{ page.props.errors.end_date }}</span>
                     </label>
                 </div>
 
@@ -197,13 +205,15 @@ function applySelection() {
                     <p class="mt-1 text-4xl font-bold tracking-tight">{{ heroCalories }}<span class="text-sm font-medium text-muted-foreground"> kcal</span></p>
                 </div>
                 <div class="text-right text-sm text-muted-foreground">
-                    <p v-if="heroTarget">{{ heroTarget }} kcal daily target</p>
+                    <p v-if="roundup.average_target !== null">{{ roundup.average_target }} kcal daily target</p>
+                    <p v-else-if="roundup.effective_target">{{ roundup.effective_target }} kcal period target</p>
                     <p v-if="roundup.calories">{{ roundup.calories }} kcal this period</p>
                     <p v-if="roundup.burned_calories">{{ roundup.burned_calories }} burned</p>
                 </div>
             </div>
 
             <Progress class="mt-3 h-2.5" :model-value="progress(heroCalories, heroTarget)" indicator-class="bg-success" />
+            <p class="mt-3 text-xs text-muted-foreground">Targets use your current goal and update when that goal changes.</p>
 
             <div class="mt-5 grid grid-cols-3 gap-3">
                 <div v-for="macro in macroCards" :key="macro.label" class="min-w-0">
@@ -229,13 +239,19 @@ function applySelection() {
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
             <Card class="divide-y divide-border/60 px-0 py-0">
-                <div v-for="day in week" :key="day.date" class="flex items-center gap-3 px-4 py-3.5">
+                <div
+                    v-for="day in week"
+                    :key="day.date"
+                    class="flex items-center gap-3 px-4 py-3.5"
+                    :class="day.is_selected ? 'bg-secondary/50' : ''"
+                    :aria-current="day.is_selected ? 'date' : undefined"
+                >
                     <span class="grid size-6 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground font-semibold">
                         {{ day.label }}
                     </span>
                     <div class="min-w-0 flex-1">
                         <p class="font-semibold">{{ formatDisplayDate(day.date, { weekday: 'short' }) }}</p>
-                        <p class="mt-1 truncate text-sm text-muted-foreground">
+                        <p class="mt-1 whitespace-normal text-sm text-muted-foreground">
                             {{ day.consumed_calories }} kcal
                             <span v-if="day.effective_target">/ {{ day.effective_target }}</span>
                             <span> · P {{ Math.round(day.protein_g) }}g · C {{ Math.round(day.carbs_g) }}g · F {{ Math.round(day.fat_g) }}g</span>

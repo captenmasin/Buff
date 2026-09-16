@@ -33,6 +33,7 @@ class MealController extends Controller
         };
 
         $meal = $request->string('meal')->toString();
+        $meal = in_array($meal, MealEntry::MEAL_TYPES, true) ? $meal : null;
         $availableModes = ['food', 'custom', 'workout', 'photo', 'recipe'];
 
         return Inertia::render('Add', [
@@ -75,6 +76,7 @@ class MealController extends Controller
     {
         $validated = $request->validate([
             'q' => ['nullable', 'string', 'max:120'],
+            'locale' => ['nullable', 'string', 'max:35', 'regex:/^[A-Za-z]{2,3}(?:[-_][A-Za-z0-9]{2,8})*$/'],
         ]);
 
         $query = trim((string) ($validated['q'] ?? ''));
@@ -96,7 +98,8 @@ class MealController extends Controller
             ->get()
             ->all();
 
-        $remoteProducts = $openFoodFacts->search($query, 20, $request->getPreferredLanguage() ?? 'en_GB');
+        $locale = $validated['locale'] ?? $request->getPreferredLanguage() ?? 'en_GB';
+        $remoteProducts = $openFoodFacts->search($query, 20, str_replace('-', '_', $locale));
 
         $products = collect([...$localProducts, ...$remoteProducts])
             ->unique('id')
@@ -190,11 +193,11 @@ class MealController extends Controller
             'date' => ['required', 'date'],
             'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
             'recipe_id' => ['required', 'uuid', 'exists:recipes,id'],
-            'servings' => ['nullable', 'numeric', 'min:0.1', 'max:100'],
+            'servings' => ['required', 'numeric', 'min:0.1', 'max:100'],
         ]);
 
         $recipe = Recipe::query()->findOrFail($validated['recipe_id']);
-        $loggedServings = (float) ($validated['servings'] ?? $recipe->servings);
+        $loggedServings = (float) $validated['servings'];
         $factor = $loggedServings / max((float) $recipe->servings, 0.1);
         $totals = $recipe->totals();
 
@@ -240,8 +243,14 @@ class MealController extends Controller
         ]);
 
         if ($validated['edit_mode'] === 'portion') {
-            $this->applyPortion($mealEntry, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'], $calculator);
-        } else {
+            $portionUnit = $validated['portion_unit'] ?? null;
+
+            if ((float) $validated['portion_quantity'] !== (float) $mealEntry->portion_quantity || $portionUnit !== $mealEntry->portion_unit) {
+                $this->applyPortion($mealEntry, $mealEntry, $validated['portion_quantity'], $portionUnit, $calculator);
+            }
+        } elseif ((float) $validated['protein_g'] !== (float) $mealEntry->protein_g
+            || (float) $validated['carbs_g'] !== (float) $mealEntry->carbs_g
+            || (float) $validated['fat_g'] !== (float) $mealEntry->fat_g) {
             $mealEntry->fill([
                 'protein_g' => $validated['protein_g'],
                 'carbs_g' => $validated['carbs_g'],
@@ -376,7 +385,7 @@ class MealController extends Controller
     {
         return MealEntry::query()
             ->with('foodProduct')
-            ->whereIn('source_type', [MealEntry::SOURCE_CUSTOM, MealEntry::SOURCE_BARCODE]);
+            ->whereIn('source_type', [MealEntry::SOURCE_CUSTOM, MealEntry::SOURCE_BARCODE, MealEntry::SOURCE_RECIPE]);
     }
 
     private function previousFoodEntryKey(MealEntry $entry): string
@@ -398,6 +407,7 @@ class MealController extends Controller
         return [
             'type' => 'previous_meal',
             'id' => $entry->id,
+            'source_type' => $entry->source_type,
             'name' => $entry->name,
             'brand' => $entry->foodProduct?->brand ?: 'Previous item',
             'image_url' => $entry->foodProduct?->image_url,

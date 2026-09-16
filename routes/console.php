@@ -3,9 +3,10 @@
 use App\Models\MealEntry;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('meal-reminder:check {--meal=} {--date=}', function (): int {
+Artisan::command('meal-reminder:check {--meal=} {--date=} {--result=}', function (): int {
     $meal = (string) $this->option('meal');
     $date = (string) $this->option('date');
 
@@ -20,7 +21,14 @@ Artisan::command('meal-reminder:check {--meal=} {--date=}', function (): int {
         ->where('meal_type', $meal)
         ->exists();
 
-    $this->line(($logged ? 'BUFF_MEAL_REMINDER_LOGGED:' : 'BUFF_MEAL_REMINDER_DUE:').$meal);
+    $result = ($logged ? 'BUFF_MEAL_REMINDER_LOGGED:' : 'BUFF_MEAL_REMINDER_DUE:').$meal;
+    $resultPath = $this->option('result');
+
+    if (is_string($resultPath) && $resultPath !== '') {
+        File::put($resultPath, $result);
+    }
+
+    $this->line($result);
 
     return Command::SUCCESS;
 })->purpose('Check whether a meal reminder is still due');

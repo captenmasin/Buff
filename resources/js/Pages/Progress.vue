@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BridgeCall } from '#nativephp';
 import { Head, Link, router, useForm } from '@inertiajs/vue3';
 import axios from 'axios';
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
@@ -23,6 +24,7 @@ import {
     type MeasurementUnit,
     type WeightUnit,
 } from '../bodyUnits';
+import { responseErrorMessage } from '../foodRequests';
 import { hapticImpact } from '../haptics';
 import { photoDataUrl } from '../photoDataUrl';
 import { resizePhoto } from '../photoResize';
@@ -103,6 +105,8 @@ const activeChart = ref(0);
 const photoInput = ref<HTMLInputElement | null>(null);
 const sheetPhotoInput = ref<HTMLInputElement | null>(null);
 const selectedPhotos = ref<Partial<Record<ProgressPhotoPose, SelectedPhoto>>>({});
+const metricDateLoading = ref(false);
+const metricLoadError = ref('');
 const photoUploadError = ref('');
 const photoUploading = ref(false);
 const photosMetric = ref<BodyMetric | null>(null);
@@ -117,14 +121,17 @@ const cameraOpen = ref(false);
 const cameraStarting = ref(false);
 const cameraReady = ref(false);
 const cameraError = ref('');
+const cameraPermissionDenied = ref(false);
 const cameraFacing = ref<'user' | 'environment'>('user');
 const cameraVideo = ref<HTMLVideoElement | null>(null);
 const photoTargetMetric = ref<BodyMetric | null>(null);
 let cameraStream: MediaStream | null = null;
 let photoRequest = 0;
+let metricDateRequest = 0;
 let overlayRequest = 0;
 let photoTrigger: HTMLElement | null = null;
 const photoLoads: Record<string, Promise<ProgressPhoto[]>> = {};
+const canOpenCameraSettings = import.meta.env.MODE === 'ios' || import.meta.env.MODE === 'android';
 
 const metricForm = useForm({
     date: props.today,
@@ -148,6 +155,8 @@ const rangeOptions = [
     { key: 'all', label: 'All', accessibleLabel: 'All time' },
 ] as const;
 const latestWeight = computed(() => weightFromKg(props.trend?.weight_kg ?? props.latest?.weight_kg, props.preferences.weight_unit));
+const weightMinimum = computed(() => weightFromKg(20, props.preferences.weight_unit) ?? 20);
+const weightMaximum = computed(() => weightFromKg(1000, props.preferences.weight_unit) ?? 1000);
 const previousWeight = computed(() => {
     const weight = weightFromKg(props.latest?.weight_kg, props.preferences.weight_unit);
 
@@ -261,7 +270,6 @@ function loadPhotosForMetric(metricId: string): Promise<ProgressPhoto[]> {
 
     const inflight = photoLoads[metricId] ?? axios.get(`/progress/body-metrics/${metricId}/photos`)
         .then(({data}) => cachePhotos(metricId, data.photos || []))
-        .catch(() => cachePhotos(metricId, []))
         .finally(() => {
             delete photoLoads[metricId];
         });
@@ -272,7 +280,7 @@ function loadPhotosForMetric(metricId: string): Promise<ProgressPhoto[]> {
 }
 
 async function loadHistoryPhotos(): Promise<void> {
-    await Promise.all(props.history.map((metric) => loadPhotosForMetric(metric.id)));
+    await Promise.allSettled(props.history.map((metric) => loadPhotosForMetric(metric.id)));
 }
 
 function clearSelectedPhotos(): void {
@@ -332,16 +340,21 @@ async function selectProgressPhotos(event: Event): Promise<void> {
     const input = event.target instanceof HTMLInputElement ? event.target : null;
     const file = input?.files?.[0];
 
-    if (file) {
-        await assignPhoto(libraryPose.value, file);
-    }
+    try {
+        if (file) {
+            photoUploadError.value = '';
+            await assignPhoto(libraryPose.value, file);
+        }
 
-    if (input) {
-        input.value = '';
-    }
-
-    if (file && photoTargetMetric.value) {
-        await uploadTargetedPhotos();
+        if (file && photoTargetMetric.value) {
+            await uploadTargetedPhotos();
+        }
+    } catch {
+        photoUploadError.value = 'Could not prepare that image. Choose another photo.';
+    } finally {
+        if (input) {
+            input.value = '';
+        }
     }
 }
 
@@ -364,12 +377,18 @@ function openLibrary(pose: ProgressPhotoPose): void {
     photoInput.value?.click();
 }
 
-function cameraErrorMessage(error: unknown): string {
+function cameraPermissionWasDenied(error: unknown): boolean {
     const errorName = error instanceof DOMException || error instanceof Error ? error.name : null;
 
-    if (errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError') {
+    return errorName === 'NotAllowedError' || errorName === 'PermissionDeniedError';
+}
+
+function cameraErrorMessage(error: unknown): string {
+    if (cameraPermissionWasDenied(error)) {
         return 'Camera permission was denied. Allow camera access for Buff, or choose a photo from your library.';
     }
+
+    const errorName = error instanceof DOMException || error instanceof Error ? error.name : null;
 
     if (errorName === 'NotFoundError' || errorName === 'DevicesNotFoundError') {
         return 'No usable camera was found. Choose a photo from your library instead.';
@@ -379,6 +398,8 @@ function cameraErrorMessage(error: unknown): string {
 }
 
 async function acquireCameraStream(): Promise<MediaStream | null> {
+    cameraPermissionDenied.value = false;
+
     if (!navigator.mediaDevices?.getUserMedia) {
         cameraError.value = 'Camera is not available on this device. Choose a photo from your library instead.';
         return null;
@@ -392,8 +413,17 @@ async function acquireCameraStream(): Promise<MediaStream | null> {
             },
         });
     } catch (error) {
+        cameraPermissionDenied.value = cameraPermissionWasDenied(error);
         cameraError.value = cameraErrorMessage(error);
         return null;
+    }
+}
+
+async function openCameraSettings(): Promise<void> {
+    try {
+        await BridgeCall('System.OpenAppSettings');
+    } catch {
+        cameraError.value = 'Could not open Settings. Open Buff in your device Settings to allow camera access.';
     }
 }
 
@@ -539,6 +569,10 @@ async function uploadSelectedPhotos(metricId: string): Promise<boolean> {
 }
 
 function saveMetric(): void {
+    if (metricDateLoading.value || metricLoadError.value || metricForm.errors.date) {
+        return;
+    }
+
     metricForm.transform((data) => {
         const { chest_cm, waist_cm, hips_cm, upper_arm_cm, thigh_cm, ...progress } = data;
 
@@ -694,12 +728,29 @@ async function showPhotos(metric: BodyMetric): Promise<void> {
 
         if (request === photoRequest) {
             remotePhotos.value = photos;
+            photoUploadError.value = '';
+        }
+    } catch {
+        if (request === photoRequest) {
+            photoUploadError.value = 'Could not load progress photos. Check your connection and try again.';
         }
     } finally {
         if (request === photoRequest) {
             remotePhotosLoading.value = false;
         }
     }
+}
+
+function retakeRemotePhoto(photo: ProgressPhoto): void {
+    const metric = photosMetric.value;
+
+    if (!metric || !isProgressPhotoPose(photo.pose)) {
+        return;
+    }
+
+    photoTargetMetric.value = metric;
+    closePhotos();
+    void startCamera(photo.pose);
 }
 
 async function addPhotosForMetric(): Promise<void> {
@@ -798,8 +849,66 @@ function closePhotos(): void {
     photoTrigger = null;
 }
 
-watch(() => metricForm.date, () => {
-    void loadOverlayPhotos();
+function hydrateMetricForm(metric: BodyMetric | null): void {
+    metricForm.weight_kg = metric ? weightFromKg(metric.weight_kg, props.preferences.weight_unit) ?? '' : '';
+    metricForm.body_fat_percent = metric?.body_fat_percent ?? '';
+    metricForm.chest_cm = metric ? measurementFromCm(metric.chest_cm, props.preferences.measurement_unit) ?? '' : '';
+    metricForm.waist_cm = metric ? measurementFromCm(metric.waist_cm, props.preferences.measurement_unit) ?? '' : '';
+    metricForm.hips_cm = metric ? measurementFromCm(metric.hips_cm, props.preferences.measurement_unit) ?? '' : '';
+    metricForm.upper_arm_cm = metric ? measurementFromCm(metric.upper_arm_cm, props.preferences.measurement_unit) ?? '' : '';
+    metricForm.thigh_cm = metric ? measurementFromCm(metric.thigh_cm, props.preferences.measurement_unit) ?? '' : '';
+    metricForm.notes = metric?.notes ?? '';
+}
+
+async function loadMetricForDate(date: string): Promise<void> {
+    const request = ++metricDateRequest;
+
+    if (!date || date > props.today) {
+        metricDateLoading.value = false;
+        metricLoadError.value = '';
+        metricForm.setError('date', date ? 'Choose today or an earlier date.' : 'Choose a date.');
+
+        return;
+    }
+
+    metricDateLoading.value = true;
+
+    try {
+        const params = new URLSearchParams({date});
+        const {data} = await axios.get(`/progress/body-metrics/by-date?${params.toString()}`);
+
+        if (request === metricDateRequest) {
+            hydrateMetricForm(data.metric ?? null);
+            metricLoadError.value = '';
+            metricForm.clearErrors('date');
+        }
+    } catch (error) {
+        if (request === metricDateRequest) {
+            const dateError = axios.isAxiosError(error) && error.response?.status === 422
+                ? responseErrorMessage(error, 'date', '')
+                : null;
+
+            if (typeof dateError === 'string' && dateError) {
+                metricForm.setError('date', dateError);
+                metricLoadError.value = '';
+            } else {
+                metricLoadError.value = 'Could not load that check-in. Check your connection before editing.';
+            }
+        }
+    } finally {
+        if (request === metricDateRequest) {
+            metricDateLoading.value = false;
+            void loadOverlayPhotos();
+        }
+    }
+}
+
+watch(() => metricForm.date, (date) => {
+    metricForm.clearErrors();
+    metricLoadError.value = '';
+    hydrateMetricForm(null);
+    clearSelectedPhotos();
+    void loadMetricForDate(date);
 });
 
 watch(() => props.history.map((metric) => metric.id).join(','), () => {
@@ -815,6 +924,7 @@ onMounted(() => {
 onUnmounted(() => {
     window.removeEventListener('buff:android-back', handleNativeAndroidBack);
     overlayRequest++;
+    metricDateRequest++;
     stopCamera();
     clearSelectedPhotos();
 });
@@ -972,19 +1082,25 @@ onUnmounted(() => {
             <form class="space-y-3" @submit.prevent="saveMetric">
                 <label class="block">
                     <span class="field-label">Date</span>
-                    <Input v-model="metricForm.date" type="date" class="mt-1" />
-                    <span v-if="metricForm.errors.date" class="text-sm text-destructive">{{ metricForm.errors.date }}</span>
+                    <Input v-model="metricForm.date" type="date" :max="today" class="mt-1" :aria-invalid="Boolean(metricForm.errors.date)" :aria-describedby="metricForm.errors.date ? 'metric-date-error' : undefined" />
+                    <span v-if="metricForm.errors.date" id="metric-date-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.date }}</span>
                 </label>
+                <p v-if="metricDateLoading" class="text-sm text-muted-foreground" role="status">Loading this check-in…</p>
+                <div v-if="metricLoadError" class="space-y-2">
+                    <p class="text-sm text-destructive" role="alert">{{ metricLoadError }}</p>
+                    <Button type="button" variant="surface" :disabled="metricDateLoading" @click="loadMetricForDate(metricForm.date)">Retry loading check-in</Button>
+                </div>
+                <fieldset :disabled="metricDateLoading || Boolean(metricLoadError) || Boolean(metricForm.errors.date)" class="space-y-3">
                 <div class="grid grid-cols-2 gap-3">
                     <label>
                         <span class="field-label">Weight {{ preferences.weight_unit }}</span>
-                        <Input v-model="metricForm.weight_kg" type="number" min="1" step="0.1" class="mt-1" :placeholder="previousWeight" />
-                        <span v-if="metricForm.errors.weight_kg" class="text-sm text-destructive">{{ metricForm.errors.weight_kg }}</span>
+                        <Input v-model="metricForm.weight_kg" type="number" :min="weightMinimum" :max="weightMaximum" step="0.1" class="mt-1" :placeholder="previousWeight" :aria-invalid="Boolean(metricForm.errors.weight_kg)" :aria-describedby="metricForm.errors.weight_kg ? 'metric-weight-error' : undefined" @update:model-value="metricForm.clearErrors('weight_kg')" />
+                        <span v-if="metricForm.errors.weight_kg" id="metric-weight-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.weight_kg }}</span>
                     </label>
                     <label>
                         <span class="field-label">Body fat %</span>
-                        <Input v-model="metricForm.body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" :placeholder="previousBodyFat" />
-                        <span v-if="metricForm.errors.body_fat_percent" class="text-sm text-destructive">{{ metricForm.errors.body_fat_percent }}</span>
+                        <Input v-model="metricForm.body_fat_percent" type="number" min="1" max="80" step="0.1" class="mt-1" :placeholder="previousBodyFat" :aria-invalid="Boolean(metricForm.errors.body_fat_percent)" :aria-describedby="metricForm.errors.body_fat_percent ? 'metric-body-fat-error' : undefined" @update:model-value="metricForm.clearErrors('body_fat_percent')" />
+                        <span v-if="metricForm.errors.body_fat_percent" id="metric-body-fat-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.body_fat_percent }}</span>
                     </label>
                 </div>
                 <details class="rounded-xl border border-border/60">
@@ -1003,8 +1119,11 @@ onUnmounted(() => {
                                 step="0.1"
                                 class="mt-1"
                                 :placeholder="formatBodyValue(measurementDisplay(measurements[field.key]?.value_cm))"
+                                :aria-invalid="Boolean(metricForm.errors[field.key])"
+                                :aria-describedby="metricForm.errors[field.key] ? `metric-${field.key}-error` : undefined"
+                                @update:model-value="metricForm.clearErrors(field.key)"
                             />
-                            <span v-if="metricForm.errors[field.key]" class="text-sm text-destructive">{{ metricForm.errors[field.key] }}</span>
+                            <span v-if="metricForm.errors[field.key]" :id="`metric-${field.key}-error`" class="text-sm text-destructive" role="alert">{{ metricForm.errors[field.key] }}</span>
                         </label>
                     </div>
                 </details>
@@ -1065,20 +1184,26 @@ onUnmounted(() => {
                         class="sr-only"
                         @change="selectProgressPhotos"
                     >
-                    <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
-                    <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                    <p v-if="cameraError" class="text-sm text-destructive" role="alert">{{ cameraError }}</p>
+                    <Button v-if="cameraPermissionDenied && canOpenCameraSettings" type="button" variant="surface" class="w-full" @click="openCameraSettings">
+                        Open Buff settings
+                    </Button>
+                    <p v-if="photoUploadError" class="text-sm text-destructive" role="alert">{{ photoUploadError }}</p>
                 </div>
                 <label class="block">
                     <span class="field-label">Notes</span>
-                    <Textarea v-model="metricForm.notes" rows="3" class="mt-1" />
+                    <Textarea v-model="metricForm.notes" rows="3" maxlength="1000" class="mt-1" :aria-invalid="Boolean(metricForm.errors.notes)" :aria-describedby="metricForm.errors.notes ? 'metric-notes-error' : undefined" @update:model-value="metricForm.clearErrors('notes')" />
+                    <span v-if="metricForm.errors.notes" id="metric-notes-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.notes }}</span>
                 </label>
                 <Button
                     class="w-full"
+                    :disabled="metricDateLoading || Boolean(metricLoadError) || Boolean(metricForm.errors.date)"
                     :loading="metricForm.processing || photoUploading"
                     :loading-label="photoUploading ? 'Uploading photos…' : 'Saving progress…'"
                 >
                     Save progress
                 </Button>
+                </fieldset>
             </form>
         </Card>
 
@@ -1131,11 +1256,10 @@ onUnmounted(() => {
             </div>
             <div v-else-if="remotePhotos.length" class="grid grid-cols-3 gap-2">
                 <figure v-for="photo in remotePhotos" :key="photo.id" class="relative space-y-1">
-                    <img
-                        :src="photo.url"
-                        :alt="photoPoseLabel(photo.pose)"
-                        class="aspect-square w-full rounded-xl object-cover"
-                    >
+                    <button v-if="isProgressPhotoPose(photo.pose)" type="button" class="block w-full" :aria-label="`Retake ${photoPoseLabel(photo.pose).toLowerCase()} photo`" @click="retakeRemotePhoto(photo)">
+                        <img :src="photo.url" :alt="photoPoseLabel(photo.pose)" class="aspect-square w-full rounded-xl object-cover">
+                    </button>
+                    <img v-else :src="photo.url" :alt="photoPoseLabel(photo.pose)" class="aspect-square w-full rounded-xl object-cover">
                     <Button
                         v-if="!photo.pending"
                         type="button"
@@ -1150,12 +1274,15 @@ onUnmounted(() => {
                     <figcaption class="text-center text-xs text-muted-foreground">{{ photoPoseLabel(photo.pose) }}</figcaption>
                 </figure>
             </div>
-            <div v-if="!remotePhotosLoading && remotePhotos.length < 3" class="space-y-3" :class="remotePhotos.length ? 'mt-4' : ''">
+            <div v-if="!remotePhotosLoading" class="space-y-3" :class="remotePhotos.length ? 'mt-4' : ''">
                 <p v-if="remotePhotos.length === 0" class="text-sm text-muted-foreground">No photos for this measurement yet.</p>
-                <p v-if="cameraError" class="text-sm text-destructive">{{ cameraError }}</p>
-                <p v-if="photoUploadError" class="text-sm text-destructive">{{ photoUploadError }}</p>
+                <p v-if="cameraError" class="text-sm text-destructive" role="alert">{{ cameraError }}</p>
+                <Button v-if="cameraPermissionDenied && canOpenCameraSettings" type="button" variant="surface" class="w-full" @click.stop="openCameraSettings">
+                    Open Buff settings
+                </Button>
+                <p v-if="photoUploadError" class="text-sm text-destructive" role="alert">{{ photoUploadError }}</p>
                 <Button type="button" class="w-full" :loading="photoUploading" loading-label="Uploading photos…" @click.stop="addPhotosForMetric">
-                    Add photos
+                    {{ remotePhotos.length ? 'Retake photos' : 'Add photos' }}
                 </Button>
                 <Button type="button" variant="surface" class="w-full" :disabled="photoUploading" @click.stop="addPhotosFromLibrary">
                     Choose from library
@@ -1199,7 +1326,7 @@ onUnmounted(() => {
                 leave-from-class="translate-y-0 opacity-100"
                 leave-to-class="translate-y-full opacity-0 motion-reduce:translate-y-0"
             >
-                <div v-if="cameraOpen" data-motion-transform class="fixed inset-0 z-[80] flex flex-col bg-foreground text-background">
+                <div v-if="cameraOpen" data-motion-transform data-native-overlay class="fixed inset-0 z-[80] flex flex-col bg-foreground text-background">
             <div class="flex items-center justify-between gap-3 bg-background px-4 py-3 text-foreground pt-[calc(env(safe-area-inset-top,0px)+0.75rem)]">
                 <div class="min-w-0">
                     <p class="text-sm text-muted-foreground">{{ progressPhotoLabels[capturingPose] }} photo</p>

@@ -153,6 +153,65 @@ it('stages photos while the body metric is still in the sync outbox', function (
     }
 });
 
+it('persists offline photos for a synced metric across requests and cleans them up after sync', function (): void {
+    Http::preventStrayRequests();
+    $online = false;
+    $metric = BodyMetric::query()->create(['date' => '2026-08-20', 'weight_kg' => 82.4]);
+    SyncOutbox::query()->where('record_id', $metric->id)->delete();
+    Http::fake([
+        "*/body-metrics/{$metric->id}/photos" => function () use (&$online) {
+            return $online ? Http::response(['photos' => []], 201) : Http::failedConnection();
+        },
+        '*/sync' => Http::response([
+            'acknowledged' => [], 'changes' => [], 'cursor' => 0, 'has_more' => false,
+        ]),
+    ]);
+
+    $this->post("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => [UploadedFile::fake()->image('front.jpg', 800, 600)],
+        'poses' => ['front'],
+    ])->assertOk()->assertJsonPath('pending', true);
+
+    $pending = PendingBodyMetricPhotoUpload::query()->sole();
+    $path = $pending->paths[0];
+    $storedPhoto = Storage::disk('local')->get($path);
+    Storage::disk('local')->assertExists($path);
+
+    $this->getJson("/progress/body-metrics/{$metric->id}/photos")
+        ->assertOk()
+        ->assertJsonPath('pending', true)
+        ->assertJsonPath('photos.0.id', $pending->id.':0')
+        ->assertJsonPath('photos.0.url', 'data:image/jpeg;base64,'.base64_encode($storedPhoto));
+
+    $online = true;
+    app(BuffSyncService::class)->sync();
+
+    $this->assertDatabaseEmpty('pending_body_metric_photo_uploads');
+    Storage::disk('local')->assertMissing($path);
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === "https://api.usebuff.app/api/v1/body-metrics/{$metric->id}/photos"
+        && $request->method() === 'POST'
+        && $request->hasFile('photos[]', filename: 'front.jpg')
+        && outgoingField($request, 'poses') === ['front']);
+});
+
+it('keeps cloud authentication and validation failures visible without staging photos', function (int $status): void {
+    Http::preventStrayRequests();
+    $metric = BodyMetric::query()->create(['date' => '2026-08-20', 'weight_kg' => 82.4]);
+    SyncOutbox::query()->where('record_id', $metric->id)->delete();
+    Http::fake([
+        "*/body-metrics/{$metric->id}/photos" => Http::response(['message' => 'Upload rejected.'], $status),
+    ]);
+
+    $this->postJson("/progress/body-metrics/{$metric->id}/photos", [
+        'photos' => [UploadedFile::fake()->image('front.jpg', 800, 600)],
+        'poses' => ['front'],
+    ])->assertStatus($status)->assertJsonPath('message', 'Upload rejected.');
+
+    $this->assertDatabaseEmpty('pending_body_metric_photo_uploads');
+    expect(Storage::disk('local')->allFiles('progress-photos'))->toBe([]);
+    Http::assertSentCount(1);
+})->with(['unauthorized' => 401, 'invalid photo' => 422]);
+
 it('does not report staging success when a photo cannot be written', function (): void {
     stubIdleSync();
 
@@ -186,6 +245,7 @@ it('lists and serves staged pending photos when cloud has none yet', function ()
     ])->assertOk()->assertJsonPath('pending', true);
 
     $pending = PendingBodyMetricPhotoUpload::query()->sole();
+    $storedPhoto = Storage::disk('local')->get($pending->paths[0]);
 
     Http::fake([
         "*/body-metrics/{$metric->id}/photos" => Http::response(['photos' => []]),
@@ -201,12 +261,16 @@ it('lists and serves staged pending photos when cloud has none yet', function ()
         ->assertOk()
         ->assertJsonPath('pending', true)
         ->assertJsonPath('photos.0.id', $pending->id.':0')
+        ->assertJsonPath('photos.0.mime_type', 'image/jpeg')
         ->assertJsonPath('photos.0.pose', 'front');
 
     $url = $list->json('photos.0.url');
-    expect($url)->toContain("/progress/body-metrics/{$metric->id}/photos/pending/{$pending->id}/0");
+    expect($url)->toStartWith('data:image/jpeg;base64,')
+        ->and(base64_decode((string) str($url)->after(','), true))->toBe($storedPhoto);
 
-    $this->get($url)->assertOk();
+    $this->get("/progress/body-metrics/{$metric->id}/photos/pending/{$pending->id}/0")
+        ->assertOk()
+        ->assertStreamedContent($storedPhoto);
 });
 
 it('merges staged photos with existing cloud photos', function (): void {

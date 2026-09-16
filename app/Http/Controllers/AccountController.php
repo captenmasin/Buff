@@ -143,8 +143,8 @@ class AccountController extends Controller
         $isRegistration = $request->string('flow')->toString() === 'register';
         $failureRoute = $isRegistration ? 'account.register' : 'account.login';
 
-        if ($error = $request->string('error')->toString()) {
-            return redirect()->route($failureRoute)->with('message', $error);
+        if ($request->string('error')->toString() !== '') {
+            return redirect()->route($failureRoute)->with('message', 'Social sign-in could not be completed.');
         }
 
         $code = $request->string('code')->toString();

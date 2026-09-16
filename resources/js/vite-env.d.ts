@@ -1,6 +1,8 @@
 /// <reference types="vite/client" />
 
 declare module '#nativephp' {
+    export function BridgeCall(method: string, params?: Record<string, unknown>): Promise<unknown>;
+
     export const Browser: {
         auth(url: string): Promise<boolean>;
         inApp(url: string): Promise<boolean>;

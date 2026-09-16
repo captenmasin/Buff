@@ -51,6 +51,10 @@ class WeeklySummaryController extends Controller
                 'start_date' => $startDate->toDateString(),
                 'end_date' => $endDate->toDateString(),
             ],
+            'rejectedControls' => [
+                'start_date' => $request->old('start_date'),
+                'end_date' => $request->old('end_date'),
+            ],
             'week' => $summary['days'],
             'roundup' => $summary['roundup'],
             'insights' => $summary['insights'],

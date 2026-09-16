@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import Card from './Card.vue'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from './ui/dialog'
 import { Sheet, SheetContent } from './ui/sheet'
@@ -64,6 +64,24 @@ function preventDismiss(event: Event) {
     }
 }
 
+function handleNativeAndroidBack(event: Event) {
+    if (!props.open || event.defaultPrevented) {
+        return
+    }
+
+    const openSheets = document.querySelectorAll<HTMLElement>('[data-app-sheet][data-state="open"]')
+
+    if (openSheets.item(openSheets.length - 1)?.dataset.appSheet !== props.labelledBy) {
+        return
+    }
+
+    event.preventDefault()
+
+    if (props.dismissible) {
+        emit('close')
+    }
+}
+
 function onHandlePointerDown(event: PointerEvent) {
     if (props.variant !== 'drawer' || !props.dismissible || prefersReducedMotion() || isDesktopDrawer()) {
         return
@@ -108,6 +126,9 @@ function onHandlePointerUp() {
         emit('close')
     }
 }
+
+onMounted(() => window.addEventListener('buff:android-back', handleNativeAndroidBack))
+onBeforeUnmount(() => window.removeEventListener('buff:android-back', handleNativeAndroidBack))
 </script>
 
 <template>
@@ -118,6 +139,7 @@ function onHandlePointerUp() {
             role="dialog"
             aria-modal="true"
             :aria-labelledby="labelledBy"
+            :data-app-sheet="labelledBy"
             overlay-class="sm:left-64"
             :class="cn('bottom-drawer max-h-[88dvh] gap-0 overflow-y-auto overscroll-contain rounded-t-3xl border-border/70 p-4 sm:left-64 sm:max-w-lg', props.class)"
             :style="drawerStyle"
@@ -147,6 +169,7 @@ function onHandlePointerUp() {
             role="dialog"
             aria-modal="true"
             :aria-labelledby="labelledBy"
+            :data-app-sheet="labelledBy"
             :class="cn('max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-md gap-0 overflow-x-hidden overflow-y-auto overscroll-contain p-0 sm:max-w-lg', props.class)"
             @pointer-down-outside="preventDismiss"
             @interact-outside="preventDismiss"

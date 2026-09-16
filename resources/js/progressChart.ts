@@ -1,4 +1,4 @@
-import { parseLocalDate } from './dateFormat.ts';
+import { formatChartTickDate, parseLocalDate } from './dateFormat.ts';
 
 export type TrendChartRow = {
     date: Date;
@@ -38,6 +38,32 @@ export function buildGoalLine(rangeStart: string, rangeEnd: string, goal: number
 
 export function chartXDomain(rangeStart: string, rangeEnd: string): [number, number] {
     return [parseLocalDate(rangeStart).getTime(), parseLocalDate(rangeEnd).getTime()];
+}
+
+export function chartTickValues(domain: [number, number]): number[] {
+    const start = new Date(Math.min(...domain));
+    const end = new Date(Math.max(...domain));
+    const calendarDays = Math.round((
+        Date.UTC(end.getFullYear(), end.getMonth(), end.getDate())
+        - Date.UTC(start.getFullYear(), start.getMonth(), start.getDate())
+    ) / 86_400_000);
+    const tickCount = Math.min(4, calendarDays + 1);
+
+    return Array.from({ length: tickCount }, (_, index) => new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() + Math.round(index * calendarDays / Math.max(1, tickCount - 1)),
+    ).getTime());
+}
+
+export function chartTickFormatter(domain: [number, number]): (value: number | Date) => string {
+    if (new Date(domain[0]).getFullYear() === new Date(domain[1]).getFullYear()) {
+        return formatChartTickDate;
+    }
+
+    const formatter = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+
+    return (value) => formatter.format(value);
 }
 
 export function chartYDomain(values: number[], goal: number | null): [number | undefined, number | undefined] {

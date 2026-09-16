@@ -145,12 +145,6 @@ export function nativeError(payload: unknown, fallback: string): {category: stri
 }
 
 export async function subscriptionPlatform(): Promise<SubscriptionPlatform> {
-    const mode = (import.meta as ImportMeta & {env?: ImportMetaEnv & {MODE?: string}}).env?.MODE;
-
-    if (mode === 'ios' || mode === 'android') {
-        return mode;
-    }
-
     try {
         const {System} = await import('#nativephp');
 
@@ -164,12 +158,15 @@ export async function subscriptionPlatform(): Promise<SubscriptionPlatform> {
     }
 }
 
-export async function configureSubscriptions(account?: SubscriptionAccount | null): Promise<{
+export async function configureSubscriptions(
+    account?: SubscriptionAccount | null,
+    resolvedPlatform?: SubscriptionPlatform,
+): Promise<{
     configured: boolean;
     platform: SubscriptionPlatform;
     reason?: 'missing_account' | 'missing_key' | 'unsupported';
 }> {
-    const platform = await subscriptionPlatform();
+    const platform = resolvedPlatform ?? await subscriptionPlatform();
     const appUserId = account?.revenuecat_app_user_id;
 
     if (!appUserId) {

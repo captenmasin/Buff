@@ -78,6 +78,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::post('/subscription/refresh', [SubscriptionController::class, 'store']);
 
     Route::get('/progress', [ProgressController::class, 'index']);
+    Route::get('/progress/body-metrics/by-date', [ProgressController::class, 'byDate']);
     Route::post('/progress/body-metrics', [ProgressController::class, 'store']);
     Route::delete('/progress/body-metrics/{bodyMetric}', [ProgressController::class, 'destroy']);
     Route::post('/progress/body-metrics/{bodyMetric}/photos', [BodyMetricPhotoController::class, 'store']);
@@ -110,6 +111,7 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::get('/health-connect/status', [HealthConnectController::class, 'status']);
     Route::post('/health-connect/connect', [HealthConnectController::class, 'connect']);
     Route::post('/health-connect/sync', [HealthConnectController::class, 'sync']);
+    Route::post('/health-connect/manage-access', [HealthConnectController::class, 'manageAccess']);
     Route::delete('/health-connect', [HealthConnectController::class, 'destroy']);
 
     Route::get('/apple-health/status', [AppleHealthController::class, 'status']);

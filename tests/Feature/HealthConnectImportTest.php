@@ -7,20 +7,26 @@ use App\Models\WorkoutEntry;
 
 it('ignores a background import after the local account is signed out', function (): void {
     SyncState::query()->delete();
+    $resultPath = storage_path('framework/testing/health-connect-skip-'.uniqid().'.result');
 
-    $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
-        'records' => [[
-            'external_id' => 'signed-out-workout',
-            'calories_burned' => 300,
-            'started_at' => '2026-05-20T07:00:00+01:00',
-        ]],
-    ])])
+    $this->artisan('health-connect:import', [
+        'payload' => healthConnectPayloadFile([
+            'records' => [[
+                'external_id' => 'signed-out-workout',
+                'calories_burned' => 300,
+                'started_at' => '2026-05-20T07:00:00+01:00',
+            ]],
+        ]),
+        '--result' => $resultPath,
+    ])
         ->expectsOutputToContain('BUFF_HEALTH_CONNECT_IMPORT_SKIPPED')
         ->expectsOutputToContain('BUFF_HEALTH_CONNECT_IMPORT_OK')
         ->assertSuccessful();
 
+    expect(file_get_contents($resultPath))->toBe('BUFF_HEALTH_CONNECT_IMPORT_OK');
     $this->assertDatabaseEmpty('workout_entries');
     $this->assertDatabaseEmpty('health_connect_sync_states');
+    unlink($resultPath);
 });
 
 it('imports health connect workouts', function (): void {
@@ -55,21 +61,26 @@ it('imports health connect workouts', function (): void {
 });
 
 it('accepts payload option from native runtime', function (): void {
-    $this->artisan('health-connect:import', ['--payload' => healthConnectPayloadFile([
-        'records' => [
-            [
-                'external_id' => 'total-calories-1',
-                'title' => 'Samsung Health workout',
-                'calories_burned' => 24,
-                'date' => '2026-05-20',
-                'started_at' => '2026-05-20T10:04:00+01:00',
-                'ended_at' => '2026-05-20T10:08:00+01:00',
-                'duration_seconds' => 240,
-                'source_name' => 'com.sec.android.app.shealth',
-                'source_package' => 'com.sec.android.app.shealth',
+    $resultPath = storage_path('framework/testing/health-connect-import-'.uniqid().'.result');
+
+    $this->artisan('health-connect:import', [
+        '--payload' => healthConnectPayloadFile([
+            'records' => [
+                [
+                    'external_id' => 'total-calories-1',
+                    'title' => 'Samsung Health workout',
+                    'calories_burned' => 24,
+                    'date' => '2026-05-20',
+                    'started_at' => '2026-05-20T10:04:00+01:00',
+                    'ended_at' => '2026-05-20T10:08:00+01:00',
+                    'duration_seconds' => 240,
+                    'source_name' => 'com.sec.android.app.shealth',
+                    'source_package' => 'com.sec.android.app.shealth',
+                ],
             ],
-        ],
-    ])])->assertSuccessful();
+        ]),
+        '--result' => $resultPath,
+    ])->assertSuccessful();
 
     $this->assertDatabaseHas('workout_entries', [
         'external_id' => 'total-calories-1',
@@ -77,6 +88,19 @@ it('accepts payload option from native runtime', function (): void {
         'calories_burned' => 24,
         'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
     ]);
+    expect(file_get_contents($resultPath))->toBe('BUFF_HEALTH_CONNECT_IMPORT_OK');
+    unlink($resultPath);
+});
+
+it('does not acknowledge a failed native runtime import', function (): void {
+    $resultPath = storage_path('framework/testing/health-connect-failed-'.uniqid().'.result');
+
+    $this->artisan('health-connect:import', [
+        '--payload' => 'not-json',
+        '--result' => $resultPath,
+    ])->assertFailed();
+
+    expect(is_file($resultPath))->toBeFalse();
 });
 
 it('updates existing health connect workouts', function (): void {
@@ -137,6 +161,37 @@ it('deletes imported workouts missing from the sync window', function (): void {
 
     $this->assertDatabaseMissing('workout_entries', ['external_id' => 'hc-deleted']);
     $this->assertDatabaseHas('workout_entries', ['title' => 'Manual workout']);
+});
+
+it('reconciles positive-offset workouts in UTC while preserving their local date and time', function (): void {
+    $window = [
+        'window_start' => '2026-05-20T22:00:00Z',
+        'window_end' => '2026-05-21T00:15:00Z',
+    ];
+
+    $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
+        ...$window,
+        'records' => [[
+            'external_id' => 'hc-positive-offset',
+            'calories_burned' => 300,
+            'started_at' => '2026-05-21T00:16:00+01:00',
+            'ended_at' => '2026-05-21T00:46:00+01:00',
+        ]],
+    ])])->assertSuccessful();
+
+    $workout = WorkoutEntry::query()->where('external_id', 'hc-positive-offset')->sole();
+
+    expect($workout->date->toDateString())->toBe('2026-05-21')
+        ->and($workout->logged_at->format('Y-m-d H:i:s'))->toBe('2026-05-21 00:16:00')
+        ->and($workout->started_at->format('Y-m-d H:i:s'))->toBe('2026-05-20 23:16:00')
+        ->and($workout->ended_at->format('Y-m-d H:i:s'))->toBe('2026-05-20 23:46:00');
+
+    $this->artisan('health-connect:import', ['payload' => healthConnectPayloadFile([
+        ...$window,
+        'records' => [],
+    ])])->assertSuccessful();
+
+    $this->assertDatabaseMissing('workout_entries', ['external_id' => 'hc-positive-offset']);
 });
 
 it('does not reimport locally ignored health connect workouts', function (): void {

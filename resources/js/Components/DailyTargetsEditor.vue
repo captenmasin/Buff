@@ -52,9 +52,9 @@ const percentageOptions = Array.from({ length: 21 }, (_, index) => index * 5);
 const customScrollerElements: Partial<Record<'protein' | 'carbs', HTMLElement>> = {};
 const scrollerItemHeight = 40;
 const pickerColumns = [
-    { key: 'protein', color: 'text-protein', scrollable: true },
-    { key: 'carbs', color: 'text-carbs', scrollable: true },
-    { key: 'fat', color: 'text-fat', scrollable: false },
+    { key: 'protein', label: 'Protein', color: 'text-protein', scrollable: true },
+    { key: 'carbs', label: 'Carbs', color: 'text-carbs', scrollable: true },
+    { key: 'fat', label: 'Fat', color: 'text-fat', scrollable: false },
 ] as const;
 const macros = computed(() => [
     { key: 'protein' as const, label: 'Protein', percent: activeSplit.value.protein, grams: generatedGrams.value.protein, color: 'bg-protein' },
@@ -78,6 +78,7 @@ function selectPreset(index: number): void {
 function selectCustom(): void {
     hapticImpact();
     activePreset.value = null;
+    applySplit(customSplit.value);
     nextTick(() => {
         scrollToCustom('protein', customSplit.value.protein);
         scrollToCustom('carbs', customSplit.value.carbs);
@@ -122,7 +123,7 @@ function scrollToCustom(key: 'protein' | 'carbs' | 'fat', percent: number): void
     }
 
     const index = customOptions(key).indexOf(percent);
-    customScrollerElements[key]?.scrollTo({ top: Math.max(0, index) * scrollerItemHeight, behavior: 'smooth' });
+    customScrollerElements[key]?.scrollTo({ top: Math.max(0, index) * scrollerItemHeight });
 }
 
 function handleCustomScroller(key: 'protein' | 'carbs' | 'fat', event: Event): void {
@@ -299,13 +300,18 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                             v-if="column.scrollable"
                             :ref="(element) => bindPickerScroller(column.key, element)"
                             class="macro-wheel h-40 snap-y snap-mandatory overflow-y-auto py-[60px] text-center"
-                            :aria-label="`${column.key} percent`"
+                            role="listbox"
+                            aria-orientation="vertical"
+                            :aria-label="`${column.label} percentage`"
                             @scroll.passive="handleCustomScroller(column.key, $event)"
                         >
                             <button
                                 v-for="percent in customOptions(column.key)"
                                 :key="percent"
                                 type="button"
+                                role="option"
+                                :aria-selected="customSplit[column.key] === percent"
+                                :aria-label="`${column.label} ${percent} percent`"
                                 class="flex h-10 w-full appearance-none snap-center items-center justify-center bg-transparent p-0 font-normal"
                                 :class="customSplit[column.key] === percent ? column.color : 'text-muted-foreground/35'"
                                 @click="updateCustom(column.key, percent); scrollToCustom(column.key, percent)"

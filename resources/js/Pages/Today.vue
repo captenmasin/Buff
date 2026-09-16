@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {Head, Link, router, useForm} from '@inertiajs/vue3';
+import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
 import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import type {DateValue} from '@internationalized/date';
@@ -7,6 +7,7 @@ import {parseDate} from '@internationalized/date';
 import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import {dayStatusLabel, type DayStatus} from '../dayStatus';
+import {responseErrorMessage} from '../foodRequests';
 import { hapticImpact } from '../haptics';
 import CalorieRing from '../Components/CalorieRing.vue';
 import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
@@ -156,6 +157,7 @@ const props = defineProps<{
     healthConnect: HealthConnectState;
     appleHealth: AppleHealthState;
 }>();
+const page = usePage<{errors?: {date?: string}}>();
 
 const mealLabels: Record<MealType, string> = {
     breakfast: 'Breakfast',
@@ -179,6 +181,7 @@ const isToday = computed(() => props.week.some((day) => day.is_selected && day.i
 const showDayLists = computed(() => !isEmptyDay.value || !isToday.value);
 const openAddDrawer = inject<() => void>('openAddDrawer')!;
 const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
+const dateError = computed(() => page.props.errors?.date ?? '');
 const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
 const longWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'long'});
@@ -205,6 +208,7 @@ const mealSheetMode = ref<'details' | 'edit' | null>(null);
 const selectedWorkout = ref<WorkoutEntry | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
 const mealPhotosLoading = ref(false);
+const mealPhotosError = ref('');
 const pendingDelete = ref<null | { kind: 'meal' | 'workout'; id: string; title: string }>(null);
 const deleteProcessing = ref(false);
 const deleteError = ref('');
@@ -238,6 +242,11 @@ const editMealForm = useForm<{
     fat_g: 0,
 });
 
+const repeatMealForm = useForm({
+    date: props.summary.date,
+    meal_type: 'breakfast' as MealType,
+});
+
 const editWorkoutForm = useForm({
     date: props.summary.date,
     title: '',
@@ -266,6 +275,18 @@ const editMealMacroFields: ReadonlyArray<readonly [MacroKey, string]> = [
 function macroProgress(consumed: number, goal?: number) {
     if (!goal) return 0;
     return Math.min(100, Math.round((consumed / goal) * 100));
+}
+
+function mealPortionLabel(entry: MealEntry): string {
+    if (entry.portion_quantity === null) {
+        return '';
+    }
+
+    if (entry.source_type === 'recipe' || entry.portion_unit === null) {
+        return `${entry.portion_quantity} serving${Number(entry.portion_quantity) === 1 ? '' : 's'}`;
+    }
+
+    return `${entry.portion_quantity}${entry.portion_unit}`;
 }
 
 function requestDelete(kind: 'meal' | 'workout', id: string, title: string) {
@@ -469,10 +490,19 @@ function selectDate(value: DateValue | DateValue[] | undefined, close: () => voi
     router.visit(`/?date=${date.toString()}`, {preserveScroll: true});
 }
 
+function closeSelectedDate(value: DateValue, close: () => void): void {
+    if (value.toString() === props.summary.date) {
+        close();
+    }
+}
+
 function openMeal(entry: MealEntry, mealType: MealType, event: Event) {
     hapticImpact();
     mealRowTrigger = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
     selectedMeal.value = {...entry, meal_type: mealType};
+    repeatMealForm.date = props.summary.date;
+    repeatMealForm.meal_type = mealType;
+    repeatMealForm.clearErrors();
     mealSheetMode.value = 'details';
     loadMealPhotos(entry.id);
 }
@@ -480,6 +510,7 @@ function openMeal(entry: MealEntry, mealType: MealType, event: Event) {
 async function loadMealPhotos(mealId: string) {
     const request = ++mealPhotoRequest;
     selectedMealPhotos.value = [];
+    mealPhotosError.value = '';
 
     mealPhotosLoading.value = true;
 
@@ -489,9 +520,9 @@ async function loadMealPhotos(mealId: string) {
         if (request === mealPhotoRequest) {
             selectedMealPhotos.value = data.photos || [];
         }
-    } catch {
-        if (request === mealPhotoRequest) {
-            selectedMealPhotos.value = [];
+    } catch (error) {
+        if (request === mealPhotoRequest && !(axios.isAxiosError(error) && error.response?.status === 404)) {
+            mealPhotosError.value = responseErrorMessage(error, 'photos', 'Could not load meal photos. Check your connection and try again.');
         }
     } finally {
         if (request === mealPhotoRequest) {
@@ -505,11 +536,25 @@ function closeMeal() {
     selectedMeal.value = null;
     selectedMealPhotos.value = [];
     mealPhotosLoading.value = false;
+    mealPhotosError.value = '';
     editMealForm.reset();
     editMealForm.clearErrors();
+    repeatMealForm.clearErrors();
     mealSheetMode.value = null;
     mealRowTrigger?.focus();
     mealRowTrigger = null;
+}
+
+function repeatMeal(): void {
+    if (!selectedMeal.value) {
+        return;
+    }
+
+    hapticImpact();
+    repeatMealForm.post(`/meals/${selectedMeal.value.id}/repeat`, {
+        preserveScroll: true,
+        onSuccess: closeMeal,
+    });
 }
 
 function startEditingMeal() {
@@ -646,12 +691,15 @@ onBeforeUnmount(() => {
                             locale="en-GB"
                             layout="month-and-year"
                             initial-focus
+                            @day-click="(value) => closeSelectedDate(value, close)"
                             @update:model-value="(value) => selectDate(value, close)"
                         />
                     </PopoverContent>
                 </Popover>
             </template>
         </PageHeader>
+
+        <p v-if="dateError" class="rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">{{ dateError }}</p>
 
         <nav class="grid grid-cols-7 gap-1 rounded-2xl bg-card p-1.5 shadow-card" aria-label="Week">
             <Link
@@ -660,6 +708,7 @@ onBeforeUnmount(() => {
                 :href="`/?date=${day.date}`"
                 class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold"
                 :class="day.is_selected ? 'bg-secondary text-foreground' : 'text-muted-foreground active:bg-muted'"
+                :aria-current="day.is_selected ? 'date' : undefined"
                 :aria-label="`${weekdayLabel(day.date, 'long')} ${day.date}, ${dayStatusLabel(day.status)}${day.is_today ? ', today' : ''}`"
             >
                 <span class="sm:hidden">{{ day.label }}</span>
@@ -752,7 +801,7 @@ onBeforeUnmount(() => {
                                     <span class="min-w-0">
                                         <span class="block truncate font-medium text-foreground">{{ entry.name }}</span>
                                         <span class="block text-xs text-muted-foreground">
-                                            {{ entry.portion_quantity }}{{ entry.portion_unit }}
+                                            {{ mealPortionLabel(entry) }}
                                         </span>
                                     </span>
                                     <span class="shrink-0 text-right">
@@ -767,7 +816,7 @@ onBeforeUnmount(() => {
             </Card>
         </section>
 
-        <section v-if="showDayLists" class="space-y-3">
+        <section v-if="showDayLists || showHealthConnect" class="space-y-3">
             <div class="flex items-center justify-between gap-3">
                 <h2 class="text-lg font-semibold tracking-tight">Workouts</h2>
                 <div class="flex items-center gap-2">
@@ -853,8 +902,8 @@ onBeforeUnmount(() => {
             :open="Boolean(mealSheetMode && selectedMeal)"
             labelled-by="meal-sheet-title"
             :title="mealSheetMode === 'edit' ? 'Edit meal' : 'Meal details'"
-            description="Review, edit, or delete this meal."
-            :dismissible="!editMealForm.processing"
+            description="Review, repeat, edit, or delete this meal."
+            :dismissible="!editMealForm.processing && !repeatMealForm.processing"
             @close="closeMeal"
         >
             <Transition
@@ -883,7 +932,7 @@ onBeforeUnmount(() => {
                         <div>
                             {{ selectedMeal.calories }} kcal
                             <span v-if="selectedMeal.portion_quantity">
-                             · {{ selectedMeal.portion_quantity }}{{ selectedMeal.portion_unit }}
+                             · {{ mealPortionLabel(selectedMeal) }}
                         </span>
                         </div>
                     </div>
@@ -891,6 +940,10 @@ onBeforeUnmount(() => {
                 <div v-if="mealPhotosLoading" class="mt-4 flex items-center gap-2 text-sm text-muted-foreground" role="status">
                     <RefreshCw :size="16" class="animate-spin" />
                     Loading meal photos…
+                </div>
+                <div v-else-if="mealPhotosError" class="mt-4 space-y-2 text-sm text-destructive" role="alert">
+                    <p>{{ mealPhotosError }}</p>
+                    <Button type="button" variant="surface" @click="loadMealPhotos(selectedMeal.id)">Retry meal photos</Button>
                 </div>
                 <div v-else-if="selectedMealPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
                     <img
@@ -908,9 +961,13 @@ onBeforeUnmount(() => {
                         <p class="truncate text-xs text-muted-foreground">{{ macroPercent(macro[1], macro[2]) }}% goal</p>
                     </div>
                 </div>
-                <div class="mt-4 grid grid-cols-2 gap-2">
-                    <Button type="button" variant="surface" @click="startEditingMeal"><Pencil :size="18" />Edit</Button>
-                    <Button type="button" variant="destructive" @click="requestDelete('meal', selectedMeal.id, `Delete ${selectedMeal.name} from ${mealLabels[selectedMeal.meal_type]}?`)"><Trash2 :size="18" />Delete</Button>
+                <div class="mt-4 grid gap-2">
+                    <Button type="button" class="w-full" :loading="repeatMealForm.processing" loading-label="Repeating meal…" @click="repeatMeal"><RefreshCw :size="18" />Repeat</Button>
+                    <p v-if="Object.values(repeatMealForm.errors)[0]" class="text-sm text-destructive" role="alert">{{ Object.values(repeatMealForm.errors)[0] }}</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <Button type="button" variant="surface" @click="startEditingMeal"><Pencil :size="18" />Edit</Button>
+                        <Button type="button" variant="destructive" @click="requestDelete('meal', selectedMeal.id, `Delete ${selectedMeal.name} from ${mealLabels[selectedMeal.meal_type]}?`)"><Trash2 :size="18" />Delete</Button>
+                    </div>
                 </div>
                 </div>
                 <div v-else-if="mealSheetMode === 'edit' && selectedMeal" key="edit">
@@ -921,60 +978,68 @@ onBeforeUnmount(() => {
                     </Button>
                 </div>
 
-                <form class="space-y-4" @submit.prevent="saveMealEdit">
-                    <label class="block">
-                        <span class="field-label">Name</span>
-                        <Input v-model="editMealForm.name" type="text" class="mt-1" />
-                    </label>
-
-                    <div v-if="selectedMeal.portion_quantity !== null" class="grid grid-cols-2 gap-2" role="group" aria-label="Nutrition edit mode">
-                        <Button
-                            v-for="mode in (['portion', 'macros'] as MealEditMode[])"
-                            :key="mode"
-                            type="button"
-                            :variant="editMealForm.edit_mode === mode ? 'default' : 'surface'"
-                            :aria-pressed="editMealForm.edit_mode === mode"
-                            @click="editMealForm.edit_mode = mode"
-                        >
-                            {{ mode === 'portion' ? 'Portion' : 'Macros' }}
-                        </Button>
-                    </div>
-
-                    <label v-if="editMealForm.edit_mode === 'portion'" class="block">
-                        <span class="field-label">{{ editMealForm.portion_unit === null ? 'Servings' : 'Portion' }}</span>
-                        <div class="mt-1 flex items-center gap-3">
-                            <Input v-model.number="editMealForm.portion_quantity" type="number" min="0.1" step="0.1" class="text-right font-semibold" />
-                            <span v-if="editMealForm.portion_unit" class="w-8 text-sm text-muted-foreground">{{ editMealForm.portion_unit }}</span>
-                        </div>
-                        <span v-if="editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit" class="mt-1 block text-sm text-destructive" role="alert">
-                            {{ editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit }}
-                        </span>
-                    </label>
-
-                    <div v-else class="grid grid-cols-3 gap-2">
-                        <label v-for="field in editMealMacroFields" :key="field[0]">
-                            <span class="field-label">{{ field[1] }}</span>
-                            <Input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.1" class="mt-1 px-2 text-right font-semibold" />
-                            <span v-if="editMealForm.errors[field[0]]" class="mt-1 block text-sm text-destructive" role="alert">{{ editMealForm.errors[field[0]] }}</span>
+                <form @submit.prevent="saveMealEdit">
+                    <fieldset :disabled="editMealForm.processing" class="space-y-4">
+                        <label class="block">
+                            <span class="field-label">Name</span>
+                            <Input v-model="editMealForm.name" type="text" class="mt-1" :aria-invalid="Boolean(editMealForm.errors.name)" :aria-describedby="editMealForm.errors.name ? 'meal-edit-name-error' : undefined" @update:model-value="editMealForm.clearErrors('name')" />
+                            <span v-if="editMealForm.errors.name" id="meal-edit-name-error" class="mt-1 block text-sm text-destructive" role="alert">{{ editMealForm.errors.name }}</span>
                         </label>
-                    </div>
 
-                    <div class="grid grid-cols-2 gap-2">
-                        <Button
-                            v-for="mealType in mealTypes"
-                            :key="mealType"
-                            type="button"
-                            class="min-h-11 px-3 text-sm"
-                            :variant="editMealForm.meal_type === mealType ? 'default' : 'surface'"
-                            @click="editMealForm.meal_type = mealType"
-                        >
-                            {{ mealLabels[mealType] }}
+                        <div v-if="selectedMeal.portion_quantity !== null" class="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1 dark:bg-secondary" role="group" aria-label="Nutrition edit mode">
+                            <Button
+                                v-for="mode in (['portion', 'macros'] as MealEditMode[])"
+                                :key="mode"
+                                type="button"
+                                variant="ghost"
+                                class="h-11"
+                                :class="editMealForm.edit_mode === mode ? 'bg-card text-foreground shadow-sm hover:bg-card' : 'text-muted-foreground'"
+                                :aria-pressed="editMealForm.edit_mode === mode"
+                                @click="editMealForm.edit_mode = mode"
+                            >
+                                {{ mode === 'portion' ? 'Portion' : 'Macros' }}
+                            </Button>
+                        </div>
+
+                        <label v-if="editMealForm.edit_mode === 'portion'" class="block">
+                            <span class="field-label">{{ editMealForm.portion_unit === null ? 'Servings' : 'Portion' }}</span>
+                            <div class="mt-1 flex items-center gap-3">
+                                <Input v-model.number="editMealForm.portion_quantity" type="number" min="0.1" step="0.01" class="text-right font-semibold" :aria-invalid="Boolean(editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit)" :aria-describedby="editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit ? 'meal-edit-portion-error' : undefined" @update:model-value="editMealForm.clearErrors('portion_quantity')" />
+                                <span v-if="editMealForm.portion_unit" class="w-8 text-sm text-muted-foreground">{{ editMealForm.portion_unit }}</span>
+                            </div>
+                            <span v-if="editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit" id="meal-edit-portion-error" class="mt-1 block text-sm text-destructive" role="alert">
+                                {{ editMealForm.errors.portion_quantity || editMealForm.errors.portion_unit }}
+                            </span>
+                        </label>
+
+                        <div v-else class="grid grid-cols-3 gap-2">
+                            <label v-for="field in editMealMacroFields" :key="field[0]">
+                                <span class="field-label">{{ field[1] }}</span>
+                                <Input v-model.number="editMealForm[field[0]]" type="number" min="0" step="0.01" class="mt-1 px-2 text-right font-semibold" :aria-invalid="Boolean(editMealForm.errors[field[0]])" :aria-describedby="editMealForm.errors[field[0]] ? `meal-edit-${field[0]}-error` : undefined" @update:model-value="editMealForm.clearErrors(field[0])" />
+                                <span v-if="editMealForm.errors[field[0]]" :id="`meal-edit-${field[0]}-error`" class="mt-1 block text-sm text-destructive" role="alert">{{ editMealForm.errors[field[0]] }}</span>
+                            </label>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2" role="group" aria-label="Meal" :aria-invalid="Boolean(editMealForm.errors.meal_type)" :aria-describedby="editMealForm.errors.meal_type ? 'meal-edit-meal-type-error' : undefined">
+                            <Button
+                                v-for="mealType in mealTypes"
+                                :key="mealType"
+                                type="button"
+                                class="min-h-11 px-3 text-sm"
+                                variant="outline"
+                                :class="editMealForm.meal_type === mealType ? 'border-brand-violet bg-brand-violet/10 ring-1 ring-brand-violet hover:bg-brand-violet/10 dark:border-brand-violet dark:bg-brand-violet/10 dark:hover:bg-brand-violet/10' : ''"
+                                :aria-pressed="editMealForm.meal_type === mealType"
+                                @click="editMealForm.meal_type = mealType; editMealForm.clearErrors('meal_type')"
+                            >
+                                {{ mealLabels[mealType] }}
+                            </Button>
+                        </div>
+                        <span v-if="editMealForm.errors.meal_type" id="meal-edit-meal-type-error" class="block text-sm text-destructive" role="alert">{{ editMealForm.errors.meal_type }}</span>
+
+                        <Button class="w-full" :loading="editMealForm.processing" loading-label="Saving meal…">
+                            Save meal
                         </Button>
-                    </div>
-
-                    <Button class="w-full" :loading="editMealForm.processing" loading-label="Saving meal…">
-                        Save meal
-                    </Button>
+                    </fieldset>
                 </form>
                 </div>
             </Transition>
@@ -997,19 +1062,19 @@ onBeforeUnmount(() => {
             <form class="space-y-4" @submit.prevent="saveWorkoutEdit">
                 <label class="block">
                     <span class="field-label">Title</span>
-                    <Input v-model="editWorkoutForm.title" type="text" class="mt-1" />
+                    <Input v-model="editWorkoutForm.title" type="text" maxlength="120" class="mt-1" @update:model-value="editWorkoutForm.clearErrors('title')" />
                     <span v-if="editWorkoutForm.errors.title" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.title }}</span>
                 </label>
 
                 <div class="grid grid-cols-2 gap-2">
                     <label>
                         <span class="field-label">Calories burnt</span>
-                        <Input v-model.number="editWorkoutForm.calories_burned" type="number" min="1" step="1" class="mt-1 text-right font-semibold" />
+                        <Input v-model.number="editWorkoutForm.calories_burned" type="number" min="1" max="10000" step="1" class="mt-1 text-right font-semibold" @update:model-value="editWorkoutForm.clearErrors('calories_burned')" />
                         <span v-if="editWorkoutForm.errors.calories_burned" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.calories_burned }}</span>
                     </label>
                     <label>
                         <span class="field-label">Time</span>
-                        <Input v-model="editWorkoutForm.time" type="time" class="mt-1 font-semibold" />
+                        <Input v-model="editWorkoutForm.time" type="time" class="mt-1 font-semibold" @update:model-value="editWorkoutForm.clearErrors('time')" />
                         <span v-if="editWorkoutForm.errors.time" class="mt-1 block text-sm text-destructive" role="alert">{{ editWorkoutForm.errors.time }}</span>
                     </label>
                 </div>

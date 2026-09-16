@@ -12,7 +12,8 @@ class ImportHealthConnectWorkouts extends Command
 {
     protected $signature = 'health-connect:import
         {payload? : JSON payload or absolute payload file path}
-        {--payload= : JSON payload or absolute payload file path}';
+        {--payload= : JSON payload or absolute payload file path}
+        {--result= : Absolute result marker path for the native worker}';
 
     protected $description = 'Import normalized Android Health Connect workout records.';
 
@@ -20,6 +21,7 @@ class ImportHealthConnectWorkouts extends Command
     {
         if (SyncState::query()->doesntExist()) {
             $this->line('BUFF_HEALTH_CONNECT_IMPORT_SKIPPED');
+            $this->markSuccessfulResult();
             $this->line('BUFF_HEALTH_CONNECT_IMPORT_OK');
 
             return self::SUCCESS;
@@ -36,6 +38,7 @@ class ImportHealthConnectWorkouts extends Command
             $result = $importer->import($payload);
 
             $this->components->info("Imported {$result['imported']} Health Connect workouts; deleted {$result['deleted']}.");
+            $this->markSuccessfulResult();
             $this->line('BUFF_HEALTH_CONNECT_IMPORT_OK');
 
             return self::SUCCESS;
@@ -57,5 +60,14 @@ class ImportHealthConnectWorkouts extends Command
         }
 
         return $payload;
+    }
+
+    private function markSuccessfulResult(): void
+    {
+        $resultPath = $this->option('result');
+
+        if (is_string($resultPath) && $resultPath !== '') {
+            File::put($resultPath, 'BUFF_HEALTH_CONNECT_IMPORT_OK');
+        }
     }
 }

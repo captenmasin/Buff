@@ -83,6 +83,40 @@ it('searches through the buff-server proxy and stores returned products', functi
     Http::assertSent(fn (ClientRequest $request): bool => $request['locale'] === 'fr_FR');
 });
 
+it('uses the explicit device locale for food searches', function (): void {
+    Http::fake(['*/foods/search*' => Http::response(['products' => [productPayload()]])]);
+
+    $this->withHeader('Accept-Language', 'en-GB,en;q=0.9')
+        ->getJson('/food-products/search?q=example&locale=fr-FR')
+        ->assertOk();
+
+    Http::assertSent(fn (ClientRequest $request): bool => $request['locale'] === 'fr_FR');
+});
+
+it('rejects invalid food search locales', function (): void {
+    Http::fake();
+
+    $this->getJson('/food-products/search?q=example&locale=not/a-locale')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('locale');
+
+    Http::assertNothingSent();
+});
+
+it('returns an exact offline barcode error unless the product is cached', function (): void {
+    Http::fake(['*/foods/barcodes/*' => Http::failedConnection()]);
+
+    $this->postJson('/barcode/lookup', ['barcode' => '737628064502'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['barcode' => 'You are offline and this barcode is not stored on this device.']);
+
+    FoodProduct::query()->create(productPayload());
+
+    $this->postJson('/barcode/lookup', ['barcode' => '737628064502'])
+        ->assertOk()
+        ->assertJsonPath('product.name', 'Example Bar');
+});
+
 it('reuses a stored product when the server returns a new id for its barcode', function (): void {
     $storedProduct = FoodProduct::query()->create(productPayload([
         'id' => '10000000-0000-4000-8000-000000000001',

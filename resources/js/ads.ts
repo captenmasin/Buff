@@ -98,8 +98,18 @@ export function createAdCoordinator(dependencies: AdCoordinatorDependencies) {
     let operationTail = Promise.resolve();
     let destroyed = false;
 
-    async function hide(): Promise<void> {
+    async function hide(loadNativeBridge = false): Promise<void> {
         dependencies.setBannerHeight(0);
+
+        if (loadNativeBridge && !bridge) {
+            try {
+                if (await platform() !== 'unsupported') {
+                    bridge = await bridgeLoader();
+                }
+            } catch {
+                return;
+            }
+        }
 
         if (bridge) {
             await bridge.banner('app_shell').hide().catch(() => undefined);
@@ -249,17 +259,7 @@ export function createAdCoordinator(dependencies: AdCoordinatorDependencies) {
             generation++;
             activeAccountId = nextAccountId;
             inFlight = null;
-            await hide();
-            return;
-        }
-
-        const nativePlatform = await platform();
-
-        if (nativePlatform === 'unsupported') {
-            generation++;
-            activeAccountId = nextAccountId;
-            inFlight = null;
-            await hide();
+            await hide(true);
             return;
         }
 
@@ -280,6 +280,17 @@ export function createAdCoordinator(dependencies: AdCoordinatorDependencies) {
         const previousOperation = operationTail;
         const promise = previousOperation.catch(() => undefined).then(async () => {
             if (isCurrent(expectedGeneration, nextAccountId)) {
+                const nativePlatform = await platform();
+
+                if (!isCurrent(expectedGeneration, nextAccountId)) {
+                    return;
+                }
+
+                if (nativePlatform === 'unsupported') {
+                    await hide();
+                    return;
+                }
+
                 await run(input, nativePlatform, expectedGeneration, nextAccountId);
             }
         });
@@ -299,7 +310,7 @@ export function createAdCoordinator(dependencies: AdCoordinatorDependencies) {
         if (!destroyed && !isAdRoute(url)) {
             generation++;
             inFlight = null;
-            await hide();
+            await hide(true);
         }
     }
 

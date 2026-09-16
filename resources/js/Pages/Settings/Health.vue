@@ -48,6 +48,7 @@ const healthConnectState = ref({...props.healthConnect});
 const appleHealthState = ref({...props.appleHealth});
 const healthConnectLoading = ref(false);
 const healthConnectDisconnecting = ref(false);
+const healthConnectManaging = ref(false);
 const healthConnectRefreshTimer = ref<number | null>(null);
 
 const healthImport = computed(() => {
@@ -83,12 +84,12 @@ const healthConnectDetail = computed(() => {
         return state.message;
     }
 
-    if (state?.last_successful_sync_at) {
-        return `Last synced ${new Date(state.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
-    }
-
     if (state?.last_error) {
         return state.last_error;
+    }
+
+    if (state?.last_successful_sync_at) {
+        return `Last synced ${new Date(state.last_successful_sync_at).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}`;
     }
 
     return `Connect ${healthImport.value?.name ?? 'health data'} to import workout calories automatically.`;
@@ -101,7 +102,7 @@ const healthConnectButtonLabel = computed(() => {
 });
 
 function applyHealthImportState(data: {native?: Record<string, unknown>} & Record<string, unknown>) {
-    const nextState = {message: null, ...data, ...(data.native || {})};
+    const nextState = {message: null, last_error: null, ...data, ...(data.native || {})};
 
     if (healthImport.value?.prefix === '/apple-health') {
         appleHealthState.value = {...appleHealthState.value, ...nextState};
@@ -135,14 +136,18 @@ async function connectHealthConnect() {
 
     healthConnectLoading.value = true;
 
+    const isSync = canSyncHealthConnect.value;
+
     try {
-        const endpoint = canSyncHealthConnect.value ? `${prefix}/sync` : `${prefix}/connect`;
+        const endpoint = isSync ? `${prefix}/sync` : `${prefix}/connect`;
         const {data} = await axios.post(endpoint);
         applyHealthImportState(data);
 
-        if (healthImport.value?.state.status === 'permission_requested') {
+        if (healthConnectStatusNeedsRefresh()) {
             scheduleHealthConnectStatusRefresh();
         }
+    } catch {
+        applyHealthImportState({last_error: `Could not ${isSync ? 'sync' : 'connect'} ${healthImport.value?.name ?? 'health data'}.`});
     } finally {
         healthConnectLoading.value = false;
     }
@@ -158,9 +163,28 @@ async function disconnectHealthConnect() {
     try {
         const {data} = await axios.delete('/health-connect');
         applyHealthImportState(data);
+    } catch {
+        applyHealthImportState({last_error: 'Could not disconnect Health Connect.'});
     } finally {
         healthConnectDisconnecting.value = false;
     }
+}
+
+async function manageHealthConnectAccess() {
+    healthConnectManaging.value = true;
+
+    try {
+        const {data} = await axios.post('/health-connect/manage-access');
+        applyHealthImportState(data);
+    } catch {
+        applyHealthImportState({last_error: 'Could not open Health Connect access settings.'});
+    } finally {
+        healthConnectManaging.value = false;
+    }
+}
+
+function healthConnectStatusNeedsRefresh() {
+    return ['permission_requested', 'sync_queued'].includes(healthImport.value?.state.status ?? '');
 }
 
 function clearHealthConnectStatusRefresh() {
@@ -182,24 +206,32 @@ function scheduleHealthConnectStatusRefresh(attemptsRemaining = 20) {
     healthConnectRefreshTimer.value = window.setTimeout(async () => {
         await refreshHealthConnectStatus();
 
-        if (healthImport.value?.state.status === 'permission_requested') {
+        if (healthConnectStatusNeedsRefresh()) {
             scheduleHealthConnectStatusRefresh(attemptsRemaining - 1);
         }
     }, 1000);
 }
 
+async function refreshHealthConnectStatusAndPoll() {
+    await refreshHealthConnectStatus();
+
+    if (healthConnectStatusNeedsRefresh()) {
+        scheduleHealthConnectStatusRefresh();
+    }
+}
+
 function handleHealthConnectResume() {
-    refreshHealthConnectStatus();
+    void refreshHealthConnectStatusAndPoll();
 }
 
 function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
-        refreshHealthConnectStatus();
+        void refreshHealthConnectStatusAndPoll();
     }
 }
 
 onMounted(() => {
-    refreshHealthConnectStatus();
+    void refreshHealthConnectStatusAndPoll();
     window.addEventListener('focus', handleHealthConnectResume);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
@@ -224,7 +256,13 @@ onBeforeUnmount(() => {
                 </div>
                 <div class="min-w-0 flex-1">
                     <p class="text-sm text-muted-foreground">{{ healthConnectLabel }}</p>
-                    <p class="mt-1 text-sm text-muted-foreground">{{ healthConnectDetail }}</p>
+                    <p
+                        class="mt-1 text-sm"
+                        :class="healthImport?.state.last_error ? 'text-destructive' : 'text-muted-foreground'"
+                        :role="healthImport?.state.last_error ? 'alert' : undefined"
+                    >
+                        {{ healthConnectDetail }}
+                    </p>
                 </div>
             </div>
             <Button
@@ -245,6 +283,22 @@ onBeforeUnmount(() => {
             >
                 {{ healthConnectDisconnecting ? 'Disconnecting...' : 'Disconnect Health Connect' }}
             </Button>
+            <Button
+                v-if="healthImport?.prefix === '/health-connect' && healthImport.state.available !== false"
+                type="button"
+                variant="outline"
+                class="mt-2 w-full"
+                :disabled="healthConnectLoading || healthConnectDisconnecting || healthConnectManaging"
+                @click="manageHealthConnectAccess"
+            >
+                {{ healthConnectManaging ? 'Opening...' : 'Manage Health Connect access' }}
+            </Button>
+            <p
+                v-if="healthImport?.prefix === '/health-connect' && healthImport.state.available !== false && !healthImport.state.has_permissions"
+                class="mt-2 text-sm text-muted-foreground"
+            >
+                If Connect no longer shows a permission prompt, use Manage Health Connect access to allow access in Android settings.
+            </p>
         </Card>
     </section>
 </template>

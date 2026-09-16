@@ -3,14 +3,17 @@
 use App\BuffApiStatus;
 use App\Models\BodyMetric;
 use App\Models\DailyLog;
+use App\Models\HealthConnectIgnoredWorkout;
 use App\Models\MealEntry;
 use App\Models\SyncOutbox;
 use App\Models\SyncState;
+use App\Models\WorkoutEntry;
 use App\Services\BuffCredentialStore;
 use App\Services\BuffSyncService;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 
 beforeEach(function (): void {
     $account = [
@@ -26,6 +29,60 @@ beforeEach(function (): void {
 
 afterEach(function (): void {
     Date::setTestNow();
+});
+
+it('shares pending and failed sync state with the app shell', function (): void {
+    SyncState::current()->update([
+        'last_succeeded_at' => '2026-09-02T12:00:00Z',
+        'last_error' => 'Network unavailable.',
+    ]);
+    MealEntry::query()->create([
+        'date' => '2026-09-02',
+        'meal_type' => 'lunch',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Pending meal',
+        'calories' => 300,
+        'protein_g' => 20,
+        'carbs_g' => 40,
+        'fat_g' => 6.67,
+    ]);
+
+    $this->get('/settings')->assertInertia(fn (Assert $page) => $page
+        ->where('buff.sync.last_error', 'Network unavailable.')
+        ->where('buff.sync.pending', 1)
+        ->where('buff.sync.last_succeeded_at', '2026-09-02T12:00:00.000000Z'));
+});
+
+it('retries pending changes through the sync resume endpoint', function (): void {
+    $meal = MealEntry::query()->create([
+        'date' => '2026-09-02',
+        'meal_type' => 'lunch',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Retry meal',
+        'calories' => 300,
+        'protein_g' => 20,
+        'carbs_g' => 40,
+        'fat_g' => 6.67,
+    ]);
+    SyncState::current()->update(['last_error' => 'Network unavailable.']);
+    Http::fake(['*/sync' => Http::response([
+        'acknowledged' => [[
+            'type' => 'meal_entries',
+            'id' => $meal->id,
+            'accepted' => true,
+        ]],
+        'changes' => [],
+        'cursor' => 1,
+        'has_more' => false,
+    ])]);
+
+    $this->postJson('/sync/resume')
+        ->assertOk()
+        ->assertJsonPath('status', BuffApiStatus::Success->name);
+
+    expect(SyncState::current()->last_error)->toBeNull()
+        ->and(SyncState::current()->last_succeeded_at)->not->toBeNull();
+    $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $meal->id]);
 });
 
 it('captures complete normalized snapshots and fresh delete tombstones', function (): void {
@@ -215,6 +272,141 @@ it('reconciles concurrent body metrics by date and accepts meals whose catalogue
     $this->assertDatabaseHas('meal_entries', [
         'id' => $remoteMealId,
         'food_product_id' => '50000000-0000-4000-8000-000000000005',
+    ]);
+});
+
+it('applies recipe meals even when the recipe arrives later in the same page', function (): void {
+    $recipeId = '60000000-0000-4000-8000-000000000006';
+    $mealId = '70000000-0000-4000-8000-000000000007';
+
+    Http::fake(['*/sync' => Http::response([
+        'acknowledged' => [],
+        'changes' => [
+            [
+                'type' => 'meal_entries',
+                'id' => $mealId,
+                'updated_at' => '2026-08-15T10:01:00.123456Z',
+                'source_device_id' => '40000000-0000-4000-8000-000000000004',
+                'deleted' => false,
+                'data' => [
+                    'date' => '2026-08-15',
+                    'meal_type' => 'lunch',
+                    'source_type' => MealEntry::SOURCE_RECIPE,
+                    'food_product_id' => null,
+                    'recipe_id' => $recipeId,
+                    'name' => 'Chicken bowl',
+                    'portion_quantity' => 1,
+                    'portion_unit' => 'g',
+                    'calories' => 200,
+                    'protein_g' => 30,
+                    'carbs_g' => 0,
+                    'fat_g' => 8,
+                ],
+            ],
+            [
+                'type' => 'recipes',
+                'id' => $recipeId,
+                'updated_at' => '2026-08-15T10:00:00.123456Z',
+                'source_device_id' => '40000000-0000-4000-8000-000000000004',
+                'deleted' => false,
+                'data' => [
+                    'name' => 'Chicken bowl',
+                    'servings' => 1,
+                    'items' => [[
+                        'name' => 'Chicken',
+                        'food_product_id' => null,
+                        'portion_quantity' => 100,
+                        'portion_unit' => 'g',
+                        'calories' => 200,
+                        'protein_g' => 30,
+                        'carbs_g' => 0,
+                        'fat_g' => 8,
+                    ]],
+                ],
+            ],
+        ],
+        'cursor' => 3,
+        'has_more' => false,
+    ])]);
+
+    expect(app(BuffSyncService::class)->sync()->successful())->toBeTrue()
+        ->and(SyncState::current()->last_error)->toBeNull();
+    $this->assertDatabaseHas('recipes', ['id' => $recipeId, 'name' => 'Chicken bowl']);
+    $this->assertDatabaseHas('meal_entries', ['id' => $mealId, 'recipe_id' => $recipeId]);
+});
+
+it('reconciles ignored health workouts that share a source and external id', function (): void {
+    HealthConnectIgnoredWorkout::query()->create([
+        'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
+        'external_id' => 'health-workout-1',
+        'ignored_at' => '2026-08-15 10:00:00',
+    ]);
+    SyncOutbox::query()->delete();
+    $remoteId = '80000000-0000-4000-8000-000000000008';
+
+    Http::fake(['*/sync' => Http::response([
+        'acknowledged' => [],
+        'changes' => [[
+            'type' => 'health_connect_ignored_workouts',
+            'id' => $remoteId,
+            'updated_at' => '2026-08-15T10:00:00.123456Z',
+            'source_device_id' => '40000000-0000-4000-8000-000000000004',
+            'deleted' => false,
+            'data' => [
+                'source_type' => WorkoutEntry::SOURCE_HEALTH_CONNECT,
+                'external_id' => 'health-workout-1',
+                'ignored_at' => '2026-08-15T10:05:00.000000Z',
+            ],
+        ]],
+        'cursor' => 4,
+        'has_more' => false,
+    ])]);
+
+    expect(app(BuffSyncService::class)->sync()->successful())->toBeTrue()
+        ->and(SyncState::current()->last_error)->toBeNull();
+    $this->assertDatabaseCount('health_connect_ignored_workouts', 1);
+    $this->assertDatabaseHas('health_connect_ignored_workouts', [
+        'id' => $remoteId,
+        'external_id' => 'health-workout-1',
+    ]);
+});
+
+it('moves a body metric onto a date that already has a local row', function (): void {
+    $kept = BodyMetric::query()->create([
+        'date' => '2026-08-14',
+        'weight_kg' => 80,
+    ]);
+    BodyMetric::query()->create([
+        'date' => '2026-08-15',
+        'weight_kg' => 81,
+    ]);
+    SyncOutbox::query()->delete();
+
+    Http::fake(['*/sync' => Http::response([
+        'acknowledged' => [],
+        'changes' => [[
+            'type' => 'body_metrics',
+            'id' => $kept->id,
+            'updated_at' => '2026-08-15T10:00:00.123456Z',
+            'source_device_id' => '40000000-0000-4000-8000-000000000004',
+            'deleted' => false,
+            'data' => [
+                'date' => '2026-08-15',
+                'weight_kg' => 79.5,
+                'body_fat_percent' => null,
+                'notes' => null,
+            ],
+        ]],
+        'cursor' => 5,
+        'has_more' => false,
+    ])]);
+
+    expect(app(BuffSyncService::class)->sync()->successful())->toBeTrue()
+        ->and(SyncState::current()->last_error)->toBeNull();
+    $this->assertDatabaseCount('body_metrics', 1);
+    $this->assertDatabaseHas('body_metrics', [
+        'id' => $kept->id,
+        'weight_kg' => 79.5,
     ]);
 });
 
