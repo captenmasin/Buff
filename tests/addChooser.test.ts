@@ -4,10 +4,10 @@ import test from 'node:test';
 
 const source = readFileSync(new URL('../resources/js/Components/Add/AddChooser.vue', import.meta.url), 'utf8');
 
-test('renders compact descriptions for every add choice', () => {
+test('keeps tiles compact and describes recipe and workout choices', () => {
     assert.deepEqual(
-        [...source.matchAll(/description: '([^']+)'/g)].slice(0, 4).map(([, description]) => description),
-        ['Food & history', 'Barcode', 'Macro estimate', 'Manual entry'],
+        [...source.matchAll(/description: '([^']*)'/g)].map(([, description]) => description),
+        ['', '', '', '', 'Custom multi-ingredient meal', 'Log calories burned'],
     );
     assert.equal(source.match(/\{\{ choice\.description \}\}/g)?.length, 2);
     assert.equal(source.match(/variant="outline"/g)?.length, 2);
