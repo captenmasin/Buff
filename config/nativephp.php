@@ -130,6 +130,7 @@ return [
         'storage/framework/sessions',
         'storage/framework/cache',
         'storage/framework/testing',
+        'storage/inertia-devtools',
         'storage/logs/laravel.log',
     ],
 

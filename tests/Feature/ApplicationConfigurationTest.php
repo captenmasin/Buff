@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Vite;
 use Native\Mobile\Support\BundleFileManager;
 
@@ -31,6 +32,27 @@ it('excludes build credentials from mobile bundles', function (): void {
 
 it('excludes the Vite development marker from mobile bundles', function (): void {
     expect(BundleFileManager::excludes(config('nativephp.cleanup_exclude_files')))->toContain('/public/hot');
+});
+
+it('excludes local Inertia devtools captures from mobile bundles', function (): void {
+    $source = sys_get_temp_dir().'/buff-native-source-'.uniqid();
+    $destination = sys_get_temp_dir().'/buff-native-destination-'.uniqid();
+
+    File::ensureDirectoryExists($source.'/storage/inertia-devtools');
+    File::ensureDirectoryExists($source.'/app');
+    File::put($source.'/storage/inertia-devtools/capture.json', '{"email":"test@example.com"}');
+    File::put($source.'/app/keep.php', '<?php');
+
+    try {
+        BundleFileManager::copy($source, $destination, config('nativephp.cleanup_exclude_files'));
+
+        expect(File::exists($source.'/storage/inertia-devtools/capture.json'))->toBeTrue()
+            ->and(File::exists($destination.'/storage/inertia-devtools/capture.json'))->toBeFalse()
+            ->and(File::exists($destination.'/app/keep.php'))->toBeTrue();
+    } finally {
+        File::deleteDirectory($source);
+        File::deleteDirectory($destination);
+    }
 });
 
 it('keeps Android camera features optional', function (): void {
