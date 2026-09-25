@@ -31,7 +31,7 @@ const tiles: AddChoice[] = [
     {
         mode: 'food',
         label: 'Search',
-        description: 'Food & history',
+        description: '',
         icon: Search,
         tone: 'acid',
     },
@@ -39,21 +39,21 @@ const tiles: AddChoice[] = [
         mode: 'food',
         extra: { scan: '1' },
         label: 'Scan',
-        description: 'Barcode',
+        description: '',
         icon: ScanBarcode,
         tone: 'violet',
     },
     {
         mode: 'photo',
         label: 'Photo',
-        description: 'Macro estimate',
+        description: '',
         icon: Camera,
         tone: 'night',
     },
     {
         mode: 'custom',
         label: 'Custom',
-        description: 'Manual entry',
+        description: '',
         icon: Pencil,
         tone: 'muted',
     },
@@ -63,7 +63,7 @@ const rows: AddChoice[] = [
     {
         mode: 'recipe',
         label: 'Recipe',
-        description: 'Saved multi-ingredient meal',
+        description: 'Custom multi-ingredient meal',
         icon: UtensilsCrossed,
         tone: 'violet',
     },
@@ -89,7 +89,7 @@ const emit = defineEmits<{
                 :key="choice.label"
                 type="button"
                 variant="outline"
-                class="h-auto min-h-20 w-full justify-start gap-3 whitespace-normal rounded-2xl px-3 py-3 text-left"
+                class="h-auto w-full justify-start gap-3 whitespace-normal rounded-2xl px-3 py-3 text-left"
                 :aria-label="`${choice.label}. ${choice.description}${choice.mode === 'photo' && !props.subscriptionActive ? '. Buff+ required' : ''}`"
                 @click="emit('select', choice.mode, choice.extra)"
             >

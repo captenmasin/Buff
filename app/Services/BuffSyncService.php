@@ -31,6 +31,7 @@ class BuffSyncService
         private readonly BuffCredentialStore $credentials,
         private readonly MealReminderBridge $mealReminders,
         private readonly BodyMetricPhotoUploader $bodyMetricPhotos,
+        private readonly AnalyticsEventService $analytics,
     ) {}
 
     public function resume(): BuffApiResult
@@ -93,6 +94,7 @@ class BuffSyncService
     {
         $accountId = $this->credentials->account()['id'] ?? null;
         $state = SyncState::current(is_string($accountId) ? $accountId : null);
+        $this->analytics->flush();
         $deviceId = $state->device_id;
         $pullOnly = false;
 

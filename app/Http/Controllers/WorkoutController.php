@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\HealthConnectIgnoredWorkout;
 use App\Models\WorkoutEntry;
+use App\Services\AnalyticsEventService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -31,7 +32,7 @@ class WorkoutController extends Controller
         return redirect('/?date='.$validated['date'])->with('message', 'Workout added.');
     }
 
-    public function update(Request $request, WorkoutEntry $workoutEntry): RedirectResponse
+    public function update(Request $request, WorkoutEntry $workoutEntry, AnalyticsEventService $analytics): RedirectResponse
     {
         $validated = $request->validate([
             'date' => ['required', 'date'],
@@ -52,16 +53,20 @@ class WorkoutController extends Controller
             ]);
         });
 
+        $analytics->record('workout_updated');
+
         return redirect('/?date='.$validated['date'])->with('message', 'Workout updated.');
     }
 
-    public function destroy(WorkoutEntry $workoutEntry): RedirectResponse
+    public function destroy(WorkoutEntry $workoutEntry, AnalyticsEventService $analytics): RedirectResponse
     {
         $date = $workoutEntry->date->toDateString();
 
         $this->ignoreImportedWorkout($workoutEntry);
 
         $workoutEntry->delete();
+
+        $analytics->record('workout_deleted');
 
         return redirect('/?date='.$date)->with('message', 'Workout removed.');
     }

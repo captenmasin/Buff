@@ -28,7 +28,7 @@ import { responseErrorMessage } from '../foodRequests';
 import { hapticImpact } from '../haptics';
 import { photoDataUrl } from '../photoDataUrl';
 import { resizePhoto } from '../photoResize';
-import { buildBodyFatChartData, buildWeightChartData, chartSummary, chartXDomain, deltaTone } from '../progressChart';
+import { buildBodyFatChartData, buildWeightChartData, chartXDomain, deltaTone } from '../progressChart';
 import {
     isProgressPhotoPose,
     progressPhotoCaptureLabels,
@@ -100,7 +100,6 @@ const pendingDelete = ref<BodyMetric | null>(null);
 const pendingPhotoDelete = ref<ProgressPhoto | null>(null);
 const deleteProcessing = ref(false);
 const deleteError = ref('');
-const chartCarousel = ref<HTMLElement | null>(null);
 const activeChart = ref(0);
 const photoInput = ref<HTMLInputElement | null>(null);
 const sheetPhotoInput = ref<HTMLInputElement | null>(null);
@@ -198,18 +197,6 @@ const hasBodyFatChart = computed(() => bodyFatChartData.value.some((row) => row.
 const hasMeasurements = computed(() => measurementFields.some(({ key }) => props.measurements[key] !== null));
 const weightChartLines = computed(() => displayTargetWeight.value === null ? ['weight'] : ['weight', 'goal']);
 const bodyFatChartLines = computed(() => props.goals?.target_body_fat_percent == null ? ['bodyFat'] : ['bodyFat', 'goal']);
-const weightChartSummary = computed(() => chartSummary(
-    weightChartData.value,
-    'weight',
-    ` ${props.preferences.weight_unit}`,
-    displayTargetWeight.value,
-));
-const bodyFatChartSummary = computed(() => chartSummary(
-    bodyFatChartData.value,
-    'bodyFat',
-    '%',
-    props.goals?.target_body_fat_percent ?? null,
-));
 const weightDeltaClass = computed(() => deltaTone(
     props.trend?.delta_kg,
     props.latest?.weight_kg,
@@ -611,19 +598,6 @@ function visitRange(range: string): void {
 
 function showChart(index: number): void {
     activeChart.value = index;
-    const carousel = chartCarousel.value;
-    const firstSlide = carousel?.firstElementChild;
-    const slide = carousel?.children[index];
-
-    if (carousel && firstSlide instanceof HTMLElement && slide instanceof HTMLElement) {
-        carousel.scrollTo({ left: slide.offsetLeft - firstSlide.offsetLeft });
-    }
-}
-
-function syncChartSlide(event: Event): void {
-    const carousel = event.currentTarget as HTMLElement;
-
-    activeChart.value = Math.round(carousel.scrollLeft / carousel.clientWidth);
 }
 
 function deltaLabel(value: number | null | undefined, suffix: string): string { return value === null || value === undefined ? 'No change' : `${value > 0 ? '+' : ''}${value}${suffix}`; }
@@ -1005,13 +979,8 @@ onUnmounted(() => {
                         {{ label }}
                     </Button>
                 </div>
-                <div
-                    ref="chartCarousel"
-                    data-chart-carousel
-                    class="mt-4 flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain scroll-smooth touch-pan-x motion-reduce:scroll-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-                    @scroll.passive="syncChartSlide"
-                >
-                    <div class="w-full shrink-0 snap-start" role="group" aria-label="Weight chart">
+                <div class="mt-4">
+                    <div v-if="activeChart === 0 || !hasBodyFatChart" role="group" aria-label="Weight chart">
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Weight</span>
                             <span v-if="displayTargetWeight" class="text-xs text-muted-foreground">Goal {{ formatBodyValue(displayTargetWeight) }} {{ preferences.weight_unit }}</span>
@@ -1026,9 +995,8 @@ onUnmounted(() => {
                             :dots="['weight']"
                             :value-suffix="` ${preferences.weight_unit}`"
                         />
-                        <p v-if="weightChartSummary" class="mt-3 rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground">{{ weightChartSummary }}</p>
                     </div>
-                    <div v-if="hasBodyFatChart" class="w-full shrink-0 snap-start" role="group" aria-label="Body fat chart">
+                    <div v-else role="group" aria-label="Body fat chart">
                         <div class="mb-2 flex justify-between">
                             <span class="field-label">Body fat</span>
                             <span v-if="goals?.target_body_fat_percent" class="text-xs text-muted-foreground">Goal {{ goals.target_body_fat_percent }}%</span>
@@ -1043,7 +1011,6 @@ onUnmounted(() => {
                             :dots="['bodyFat']"
                             value-suffix="%"
                         />
-                        <p v-if="bodyFatChartSummary" class="mt-3 rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground">{{ bodyFatChartSummary }}</p>
                     </div>
                 </div>
             </Card>
@@ -1127,12 +1094,15 @@ onUnmounted(() => {
                         </label>
                     </div>
                 </details>
-                <div class="space-y-2">
+                <div class="space-y-2 pt-4">
                     <p class="text-sm font-semibold text-foreground">Progress photos</p>
-                    <div class="grid grid-cols-3 gap-2">
-                        <div v-for="pose in progressPhotoPoses" :key="pose" class="space-y-1.5">
+                    <div
+                        class="-mx-5 px-5 grid auto-cols-[calc((100%-1.5rem)/2.5)] grid-flow-col gap-3 overflow-x-auto overscroll-x-contain pb-1"
+                        aria-label="Progress photo poses"
+                    >
+                        <div v-for="pose in progressPhotoPoses" :key="pose" class="min-w-0 space-y-2">
                             <span class="field-label">{{ progressPhotoLabels[pose] }}</span>
-                            <div class="relative aspect-square overflow-hidden rounded-xl bg-muted">
+                            <div class="relative aspect-square overflow-hidden rounded-2xl bg-muted">
                                 <button
                                     v-if="selectedPhotos[pose]"
                                     type="button"
@@ -1145,19 +1115,19 @@ onUnmounted(() => {
                                 <button
                                     v-else
                                     type="button"
-                                    class="flex h-full w-full flex-col items-center justify-center gap-1 px-2 text-muted-foreground"
+                                    class="flex h-full w-full flex-col items-center justify-center gap-1.5 px-2 text-muted-foreground"
                                     :aria-label="progressPhotoCaptureLabels[pose]"
                                     @click="openFormCamera(pose)"
                                 >
-                                    <Camera :size="20" />
-                                    <span class="text-center text-xs font-medium">{{ progressPhotoCaptureLabels[pose] }}</span>
+                                    <Camera :size="22" />
+                                    <span class="text-center text-xs font-medium leading-tight">{{ progressPhotoCaptureLabels[pose] }}</span>
                                 </button>
                                 <Button
                                     v-if="selectedPhotos[pose]"
                                     type="button"
                                     size="icon"
                                     variant="inverse"
-                                    class="absolute right-1 top-1 h-8 w-8"
+                                    class="absolute right-1.5 top-1.5 h-8 w-8"
                                     aria-label="Remove photo"
                                     @click="removeSelectedPhoto(pose)"
                                 >
@@ -1168,7 +1138,7 @@ onUnmounted(() => {
                                     type="button"
                                     size="icon"
                                     variant="inverse"
-                                    class="absolute right-1 top-1 h-8 w-8"
+                                    class="absolute right-1.5 top-1.5 h-8 w-8"
                                     :aria-label="`Choose ${progressPhotoLabels[pose].toLowerCase()} from library`"
                                     @click="openLibrary(pose)"
                                 >

@@ -76,6 +76,8 @@ Route::middleware(EnsureBuffAccount::class)->group(function (): void {
     Route::post('/sync', [SyncController::class, 'store']);
     Route::post('/sync/resume', [SyncController::class, 'resume']);
     Route::post('/subscription/refresh', [SubscriptionController::class, 'store']);
+    Route::post('/subscription/prompt-seen', [SubscriptionController::class, 'markPromptSeen']);
+    Route::post('/subscription/checkout-started', [SubscriptionController::class, 'checkoutStarted']);
 
     Route::get('/progress', [ProgressController::class, 'index']);
     Route::get('/progress/body-metrics/by-date', [ProgressController::class, 'byDate']);

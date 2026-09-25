@@ -30,13 +30,26 @@ let pointerStartY = 0
 let lastY = 0
 let lastT = 0
 let velocity = 0
+let activePointerId: number | null = null
 
 const drawerStyle = computed(() => {
-    if (props.variant !== 'drawer' || dragY.value === 0) {
+    if (props.variant !== 'drawer') {
         return undefined
     }
 
-    return { transform: `translateY(${dragY.value}px)` }
+    const style: Record<string, string> = {}
+
+    if (dragY.value > 0) {
+        // SheetContent animates the CSS `translate` property — keep drag on the same axis.
+        style.translate = `0 ${dragY.value}px`
+    }
+
+    if (dragging.value) {
+        style.transitionDuration = '0ms'
+        style.transitionProperty = 'none'
+    }
+
+    return Object.keys(style).length > 0 ? style : undefined
 })
 
 function prefersReducedMotion(): boolean {
@@ -48,12 +61,21 @@ function isDesktopDrawer(): boolean {
     return window.matchMedia('(width >= 40rem)').matches
 }
 
+function canDrag(): boolean {
+    return props.variant === 'drawer'
+        && props.dismissible
+        && props.open
+        && !prefersReducedMotion()
+        && !isDesktopDrawer()
+}
+
 function onOpenChange(open: boolean) {
     if (!open) {
         if (!props.dismissible) {
             return
         }
 
+        resetDrag()
         emit('close')
     }
 }
@@ -82,53 +104,122 @@ function handleNativeAndroidBack(event: Event) {
     }
 }
 
-function onHandlePointerDown(event: PointerEvent) {
-    if (props.variant !== 'drawer' || !props.dismissible || prefersReducedMotion() || isDesktopDrawer()) {
-        return
-    }
-
+function beginDrag(clientY: number, timeStamp: number) {
     dragging.value = true
-    pointerStartY = event.clientY
-    lastY = event.clientY
-    lastT = event.timeStamp
+    pointerStartY = clientY
+    lastY = clientY
+    lastT = timeStamp
     velocity = 0
-    if (event.currentTarget instanceof HTMLElement) {
-        event.currentTarget.setPointerCapture(event.pointerId)
-    }
 }
 
-function onHandlePointerMove(event: PointerEvent) {
+function moveDrag(clientY: number, timeStamp: number) {
     if (!dragging.value) {
         return
     }
 
-    dragY.value = Math.max(0, event.clientY - pointerStartY)
-    const elapsed = event.timeStamp - lastT
+    dragY.value = Math.max(0, clientY - pointerStartY)
+    const elapsed = timeStamp - lastT
 
     if (elapsed > 0) {
-        velocity = (event.clientY - lastY) / elapsed
+        velocity = (clientY - lastY) / elapsed
     }
 
-    lastY = event.clientY
-    lastT = event.timeStamp
+    lastY = clientY
+    lastT = timeStamp
 }
 
-function onHandlePointerUp() {
+function endDrag() {
     if (!dragging.value) {
         return
     }
 
-    dragging.value = false
     const shouldClose = dragY.value > 96 || velocity > 0.45
-    dragY.value = 0
+    resetDrag()
 
     if (shouldClose) {
         emit('close')
     }
 }
 
+function resetDrag() {
+    dragging.value = false
+    dragY.value = 0
+    activePointerId = null
+    velocity = 0
+}
+
+function onHandlePointerDown(event: PointerEvent) {
+    if (!canDrag() || event.button > 0) {
+        return
+    }
+
+    activePointerId = event.pointerId
+    beginDrag(event.clientY, event.timeStamp)
+
+    if (event.currentTarget instanceof HTMLElement) {
+        event.currentTarget.setPointerCapture(event.pointerId)
+    }
+}
+
+function onHandlePointerMove(event: PointerEvent) {
+    if (!dragging.value || (activePointerId !== null && event.pointerId !== activePointerId)) {
+        return
+    }
+
+    event.preventDefault()
+    moveDrag(event.clientY, event.timeStamp)
+}
+
+function onHandlePointerUp(event: PointerEvent) {
+    if (activePointerId !== null && event.pointerId !== activePointerId) {
+        return
+    }
+
+    endDrag()
+}
+
+function onHandleTouchStart(event: TouchEvent) {
+    if (!canDrag() || event.touches.length !== 1 || activePointerId !== null) {
+        return
+    }
+
+    const touch = event.touches.item(0)
+
+    if (!touch) {
+        return
+    }
+
+    beginDrag(touch.clientY, event.timeStamp)
+}
+
+function onHandleTouchMove(event: TouchEvent) {
+    if (!dragging.value || activePointerId !== null || event.touches.length !== 1) {
+        return
+    }
+
+    const touch = event.touches.item(0)
+
+    if (!touch) {
+        return
+    }
+
+    event.preventDefault()
+    moveDrag(touch.clientY, event.timeStamp)
+}
+
+function onHandleTouchEnd() {
+    if (activePointerId !== null) {
+        return
+    }
+
+    endDrag()
+}
+
 onMounted(() => window.addEventListener('buff:android-back', handleNativeAndroidBack))
-onBeforeUnmount(() => window.removeEventListener('buff:android-back', handleNativeAndroidBack))
+onBeforeUnmount(() => {
+    window.removeEventListener('buff:android-back', handleNativeAndroidBack)
+    resetDrag()
+})
 </script>
 
 <template>
@@ -141,7 +232,7 @@ onBeforeUnmount(() => window.removeEventListener('buff:android-back', handleNati
             :aria-labelledby="labelledBy"
             :data-app-sheet="labelledBy"
             overlay-class="sm:left-64"
-            :class="cn('bottom-drawer max-h-[88dvh] gap-0 overflow-y-auto overscroll-contain rounded-t-3xl border-border/70 p-4 sm:left-64 sm:max-w-lg', props.class)"
+            :class="cn('bottom-drawer max-h-[88dvh] gap-0 overflow-y-auto overscroll-contain rounded-t-3xl border-border/70 p-4 sm:left-64 sm:max-w-lg', dragging && 'select-none', props.class)"
             :style="drawerStyle"
             @pointer-down-outside="preventDismiss"
             @interact-outside="preventDismiss"
@@ -150,13 +241,18 @@ onBeforeUnmount(() => window.removeEventListener('buff:android-back', handleNati
             <DialogTitle class="sr-only">{{ title }}</DialogTitle>
             <DialogDescription class="sr-only">{{ description }}</DialogDescription>
             <div
-                class="flex cursor-grab touch-none justify-center py-1 active:cursor-grabbing sm:hidden"
+                class="flex cursor-grab touch-none justify-center pb-2 pt-1 active:cursor-grabbing sm:hidden"
+                data-drawer-handle
                 @pointerdown="onHandlePointerDown"
                 @pointermove="onHandlePointerMove"
                 @pointerup="onHandlePointerUp"
                 @pointercancel="onHandlePointerUp"
+                @touchstart="onHandleTouchStart"
+                @touchmove="onHandleTouchMove"
+                @touchend="onHandleTouchEnd"
+                @touchcancel="onHandleTouchEnd"
             >
-                <span class="h-1.5 w-10 rounded-full bg-muted-foreground/40" aria-hidden="true" />
+                <span class="h-1.5 w-12 rounded-full bg-muted-foreground/40" aria-hidden="true" />
                 <span class="sr-only">Drag down to close</span>
             </div>
             <slot />

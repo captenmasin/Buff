@@ -161,6 +161,7 @@ async function purchase(subscriptionPackage: SubscriptionPackage): Promise<void>
     statusMessage.value = '';
 
     try {
+        await axios.post('/subscription/checkout-started', {kind: subscriptionPackage.kind}).catch(() => {});
         await subscriptionNative.purchase(subscriptionPackage.packageIdentifier);
     } catch {
         busy.value = null;

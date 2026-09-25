@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {Head, useForm} from '@inertiajs/vue3';
-import {Bot, ChevronDown, Clock3} from '@lucide/vue';
+import {Bot, ChevronDown, Clock3, Copy, Share2} from '@lucide/vue';
 import {computed, ref} from 'vue';
 import Card from '../../Components/Card.vue';
 import SettingsPageHeader from '../../Components/SettingsPageHeader.vue';
@@ -24,11 +24,17 @@ const props = defineProps<{
 const revocationForm = useForm({connection: ''});
 const revokingId = ref<string | null>(null);
 const copyStatus = ref<string | null>(null);
+const shareStatus = ref<string | null>(null);
 const authorizedConnections = computed(() => props.connections.filter((connection) => !connection.revokedAt));
 const revokedConnections = computed(() => props.connections.filter((connection) => connection.revokedAt));
+const canNativeShare = computed(() => typeof navigator !== 'undefined' && typeof navigator.share === 'function');
 
 async function copyMcpEndpoint(): Promise<void> {
-    if (!props.mcpEndpoint || !navigator.clipboard) {
+    if (!props.mcpEndpoint) {
+        return;
+    }
+
+    if (!navigator.clipboard) {
         copyStatus.value = 'Select the address above and copy it manually.';
 
         return;
@@ -41,6 +47,48 @@ async function copyMcpEndpoint(): Promise<void> {
     } catch {
         copyStatus.value = 'Select the address above and copy it manually.';
     }
+}
+
+async function shareMcpEndpoint(): Promise<void> {
+    if (!props.mcpEndpoint) {
+        return;
+    }
+
+    shareStatus.value = null;
+
+    if (canNativeShare.value) {
+        try {
+            await navigator.share({
+                title: 'Buff MCP',
+                text: 'Add Buff to your AI assistant with this MCP address.',
+                url: props.mcpEndpoint,
+            });
+            window.dispatchEvent(new CustomEvent('buff:toast', {detail: 'MCP address shared.'}));
+
+            return;
+        } catch (error) {
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                return;
+            }
+        }
+    }
+
+    await copyMcpEndpoint();
+    shareStatus.value = 'Shared by copying the address — paste it into your assistant.';
+}
+
+async function openAssistantSetup(url: string): Promise<void> {
+    try {
+        const {Browser} = await import('#nativephp');
+
+        if (await Browser.open(url) || await Browser.inApp(url)) {
+            return;
+        }
+    } catch {
+        // Fall through to the system browser.
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 function formatTimestamp(timestamp: string | null): string {
@@ -112,7 +160,7 @@ function revoke(connection: Connection) {
                         </div>
                         <div>
                             <h3 class="card-title">No assistants have access</h3>
-                            <p class="mt-1 text-sm text-muted-foreground">Add one below when you're ready.</p>
+                            <p class="mt-1 text-sm text-muted-foreground">Connect one below — you can finish the whole flow on your phone.</p>
                         </div>
                     </div>
                 </Card>
@@ -166,105 +214,115 @@ function revoke(connection: Connection) {
                     <Bot :size="19"/>
                 </div>
                 <div class="min-w-0 flex-1">
-                    <h2 class="card-title">Add an assistant</h2>
+                    <h2 class="card-title">Connect from your phone</h2>
                     <p class="mt-1 text-sm text-muted-foreground">
-                        Use Buff's MCP address with your preferred assistant.
+                        Share Buff’s MCP address into an assistant, then approve the request when Buff opens.
                     </p>
                 </div>
             </div>
 
-            <div class="mt-4 flex flex-col gap-2 sm:flex-row">
+            <ol class="mt-5 space-y-3 rounded-xl bg-muted/40 p-4 text-sm leading-6 text-muted-foreground">
+                <li class="flex gap-3">
+                    <span class="grid size-6 flex-none place-items-center rounded-full bg-primary-container text-xs font-bold text-primary-container-foreground">1</span>
+                    <span><span class="font-medium text-foreground">Share or copy</span> the MCP address below.</span>
+                </li>
+                <li class="flex gap-3">
+                    <span class="grid size-6 flex-none place-items-center rounded-full bg-primary-container text-xs font-bold text-primary-container-foreground">2</span>
+                    <span><span class="font-medium text-foreground">Paste it</span> into Claude, ChatGPT, or Gemini as a custom connector / app.</span>
+                </li>
+                <li class="flex gap-3">
+                    <span class="grid size-6 flex-none place-items-center rounded-full bg-primary-container text-xs font-bold text-primary-container-foreground">3</span>
+                    <span><span class="font-medium text-foreground">Approve in Buff</span> when the assistant opens this app — no desktop required.</span>
+                </li>
+            </ol>
+
+            <div class="mt-4 flex flex-col gap-2">
                 <Input
                     :model-value="mcpEndpoint"
                     readonly
                     aria-label="Buff MCP server address"
                     class="h-10 min-w-0 font-mono text-xs text-muted-foreground"
                 />
-                <Button
-                    type="button"
-                    variant="outline"
-                    class="w-full sm:w-auto"
-                    @click="copyMcpEndpoint"
-                >
-                    Copy MCP address
-                </Button>
+                <div class="grid grid-cols-2 gap-2">
+                    <Button
+                        type="button"
+                        class="w-full"
+                        @click="shareMcpEndpoint"
+                    >
+                        <Share2 :size="16"/>
+                        {{ canNativeShare ? 'Share' : 'Share' }}
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        class="w-full"
+                        @click="copyMcpEndpoint"
+                    >
+                        <Copy :size="16"/>
+                        Copy
+                    </Button>
+                </div>
             </div>
 
-            <p v-if="copyStatus" class="mt-3 text-sm text-muted-foreground" role="status">
-                {{ copyStatus }}
+            <p v-if="copyStatus || shareStatus" class="mt-3 text-sm text-muted-foreground" role="status">
+                {{ shareStatus || copyStatus }}
             </p>
 
-            <div class="mt-5 border-t border-border pt-5">
-                <h3 class="text-sm font-semibold text-foreground">Setup instructions</h3>
-                <p class="mt-1 text-sm text-muted-foreground">Choose your assistant to see the steps.</p>
-
-                <div class="mt-3 grid gap-3">
-                    <details class="group rounded-xl border border-border bg-muted/30 p-4">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground">
-                            Codex
-                            <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
-                        </summary>
-                        <ol class="mt-3 list-decimal space-y-3 pl-5 text-sm leading-6 text-muted-foreground">
-                            <li>
-                                Add Buff from a terminal:
-                                <code class="mt-2 block break-all rounded-lg bg-background px-3 py-2 font-mono text-xs text-foreground">codex mcp add buff --url {{ mcpEndpoint }}</code>
-                            </li>
-                            <li>
-                                Start authorization, then sign in to Buff and approve access in the browser:
-                                <code class="mt-2 block rounded-lg bg-background px-3 py-2 font-mono text-xs text-foreground">codex mcp login buff</code>
-                            </li>
-                            <li>
-                                Restart Codex, confirm the saved configuration below, then use <code class="font-mono text-xs text-foreground">/mcp</code> in Codex to confirm Buff is active:
-                                <code class="mt-2 block rounded-lg bg-background px-3 py-2 font-mono text-xs text-foreground">codex mcp get buff</code>
-                            </li>
-                        </ol>
-                    </details>
-
-                    <details class="group rounded-xl border border-border bg-muted/30 p-4">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground">
-                            ChatGPT
-                            <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
-                        </summary>
-                        <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-                            <li>Use ChatGPT on the web and turn on Developer mode in Settings &rarr; Apps &rarr; Advanced settings.</li>
-                            <li>In Settings &rarr; Apps, choose Create. Name the app Buff and paste the MCP address above as its endpoint.</li>
-                            <li>Choose OAuth if asked, scan the tools, complete the Buff sign-in, then create the app.</li>
-                        </ol>
-                        <p class="mt-3 text-xs leading-5 text-muted-foreground">
-                            Full MCP access requires an eligible ChatGPT plan and workspace permissions.
-                        </p>
-                    </details>
-
-                    <details class="group rounded-xl border border-border bg-muted/30 p-4">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground">
-                            Claude
-                            <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
-                        </summary>
-                        <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-                            <li>In Claude or Claude Desktop, open Customize &rarr; Connectors.</li>
-                            <li>Choose + &rarr; Add custom connector, then name it Buff and paste the MCP address above.</li>
-                            <li>Select Add, then Connect and approve access when Buff opens.</li>
-                        </ol>
-                        <p class="mt-3 text-xs leading-5 text-muted-foreground">
-                            Team and Enterprise owners add it first in Organization settings &rarr; Connectors.
-                        </p>
-                    </details>
-
-                    <details class="group rounded-xl border border-border bg-muted/30 p-4">
-                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground">
-                            Gemini
-                            <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
-                        </summary>
-                        <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
-                            <li>On Gemini web, open Settings &amp; help &rarr; Connected Apps.</li>
-                            <li>Under Custom apps for Spark, choose Add a custom app and paste the MCP address above.</li>
-                            <li>Select Next, complete the Buff approval, then use @Buff in a Spark task.</li>
-                        </ol>
-                        <p class="mt-3 text-xs leading-5 text-muted-foreground">
-                            Google currently limits custom MCP apps to eligible Gemini Spark accounts, with setup on the web.
-                        </p>
-                    </details>
+            <div class="mt-5 grid gap-2 border-t border-border pt-5">
+                <h3 class="text-sm font-semibold text-foreground">Open an assistant</h3>
+                <p class="text-sm text-muted-foreground">Jump straight into phone-friendly setup pages.</p>
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <Button type="button" variant="surface" class="w-full" @click="openAssistantSetup('https://claude.ai/settings/connectors')">
+                        Claude
+                    </Button>
+                    <Button type="button" variant="surface" class="w-full" @click="openAssistantSetup('https://chatgpt.com')">
+                        ChatGPT
+                    </Button>
+                    <Button type="button" variant="surface" class="w-full" @click="openAssistantSetup('https://gemini.google.com/app')">
+                        Gemini
+                    </Button>
                 </div>
+            </div>
+
+            <div class="mt-5 border-t border-border pt-5">
+                <details class="group">
+                    <summary class="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-foreground">
+                        Per-assistant tips
+                        <ChevronDown class="transition-transform group-open:rotate-180" :size="18" aria-hidden="true"/>
+                    </summary>
+
+                    <div class="mt-3 grid gap-3">
+                        <div class="rounded-xl border border-border bg-muted/30 p-4">
+                            <h4 class="text-sm font-semibold text-foreground">Claude</h4>
+                            <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                                <li>Open Claude → Customize → Connectors.</li>
+                                <li>Add a custom connector named Buff and paste the MCP address.</li>
+                                <li>Tap Connect, then Approve in Buff when this app opens.</li>
+                            </ol>
+                        </div>
+
+                        <div class="rounded-xl border border-border bg-muted/30 p-4">
+                            <h4 class="text-sm font-semibold text-foreground">ChatGPT</h4>
+                            <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                                <li>In ChatGPT Settings → Apps, turn on Developer mode if needed.</li>
+                                <li>Create an app named Buff and paste the MCP address as the endpoint.</li>
+                                <li>Choose OAuth, then approve in Buff when prompted.</li>
+                            </ol>
+                            <p class="mt-3 text-xs leading-5 text-muted-foreground">
+                                Needs an eligible ChatGPT plan. If the mobile app can’t create apps yet, open ChatGPT in your phone browser.
+                            </p>
+                        </div>
+
+                        <div class="rounded-xl border border-border bg-muted/30 p-4">
+                            <h4 class="text-sm font-semibold text-foreground">Gemini</h4>
+                            <ol class="mt-2 list-decimal space-y-2 pl-5 text-sm leading-6 text-muted-foreground">
+                                <li>Open Gemini → Settings &amp; help → Connected Apps.</li>
+                                <li>Add a custom Spark app and paste the MCP address.</li>
+                                <li>Finish the Buff approval when this app opens.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </details>
             </div>
         </Card>
 

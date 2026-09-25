@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AppPreference;
 use App\Models\DailyGoal;
+use App\Services\AnalyticsEventService;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,7 +43,7 @@ class GoalController extends Controller
         ]);
     }
 
-    public function update(Request $request, NutritionCalculator $calculator): RedirectResponse
+    public function update(Request $request, NutritionCalculator $calculator, AnalyticsEventService $analytics): RedirectResponse
     {
         $validated = $request->validate([
             'calories' => ['required', 'integer', 'min:1', 'max:20000'],
@@ -75,6 +76,8 @@ class GoalController extends Controller
         $goal
             ? $goal->update($values)
             : DailyGoal::query()->create($values);
+
+        $analytics->record('daily_goals_saved');
 
         return redirect('/goals')->with('message', 'Daily goals saved.');
     }

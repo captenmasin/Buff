@@ -19,7 +19,7 @@ it('creates and updates a body metric for a date', function (): void {
             'waist_cm' => 84.2,
             'notes' => 'Morning weigh-in',
         ])
-        ->assertRedirect('/progress?range=90');
+        ->assertRedirect('/progress?range=30');
 
     $this->assertDatabaseHas('body_metrics', [
         'date' => '2026-05-19 00:00:00',
@@ -35,7 +35,7 @@ it('creates and updates a body metric for a date', function (): void {
             'weight_kg' => 82.0,
             'body_fat_percent' => 18.2,
         ])
-        ->assertRedirect('/progress?range=90');
+        ->assertRedirect('/progress?range=30');
 
     $this->assertDatabaseCount('body_metrics', 1);
     $this->assertDatabaseHas('body_metrics', [
@@ -91,7 +91,7 @@ it('accepts a weight at the cloud minimum', function (): void {
     $this->post('/progress/body-metrics', [
         'date' => '2026-05-19',
         'weight_kg' => 20,
-    ])->assertRedirect('/progress?range=90')->assertSessionHasNoErrors();
+    ])->assertRedirect('/progress?range=30')->assertSessionHasNoErrors();
 
     $this->assertDatabaseHas('body_metrics', ['weight_kg' => 20]);
 });
@@ -214,7 +214,7 @@ it('renders latest metric delta and history', function (): void {
             ->where('measurements.waist_cm.value_cm', 85)
             ->where('measurements.waist_cm.delta_cm', null)
             ->where('measurements.hips_cm', null)
-            ->where('range', '90')
+            ->where('range', '30')
             ->where('trend.weight_kg', 82.85)
             ->where('trend.delta_kg', -0.15)
             ->missing('trend.to_goal_kg')
@@ -235,8 +235,8 @@ it('filters progress history by calendar range', function (): void {
     $this->get('/progress')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('range', '90')
-            ->has('history', 3)
+            ->where('range', '30')
+            ->has('history', 2)
             ->where('latest.weight_kg', 80)
         );
 
@@ -258,8 +258,8 @@ it('filters progress history by calendar range', function (): void {
     $this->get('/progress?range=7')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
-            ->where('range', '90')
-            ->has('history', 3)
+            ->where('range', '30')
+            ->has('history', 2)
         );
 
     Date::setTestNow();
@@ -333,7 +333,7 @@ it('deletes a body metric', function (): void {
     ]);
 
     $this->delete("/progress/body-metrics/{$metric->id}")
-        ->assertRedirect('/progress?range=90');
+        ->assertRedirect('/progress?range=30');
 
     $this->assertDatabaseMissing('body_metrics', ['id' => $metric->id]);
 });

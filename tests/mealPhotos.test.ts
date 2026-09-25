@@ -11,19 +11,40 @@ function mealPhotoLoader(get: (url: string) => Promise<unknown>) {
     const selectedMealPhotos = { value: [] };
     const mealPhotosLoading = { value: false };
     const mealPhotosError = { value: '' };
-    const load = new Function('axios', 'responseErrorMessage', 'selectedMealPhotos', 'mealPhotosLoading', 'mealPhotosError', `
+    const mealPhotosCache = new Map();
+    const load = new Function('axios', 'responseErrorMessage', 'selectedMealPhotos', 'mealPhotosLoading', 'mealPhotosError', 'mealPhotosCache', `
         let mealPhotoRequest = 0;
         ${stripTypeScriptTypes(loadFunction)}
         return loadMealPhotos;
-    `)({ get, isAxiosError: axios.isAxiosError }, responseErrorMessage, selectedMealPhotos, mealPhotosLoading, mealPhotosError);
+    `)({ get, isAxiosError: axios.isAxiosError }, responseErrorMessage, selectedMealPhotos, mealPhotosLoading, mealPhotosError, mealPhotosCache);
 
-    return { load, photos: selectedMealPhotos, loading: mealPhotosLoading, error: mealPhotosError };
+    return { load, photos: selectedMealPhotos, loading: mealPhotosLoading, error: mealPhotosError, cache: mealPhotosCache };
 }
+
+test('reuses meal photos and their signed URLs until the cache expires', async () => {
+    let requests = 0;
+    const loader = mealPhotoLoader(async () => {
+        requests++;
+        return {data: {photos: [{id: 'photo-a', url: 'https://example.test/signed-photo'}]}};
+    });
+
+    await loader.load('meal-a');
+    await loader.load('meal-a');
+    assert.equal(requests, 1);
+    assert.equal(loader.loading.value, false);
+    assert.equal(loader.photos.value[0].url, 'https://example.test/signed-photo');
+
+    loader.cache.get('meal-a').expiresAt = Date.now() - 1;
+    await loader.load('meal-a');
+    assert.equal(requests, 2);
+});
 
 test('keeps a missing meal gallery quiet but exposes other failures and clears them on retry', async () => {
     let response: unknown = { isAxiosError: true, response: { status: 404 } };
+    let requests = 0;
     const loader = mealPhotoLoader(async (url) => {
         assert.equal(url, '/meals/meal-a/photos');
+        requests++;
 
         if ((response as { isAxiosError?: boolean }).isAxiosError) {
             throw response;
@@ -36,6 +57,9 @@ test('keeps a missing meal gallery quiet but exposes other failures and clears t
     assert.deepEqual(loader.photos.value, []);
     assert.equal(loader.error.value, '');
     assert.equal(loader.loading.value, false);
+    await loader.load('meal-a');
+    assert.equal(requests, 1);
+    loader.cache.get('meal-a').expiresAt = Date.now() - 1;
 
     for (const status of [401, 500]) {
         response = { isAxiosError: true, response: { status, data: JSON.stringify({ message: 'Photo request failed.' }) } };
@@ -107,6 +131,13 @@ test('renders retryable meal-photo feedback and clears it when the drawer closes
     assert.match(source, /v-else-if="mealPhotosError"[^>]*role="alert"/);
     assert.match(source, /@click="loadMealPhotos\(selectedMeal\.id\)"[^>]*>Retry meal photos<\/Button>/);
     assert.match(closeFunction, /mealPhotosError\.value = ''/);
+});
+
+test('loads the first meal photo eagerly and defers the rest', () => {
+    const source = readFileSync(new URL('../resources/js/Pages/Today.vue', import.meta.url), 'utf8');
+
+    assert.match(source, /:loading="index === 0 \? 'eager' : 'lazy'"/);
+    assert.match(source, /:fetchpriority="index === 0 \? 'high' : 'low'"/);
 });
 
 test('uses separate camera capture and photo library inputs', () => {

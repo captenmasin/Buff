@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\BuffApiStatus;
 use App\Models\AppPreference;
 use App\Models\BodyProfile;
+use App\Services\AnalyticsEventService;
 use App\Services\BuffApiClient;
 use App\Services\BuffApiResult;
 use App\Services\BuffCredentialStore;
@@ -76,8 +77,10 @@ class SettingsController extends Controller
         ]);
     }
 
-    public function subscription(): Response
+    public function subscription(AnalyticsEventService $analytics): Response
     {
+        $analytics->record('subscription_plans_viewed');
+
         return Inertia::render('Settings/Subscription');
     }
 

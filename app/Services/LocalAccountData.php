@@ -10,6 +10,7 @@ use App\Models\DailyLog;
 use App\Models\HealthConnectIgnoredWorkout;
 use App\Models\HealthConnectSyncState;
 use App\Models\MealEntry;
+use App\Models\PendingAnalyticsEvent;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\Recipe;
 use App\Models\SyncOutbox;
@@ -41,6 +42,7 @@ class LocalAccountData
             AppPreference::query()->delete();
             HealthConnectSyncState::query()->delete();
             PendingMealAnalysisConfirmation::query()->delete();
+            PendingAnalyticsEvent::query()->delete();
             SyncOutbox::query()->delete();
             SyncState::query()->delete();
         });

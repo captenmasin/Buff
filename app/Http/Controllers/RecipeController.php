@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\FoodProduct;
 use App\Models\Recipe;
+use App\Services\AnalyticsEventService;
 use App\Services\NutritionCalculator;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,25 +14,31 @@ use Illuminate\Validation\ValidationException;
 
 class RecipeController extends Controller
 {
-    public function store(Request $request, NutritionCalculator $calculator): RedirectResponse
+    public function store(Request $request, NutritionCalculator $calculator, AnalyticsEventService $analytics): RedirectResponse
     {
         $date = Carbon::parse($request->validate(['date' => ['nullable', 'date']])['date'] ?? today())->toDateString();
         $recipe = Recipe::query()->create($this->validatedRecipe($request, $calculator));
+
+        $analytics->record('recipe_saved');
 
         return redirect('/add?mode=recipe&date='.$date)
             ->with('message', "{$recipe->name} saved.");
     }
 
-    public function update(Request $request, Recipe $recipe, NutritionCalculator $calculator): RedirectResponse
+    public function update(Request $request, Recipe $recipe, NutritionCalculator $calculator, AnalyticsEventService $analytics): RedirectResponse
     {
         $recipe->update($this->validatedRecipe($request, $calculator));
+
+        $analytics->record('recipe_updated');
 
         return back()->with('message', 'Recipe updated.');
     }
 
-    public function destroy(Recipe $recipe): RedirectResponse
+    public function destroy(Recipe $recipe, AnalyticsEventService $analytics): RedirectResponse
     {
         $recipe->delete();
+
+        $analytics->record('recipe_deleted');
 
         return back()->with('message', 'Recipe deleted.');
     }

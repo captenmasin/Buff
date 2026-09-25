@@ -6,6 +6,7 @@ use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use App\Services\AnalyticsEventService;
 use App\Services\BodyMetricPhotoUploader;
 use App\Services\EnergyEstimator;
 use App\Services\WeightTrendService;
@@ -24,7 +25,7 @@ class ProgressController extends Controller
     public function index(Request $request, EnergyEstimator $estimator, WeightTrendService $trends): Response
     {
         $range = $request->string('range')->toString();
-        $range = in_array($range, ['30', '90', '180', 'all'], true) ? $range : '90';
+        $range = in_array($range, ['30', '90', '180', 'all'], true) ? $range : '30';
 
         $to = today()->startOfDay();
         $allMetrics = BodyMetric::query()->orderBy('date')->get();
@@ -92,7 +93,7 @@ class ProgressController extends Controller
         ]);
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, AnalyticsEventService $analytics): RedirectResponse
     {
         if (! $request->filled('weight_kg')) {
             $request->merge([
@@ -117,7 +118,7 @@ class ProgressController extends Controller
             ->mapWithKeys(fn (string $field): array => [$field => $validated[$field]])
             ->all();
 
-        BodyMetric::query()->updateOrCreate(
+        $metric = BodyMetric::query()->updateOrCreate(
             ['date' => Carbon::parse($validated['date'])->startOfDay()],
             array_merge([
                 'weight_kg' => $validated['weight_kg'],
@@ -125,6 +126,8 @@ class ProgressController extends Controller
                 'notes' => $validated['notes'] ?? null,
             ], $measurements)
         );
+
+        $analytics->record($metric->wasRecentlyCreated ? 'progress_logged' : 'progress_updated');
 
         return $this->redirectToProgress($request)->with('message', 'Progress updated.');
     }
@@ -144,10 +147,12 @@ class ProgressController extends Controller
         ]);
     }
 
-    public function destroy(Request $request, BodyMetric $bodyMetric, BodyMetricPhotoUploader $photos): RedirectResponse
+    public function destroy(Request $request, BodyMetric $bodyMetric, BodyMetricPhotoUploader $photos, AnalyticsEventService $analytics): RedirectResponse
     {
         $photos->discardForMetric($bodyMetric->id);
         $bodyMetric->delete();
+
+        $analytics->record('progress_deleted');
 
         return $this->redirectToProgress($request)->with('message', 'Progress item removed.');
     }
@@ -187,7 +192,7 @@ class ProgressController extends Controller
             }
         }
 
-        return '90';
+        return '30';
     }
 
     /**

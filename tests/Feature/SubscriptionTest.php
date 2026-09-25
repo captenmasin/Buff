@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureBuffAccount;
+use App\Models\PendingAnalyticsEvent;
 use App\Services\BuffCredentialStore;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Http;
@@ -14,6 +15,8 @@ beforeEach(function (): void {
 it('requires a signed-in Buff account', function (): void {
     $this->get('/settings/subscription')->assertRedirect('/account/login');
     $this->postJson('/subscription/refresh')->assertRedirect('/account/login');
+    $this->postJson('/subscription/prompt-seen')->assertRedirect('/account/login');
+    $this->postJson('/subscription/checkout-started', ['kind' => 'monthly'])->assertRedirect('/account/login');
 });
 
 it('renders the subscription settings page for a signed-in account', function (): void {
@@ -22,6 +25,19 @@ it('renders the subscription settings page for a signed-in account', function ()
     $this->get('/settings/subscription')
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('Settings/Subscription'));
+});
+
+it('records the chosen checkout plan without accepting arbitrary event names', function (): void {
+    storeSubscriptionAccount();
+    Http::fake(['*/sync' => Http::failedConnection()]);
+
+    $this->postJson('/subscription/checkout-started', ['kind' => 'monthly'])->assertNoContent();
+    $this->postJson('/subscription/checkout-started', ['kind' => 'annual'])->assertNoContent();
+    $this->postJson('/subscription/checkout-started', ['kind' => 'other'])
+        ->assertUnprocessable()->assertJsonValidationErrors('kind');
+
+    expect(PendingAnalyticsEvent::query()->pluck('name')->all())
+        ->toEqualCanonicalizing(['subscription_checkout_started_monthly', 'subscription_checkout_started_annual']);
 });
 
 it('refreshes from the API without trusting client entitlement fields', function (): void {
@@ -64,6 +80,33 @@ it('preserves cached state and normalized provider failures', function (): void 
         ->assertJsonPath('message', 'Subscriptions are temporarily unavailable.');
 
     expect(app(BuffCredentialStore::class)->account()['subscription']['expires_at'])->toBeNull();
+});
+
+it('passes through the account-wide prompt claim without trusting client fields', function (bool $claimed): void {
+    storeSubscriptionAccount();
+    Http::fake(['*/subscription/prompt-seen' => Http::response(['claimed' => $claimed])]);
+
+    $this->postJson('/subscription/prompt-seen', ['claimed' => true])
+        ->assertOk()
+        ->assertJsonPath('claimed', $claimed);
+
+    Http::assertSent(fn (ClientRequest $request): bool => str_ends_with($request->url(), '/subscription/prompt-seen')
+        && $request->data() === []);
+})->with([
+    'first claim' => [true],
+    'already claimed' => [false],
+]);
+
+it('returns provider failures so the prompt can retry later', function (): void {
+    storeSubscriptionAccount();
+    Http::fake(['*/subscription/prompt-seen' => Http::response([
+        'message' => 'Subscriptions are temporarily unavailable.',
+        'code' => 'subscription_unavailable',
+    ], 503)]);
+
+    $this->postJson('/subscription/prompt-seen')
+        ->assertStatus(503)
+        ->assertJsonPath('code', 'subscription_unavailable');
 });
 
 /** @return array<string, mixed> */

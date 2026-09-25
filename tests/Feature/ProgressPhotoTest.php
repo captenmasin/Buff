@@ -531,7 +531,7 @@ it('discards staged photos when a body metric is deleted', function (): void {
     $pending = PendingBodyMetricPhotoUpload::query()->sole();
     $path = $pending->paths[0];
 
-    $this->delete("/progress/body-metrics/{$metric->id}")->assertRedirect('/progress?range=90');
+    $this->delete("/progress/body-metrics/{$metric->id}")->assertRedirect('/progress?range=30');
 
     $this->assertDatabaseMissing('pending_body_metric_photo_uploads', ['id' => $pending->id]);
     Storage::disk('local')->assertMissing($path);

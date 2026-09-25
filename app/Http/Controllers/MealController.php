@@ -6,6 +6,7 @@ use App\Models\FoodProduct;
 use App\Models\MealEntry;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\Recipe;
+use App\Services\AnalyticsEventService;
 use App\Services\BuffSyncService;
 use App\Services\NutritionCalculator;
 use App\Services\OpenFoodFactsService;
@@ -23,6 +24,8 @@ use Inertia\Response;
 
 class MealController extends Controller
 {
+    public function __construct(private readonly AnalyticsEventService $analytics) {}
+
     public function create(Request $request): Response
     {
         $validated = $request->validate(['date' => ['nullable', 'date']]);
@@ -149,6 +152,8 @@ class MealController extends Controller
             defer(fn () => $sync->sync(), 'buff-sync');
         }
 
+        $this->analytics->record($analysisId ? 'meal_added_photo' : 'meal_added_custom');
+
         return redirect('/?date='.$validated['date'])->with(
             'message',
             $analysisId ? 'Meal added. Its photos will attach after sync.' : 'Custom food added.',
@@ -163,6 +168,7 @@ class MealController extends Controller
             'food_product_id' => ['required', 'uuid', 'exists:food_products,id'],
             'portion_quantity' => ['required', 'numeric', 'min:0.1', 'max:10000'],
             'portion_unit' => ['required', Rule::in(['g', 'ml'])],
+            'add_method' => ['sometimes', 'required', Rule::in(['barcode', 'search'])],
         ]);
 
         $product = FoodProduct::query()->findOrFail($validated['food_product_id']);
@@ -183,6 +189,8 @@ class MealController extends Controller
             'portion_unit' => $validated['portion_unit'],
             ...$calculator->macrosForPortion($product, $validated['portion_quantity']),
         ]);
+
+        $this->analytics->record(($validated['add_method'] ?? 'barcode') === 'search' ? 'meal_added_search' : 'meal_added_barcode');
 
         return redirect('/?date='.$validated['date'])->with('message', 'Meal added.');
     }
@@ -214,6 +222,8 @@ class MealController extends Controller
             'carbs_g' => round($totals['carbs_g'] * $factor, 2),
             'fat_g' => round($totals['fat_g'] * $factor, 2),
         ]);
+
+        $this->analytics->record('meal_added_recipe');
 
         return redirect('/?date='.$validated['date'])->with('message', 'Recipe logged.');
     }
@@ -261,6 +271,8 @@ class MealController extends Controller
 
         $mealEntry->save();
 
+        $this->analytics->record('meal_updated');
+
         return redirect('/?date='.$validated['date'])->with('message', 'Meal updated.');
     }
 
@@ -290,6 +302,8 @@ class MealController extends Controller
 
         $copy->save();
 
+        $this->analytics->record('meal_repeated');
+
         return redirect('/?date='.$copy->date->toDateString())->with('message', 'Meal added again.');
     }
 
@@ -298,6 +312,8 @@ class MealController extends Controller
         $date = $mealEntry->date->toDateString();
 
         $mealEntry->delete();
+
+        $this->analytics->record('meal_deleted');
 
         return redirect('/?date='.$date)->with('message', 'Meal removed.');
     }

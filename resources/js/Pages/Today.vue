@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
-import {computed, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import type {DateValue} from '@internationalized/date';
 import {parseDate} from '@internationalized/date';
-import {Apple, Calendar as CalendarIcon, Coffee, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
+import {Apple, Calendar as CalendarIcon, Check, Coffee, Crown, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
 import {formatDisplayDate} from '../dateFormat';
 import {dayStatusLabel, type DayStatus} from '../dayStatus';
 import {responseErrorMessage} from '../foodRequests';
@@ -21,6 +21,12 @@ import {Calendar} from '../Components/ui/calendar';
 import Input from '../Components/ui/input/Input.vue';
 import {Popover, PopoverContent, PopoverTrigger} from '../Components/ui/popover';
 import Progress from '../Components/ui/progress/Progress.vue';
+import {subscriptionPlatform, type SubscriptionAccount} from '../subscriptions';
+
+const FloatingLines = defineAsyncComponent(() => import('../Components/FloatingLines.vue'));
+const subscriptionLineGradient = ['#ffffff'];
+const subscriptionLineWaves = ['middle' as const];
+const subscriptionLinePosition = {x: 5, y: 0.82, rotate: 0.2};
 
 type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
@@ -156,8 +162,9 @@ const props = defineProps<{
     mealTypes: MealType[];
     healthConnect: HealthConnectState;
     appleHealth: AppleHealthState;
+    subscriptionPromptEligible: boolean;
 }>();
-const page = usePage<{errors?: {date?: string}}>();
+const page = usePage<{errors?: {date?: string}; buff?: {account?: SubscriptionAccount | null}}>();
 
 const mealLabels: Record<MealType, string> = {
     breakfast: 'Breakfast',
@@ -209,11 +216,58 @@ const selectedWorkout = ref<WorkoutEntry | null>(null);
 const selectedMealPhotos = ref<MealPhoto[]>([]);
 const mealPhotosLoading = ref(false);
 const mealPhotosError = ref('');
+const mealPhotosCache = new Map<string, { photos: MealPhoto[]; expiresAt: number }>();
+const subscriptionPromptOpen = ref(false);
+const subscriptionPromptChecking = ref(false);
+const showSubscriptionLines = ref(false);
 const pendingDelete = ref<null | { kind: 'meal' | 'workout'; id: string; title: string }>(null);
 const deleteProcessing = ref(false);
 const deleteError = ref('');
 let mealRowTrigger: HTMLElement | null = null;
 let mealPhotoRequest = 0;
+
+watch(subscriptionPromptOpen, (open) => {
+    showSubscriptionLines.value = open && !document.documentElement.hasAttribute('data-reduce-motion');
+});
+
+async function checkSubscriptionPrompt(): Promise<void> {
+    if (!props.subscriptionPromptEligible || !isToday.value || subscriptionPromptOpen.value || subscriptionPromptChecking.value || !navigator.onLine) {
+        return;
+    }
+
+    const account = page.props.buff?.account;
+
+    if (!account?.id || account.subscription?.entitled !== false) {
+        return;
+    }
+
+    subscriptionPromptChecking.value = true;
+
+    try {
+        if (await subscriptionPlatform() === 'unsupported') {
+            return;
+        }
+
+        const {data} = await axios.post('/subscription/prompt-seen');
+
+        if (page.props.buff?.account?.id !== account.id) {
+            return;
+        }
+
+        if (data?.claimed === true) {
+            subscriptionPromptOpen.value = true;
+        }
+    } catch {
+        // A failed claim leaves the prompt available for a later online visit.
+    } finally {
+        subscriptionPromptChecking.value = false;
+    }
+}
+
+function viewSubscriptionPlans(): void {
+    subscriptionPromptOpen.value = false;
+    router.visit('/settings/subscription');
+}
 const macros = computed<MacroCard[]>(() => [
     {key: 'protein_g', slug: 'protein', label: 'Protein', consumed: props.summary.totals.protein_g, goal: props.summary.goal?.protein_g, remaining: props.summary.totals.protein_remaining, color: 'bg-protein'},
     {key: 'carbs_g', slug: 'carbs', label: 'Carbs', consumed: props.summary.totals.carbs_g, goal: props.summary.goal?.carbs_g, remaining: props.summary.totals.carbs_remaining, color: 'bg-carbs'},
@@ -511,6 +565,15 @@ async function loadMealPhotos(mealId: string) {
     const request = ++mealPhotoRequest;
     selectedMealPhotos.value = [];
     mealPhotosError.value = '';
+    const cached = mealPhotosCache.get(mealId);
+
+    if (cached && cached.expiresAt > Date.now()) {
+        selectedMealPhotos.value = cached.photos;
+        mealPhotosLoading.value = false;
+        return;
+    }
+
+    mealPhotosCache.delete(mealId);
 
     mealPhotosLoading.value = true;
 
@@ -519,10 +582,18 @@ async function loadMealPhotos(mealId: string) {
 
         if (request === mealPhotoRequest) {
             selectedMealPhotos.value = data.photos || [];
+            mealPhotosCache.set(mealId, {
+                photos: selectedMealPhotos.value,
+                expiresAt: Date.now() + (selectedMealPhotos.value.length ? 8 * 60_000 : 30_000),
+            });
         }
     } catch (error) {
-        if (request === mealPhotoRequest && !(axios.isAxiosError(error) && error.response?.status === 404)) {
-            mealPhotosError.value = responseErrorMessage(error, 'photos', 'Could not load meal photos. Check your connection and try again.');
+        if (request === mealPhotoRequest) {
+            if (axios.isAxiosError(error) && error.response?.status === 404) {
+                mealPhotosCache.set(mealId, {photos: [], expiresAt: Date.now() + 30_000});
+            } else {
+                mealPhotosError.value = responseErrorMessage(error, 'photos', 'Could not load meal photos. Check your connection and try again.');
+            }
         }
     } finally {
         if (request === mealPhotoRequest) {
@@ -659,15 +730,22 @@ watch(() => props.appleHealth, (appleHealth) => {
     }
 }, {deep: true});
 
+watch(() => [props.subscriptionPromptEligible, isToday.value, page.props.buff?.account?.id, page.props.buff?.account?.subscription?.entitled], () => {
+    void checkSubscriptionPrompt();
+});
+
 onMounted(() => {
     refreshHealthConnectStatus();
+    void checkSubscriptionPrompt();
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('online', checkSubscriptionPrompt);
     document.addEventListener('visibilitychange', handleVisibilityChange);
 });
 
 onBeforeUnmount(() => {
     clearHealthConnectStatusRefresh();
     window.removeEventListener('focus', handleWindowFocus);
+    window.removeEventListener('online', checkSubscriptionPrompt);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
 });
 </script>
@@ -769,10 +847,10 @@ onBeforeUnmount(() => {
                 <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" size="sm"><Plus class="w-4" />Add food</Button>
             </div>
 
-            <Card class="py-0">
-                <div class="-mx-5 divide-y divide-border/60">
-                    <div v-for="mealType in mealTypes" :key="mealType" class="px-5 py-3">
-                        <div class="flex items-center justify-between gap-2 text-muted-foreground">
+            <div class="space-y-3">
+                <Card v-for="mealType in mealTypes" :key="mealType" class="px-0 py-0">
+                    <div class="px-0 py-3">
+                        <div class="flex items-center justify-between gap-2 px-5 text-muted-foreground">
                             <div class="flex items-center gap-2">
                                 <component :is="mealIcons[mealType]" class="w-4"></component>
                                 <h3 class="font-semibold text-foreground">{{ mealLabels[mealType] }}</h3>
@@ -790,7 +868,7 @@ onBeforeUnmount(() => {
                             </Button>
                         </div>
 
-                        <div v-if="summary.entries[mealType]?.length" class="-mx-5 mt-1 divide-y divide-border/60">
+                        <div v-if="summary.entries[mealType]?.length" class="mt-1 divide-y divide-border/60">
                             <div v-for="entry in summary.entries[mealType]" :key="entry.id">
                                 <Button
                                     variant="ghost"
@@ -811,9 +889,11 @@ onBeforeUnmount(() => {
                                 </Button>
                             </div>
                         </div>
+
+                        <p v-else class="mb-2 px-5 text-sm text-muted-foreground">No {{ mealLabels[mealType].toLowerCase() }} yet.</p>
                     </div>
-                </div>
-            </Card>
+                </Card>
+            </div>
         </section>
 
         <section v-if="showDayLists || showHealthConnect" class="space-y-3">
@@ -947,9 +1027,11 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else-if="selectedMealPhotos.length" class="mt-4 grid grid-cols-3 gap-2">
                     <img
-                        v-for="photo in selectedMealPhotos"
+                        v-for="(photo, index) in selectedMealPhotos"
                         :key="photo.id"
                         :src="photo.url"
+                        :loading="index === 0 ? 'eager' : 'lazy'"
+                        :fetchpriority="index === 0 ? 'high' : 'low'"
                         alt="Meal photo"
                         class="aspect-square w-full rounded-xl object-cover"
                     >
@@ -1094,5 +1176,52 @@ onBeforeUnmount(() => {
             @cancel="cancelDelete"
             @confirm="confirmDelete"
         />
+        <AppSheet
+            :open="subscriptionPromptOpen"
+            labelled-by="subscription-prompt-title"
+            title="Meet Buff+"
+            description="See what a Buff+ subscription adds."
+            class="top-0 left-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 rounded-none border-0 bg-brand-acid p-0 sm:max-w-none"
+            @close="subscriptionPromptOpen = false"
+        >
+            <div class="relative -m-5 flex min-h-dvh flex-col overflow-x-hidden overflow-y-auto bg-brand-acid px-6 pb-[calc(env(safe-area-inset-bottom,0px)+1.5rem)] pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] text-black">
+                <div v-if="showSubscriptionLines" class="pointer-events-none absolute inset-0" aria-hidden="true">
+                    <FloatingLines
+                        class="opacity-65"
+                        :lines-gradient="subscriptionLineGradient"
+                        :enabled-waves="subscriptionLineWaves"
+                        :line-count="3"
+                        :line-distance="18"
+                        :middle-wave-position="subscriptionLinePosition"
+                        :animation-speed="1"
+                        :interactive="false"
+                        :parallax="false"
+                    />
+                </div>
+                <div class="relative flex justify-end">
+                    <Button type="button" variant="ghost" size="icon" class="rounded-full text-black hover:bg-black/10 hover:text-black dark:hover:bg-black/10" aria-label="Close Buff+ offer" @click="subscriptionPromptOpen = false">
+                        <X :size="20" />
+                    </Button>
+                </div>
+                <div class="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center">
+                    <div class="p-1 text-black">
+                        <div class="mb-6 grid size-16 place-items-center rounded-2xl bg-black/10 text-black">
+                            <Crown :size="32" aria-hidden="true" />
+                        </div>
+                        <h2 id="subscription-prompt-title" class="mt-3 text-4xl font-bold tracking-tight">Meet Buff+</h2>
+                        <p class="mt-4 text-base leading-relaxed">You’ve built a meal logging habit. Get more from it with Buff+</p>
+                        <ul class="mt-8 grid gap-4 text-base">
+                            <li class="flex items-center gap-3 text-pretty"><Check :size="20" class="shrink-0" aria-hidden="true" /> AI meal analysis and follow-ups</li>
+                            <li class="flex items-center gap-3"><Check :size="20" class="shrink-0" aria-hidden="true" /> An ad-free experience</li>
+                            <li class="flex items-center gap-3"><Check :size="20" class="shrink-0" aria-hidden="true" /> Early access to future updates...</li>
+                        </ul>
+                        <div class="mt-8 grid gap-2">
+                            <Button type="button" class="w-full bg-white text-black hover:bg-white/90" @click="viewSubscriptionPlans">See Buff+ plans</Button>
+                            <Button type="button" variant="ghost" class="w-full text-black hover:bg-black/10 hover:text-black dark:hover:bg-black/10" @click="subscriptionPromptOpen = false">Maybe later</Button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </AppSheet>
     </section>
 </template>

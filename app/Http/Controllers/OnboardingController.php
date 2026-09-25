@@ -7,6 +7,7 @@ use App\Models\AppPreference;
 use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
+use App\Services\AnalyticsEventService;
 use App\Services\EnergyEstimator;
 use App\Services\NutritionCalculator;
 use App\Sex;
@@ -101,7 +102,7 @@ class OnboardingController extends Controller
         ]);
     }
 
-    public function store(Request $request, NutritionCalculator $calculator): RedirectResponse
+    public function store(Request $request, NutritionCalculator $calculator, AnalyticsEventService $analytics): RedirectResponse
     {
         $validated = $request->validate([
             'calories' => ['required', 'integer', 'min:1', 'max:20000'],
@@ -128,8 +129,8 @@ class OnboardingController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($validated, $macroCalories): void {
-            DailyGoal::query()->firstOrCreate([], [
+        $completed = DB::transaction(function () use ($validated, $macroCalories): bool {
+            $goal = DailyGoal::query()->firstOrCreate([], [
                 'calories' => $validated['calories'],
                 'protein_g' => $validated['protein_g'],
                 'carbs_g' => $validated['carbs_g'],
@@ -160,7 +161,13 @@ class OnboardingController extends Controller
                     'notes' => null,
                 ]
             );
+
+            return $goal->wasRecentlyCreated;
         });
+
+        if ($completed) {
+            $analytics->record('onboarding_completed');
+        }
 
         return redirect('/')->with('message', 'Buff is ready.');
     }

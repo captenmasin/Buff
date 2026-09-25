@@ -68,7 +68,7 @@ function deny() {
                         <div class="grid gap-2">
                             <h1 id="approval-title" class="text-2xl font-bold tracking-tight">Connection approved</h1>
                             <p class="text-sm leading-6 text-muted-foreground">
-                                Return to your browser. It will continue connecting your AI assistant to Buff.
+                                You’re done. Return to your AI assistant — it will finish connecting to Buff.
                             </p>
                         </div>
                         <Button :as="Link" href="/" variant="surface" class="w-full">

@@ -33,6 +33,10 @@ class DashboardController extends Controller
             'summary' => $summary->forDate($date),
             'week' => $weekSummary->forDate($date)['days'],
             'mealTypes' => MealEntry::MEAL_TYPES,
+            'subscriptionPromptEligible' => MealEntry::query()
+                ->where('date', '<', today()->addDay()->toDateString())
+                ->distinct()
+                ->count('date') >= 3,
             'healthConnect' => HealthConnectController::sharedStatus(),
             'appleHealth' => AppleHealthController::sharedStatus(),
         ]);

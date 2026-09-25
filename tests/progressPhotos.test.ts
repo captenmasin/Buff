@@ -99,6 +99,24 @@ test('shows progress photos before notes and distinguishes the heading from pose
     assert.ok(progressSource.indexOf('>Progress photos<') < progressSource.indexOf('>Notes<'));
 });
 
+test('scrolls progress photo capture slots horizontally with a 2.5-card peek', () => {
+    const progressSource = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
+    const captureSlots = progressSource.match(
+        /Progress photos<\/p>\s*<div[\s\S]*?v-for="pose in progressPhotoPoses"[\s\S]*?<\/div>\s*<\/div>\s*<input/,
+    )?.[0] ?? '';
+
+    assert.match(captureSlots, /-mx-5/);
+    assert.match(captureSlots, /auto-cols-\[calc\(\(100%-1\.5rem\)\/2\.5\)\]/);
+    assert.match(captureSlots, /grid-flow-col/);
+    assert.match(captureSlots, /overflow-x-auto/);
+    assert.match(captureSlots, /gap-3/);
+    assert.doesNotMatch(captureSlots, /grid-cols-3/);
+    assert.match(captureSlots, /aspect-square/);
+    assert.doesNotMatch(captureSlots, /aspect-\[3\/4\]/);
+    assert.match(captureSlots, /progressPhotoCaptureLabels\[pose\]/);
+    assert.match(captureSlots, /openLibrary\(pose\)/);
+});
+
 test('keeps native camera controls visible and lets Android Back close the camera', () => {
     const progressSource = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
     const shellSource = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');

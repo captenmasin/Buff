@@ -207,6 +207,8 @@ const webScannerOpen = ref(false);
 const webScannerReady = ref(false);
 const webScannerVideo = ref<HTMLVideoElement | null>(null);
 const webScannerControls = ref<{ stop(): void } | null>(null);
+const scanSuccessFlash = ref(false);
+let scanSuccessFlashTimer: number | null = null;
 const product = ref<FoodProduct | null>(null);
 const portionOptions = ref<PortionOption[]>([]);
 const selectedPortionKey = ref('');
@@ -249,6 +251,7 @@ const customMealForm = useForm({
 const barcodeMealForm = useForm({
     date: props.date,
     meal_type: selectedMealType.value,
+    add_method: 'barcode',
     food_product_id: '',
     portion_quantity: 100,
     portion_unit: 'g',
@@ -388,6 +391,7 @@ const activeFoodPortionOptions = computed<PortionOption[]>(() => {
         unit: selectedPreviousMeal.value.portion_unit || previousMealPortionUnit.value,
     }];
 });
+const selectedPortion = computed(() => selectedPortionKey.value === '' ? null : activeFoodPortionOptions.value[Number(selectedPortionKey.value)] ?? null);
 
 const displayDate = computed(() => formatDisplayDate(props.date));
 const foodSearchQuery = computed(() => foodSearch.value.trim());
@@ -403,6 +407,12 @@ function selectPortion(option: PortionOption, index: number) {
     selectedPortionKey.value = String(index);
     activeFoodPortionQuantity.value = option.quantity;
     activeFoodPortionUnit.value = option.unit;
+}
+
+function addSelectedPortion() {
+    if (!selectedPortion.value) return;
+
+    activeFoodPortionQuantity.value = Math.round((Number(activeFoodPortionQuantity.value) + selectedPortion.value.quantity) * 100) / 100;
 }
 
 function roundMacro(value: number) {
@@ -429,6 +439,22 @@ function portionOptionLabel(option: PortionOption) {
     return option.label || `${option.quantity}${option.unit}`;
 }
 
+async function notifyBarcodeFound(code: string): Promise<void> {
+    scanSuccessFlash.value = true;
+
+    if (scanSuccessFlashTimer !== null) {
+        window.clearTimeout(scanSuccessFlashTimer);
+    }
+
+    scanSuccessFlashTimer = window.setTimeout(() => {
+        scanSuccessFlash.value = false;
+        scanSuccessFlashTimer = null;
+    }, 700);
+
+    await hapticImpact(40);
+    window.dispatchEvent(new CustomEvent('buff:toast', { detail: `Barcode found · ${code}` }));
+}
+
 async function lookup(scannedBarcode: string | null = null) {
     lookupError.value = '';
     lookupLoading.value = true;
@@ -443,8 +469,12 @@ async function lookup(scannedBarcode: string | null = null) {
         portionOptions.value = response.data.portion_options || [];
         barcode.value = response.data.product.barcode;
         barcodeMealForm.food_product_id = response.data.product.id;
+        barcodeMealForm.add_method = 'barcode';
         barcodeMealForm.portion_unit = response.data.product.nutrition_unit || 'g';
-        hapticImpact();
+
+        if (!scannedBarcode) {
+            await hapticImpact();
+        }
 
         if (portionOptions.value.length > 0) {
             selectPortion(portionOptions.value[0], 0);
@@ -522,6 +552,7 @@ function selectFoodProduct(foodProduct: FoodProduct) {
     ];
     barcode.value = foodProduct.barcode;
     barcodeMealForm.food_product_id = foodProduct.id;
+    barcodeMealForm.add_method = 'search';
     barcodeMealForm.portion_unit = foodProduct.nutrition_unit || 'g';
     selectPortion(portionOptions.value[0], 0);
     hapticImpact();
@@ -625,11 +656,14 @@ async function startWebScan() {
             (result) => {
                 const scanned = result?.getText();
 
-                if (!scanned) return;
+                if (!scanned || lookupLoading.value) {
+                    return;
+                }
 
                 barcode.value = scanned;
+                void notifyBarcodeFound(scanned);
                 stopWebScan();
-                lookup(scanned);
+                void lookup(scanned);
             },
         );
 
@@ -677,7 +711,8 @@ function handleScan(payload: unknown) {
 
     if (scanned) {
         barcode.value = scanned;
-        lookup(scanned);
+        void notifyBarcodeFound(scanned);
+        void lookup(scanned);
     }
 }
 
@@ -923,6 +958,11 @@ onMounted(async () => {
 
 onUnmounted(() => {
     window.clearTimeout(foodSearchTimer);
+
+    if (scanSuccessFlashTimer !== null) {
+        window.clearTimeout(scanSuccessFlashTimer);
+    }
+
     stopWebScan();
     selectedPhotos.value.forEach(({preview}) => URL.revokeObjectURL(preview));
 
@@ -1006,6 +1046,38 @@ onUnmounted(() => {
                     @loadeddata="markWebScannerReady"
                     @playing="markWebScannerReady"
                 />
+
+                <div
+                    v-if="!manualBarcodeOpen"
+                    class="pointer-events-none absolute inset-0 z-20 flex items-center justify-center px-10"
+                    aria-hidden="true"
+                >
+                    <div
+                        class="relative aspect-[5/3] w-full max-w-sm rounded-2xl border-2 transition-[border-color,box-shadow,background-color] duration-200"
+                        :class="scanSuccessFlash
+                            ? 'border-success bg-success/15 shadow-[0_0_0_9999px_rgb(15_17_37_/_0.45)]'
+                            : 'border-background/85 shadow-[0_0_0_9999px_rgb(15_17_37_/_0.45)]'"
+                    >
+                        <span class="absolute -left-0.5 -top-0.5 h-7 w-7 rounded-tl-2xl border-l-4 border-t-4 border-background" />
+                        <span class="absolute -right-0.5 -top-0.5 h-7 w-7 rounded-tr-2xl border-r-4 border-t-4 border-background" />
+                        <span class="absolute -bottom-0.5 -left-0.5 h-7 w-7 rounded-bl-2xl border-b-4 border-l-4 border-background" />
+                        <span class="absolute -bottom-0.5 -right-0.5 h-7 w-7 rounded-br-2xl border-b-4 border-r-4 border-background" />
+                        <span
+                            class="absolute inset-x-5 top-1/2 h-0.5 -translate-y-1/2 rounded-full"
+                            :class="scanSuccessFlash ? 'bg-success' : 'bg-background/70'"
+                        />
+                    </div>
+                </div>
+
+                <div
+                    v-if="scanSuccessFlash && !manualBarcodeOpen"
+                    class="pointer-events-none absolute inset-x-0 bottom-6 z-30 flex justify-center px-4"
+                    role="status"
+                >
+                    <p class="rounded-full bg-success px-4 py-2 text-sm font-semibold text-success-foreground shadow-lg">
+                        Barcode found
+                    </p>
+                </div>
 
                 <div v-if="manualBarcodeOpen" class="flex h-full items-center px-4">
                     <div class="w-full rounded-xl bg-card p-4 text-foreground">
@@ -1304,15 +1376,28 @@ onUnmounted(() => {
                         </Button>
                     </div>
 
-                    <Input
-                        v-model.number="activeFoodPortionQuantity"
-                        type="number"
-                        min="0.1"
-                        step="0.1"
-                        class="py-2.5 text-lg"
-                        aria-label="Portion quantity"
-                        @input="selectedPortionKey = ''"
-                    />
+                    <div class="flex min-w-0 gap-2">
+                        <Input
+                            v-model.number="activeFoodPortionQuantity"
+                            type="number"
+                            min="0.1"
+                            step="any"
+                            class="min-w-0 flex-1 py-2.5 text-lg"
+                            aria-label="Portion quantity"
+                            @input="selectedPortionKey = ''"
+                        />
+                        <Button
+                            v-if="selectedPortion"
+                            type="button"
+                            variant="surface"
+                            class="shrink-0 px-3 text-lg"
+                            :aria-label="`Add ${portionOptionLabel(selectedPortion)}`"
+                            :disabled="Number(activeFoodPortionQuantity) + selectedPortion.quantity > 10000"
+                            @click="addSelectedPortion"
+                        >
+                            +1
+                        </Button>
+                    </div>
                     <Select v-model="activeFoodPortionUnit">
                         <SelectTrigger class="py-2.5 text-lg" aria-label="Portion unit">
                             <SelectValue />

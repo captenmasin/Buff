@@ -127,6 +127,16 @@ test('names settings selection and inventory controls for assistive technology',
     assert.doesNotMatch(assistants, /aria-labelledby="authorized-assistants-heading"/);
 });
 
+test('keeps connected assistants MCP setup phone-first without desktop Codex instructions', () => {
+    const assistants = readFileSync(new URL('../resources/js/Pages/Settings/ConnectedAssistants.vue', import.meta.url), 'utf8');
+
+    assert.match(assistants, /Connect from your phone/);
+    assert.match(assistants, /shareMcpEndpoint/);
+    assert.match(assistants, /openAssistantSetup/);
+    assert.doesNotMatch(assistants, /Desktop setup/);
+    assert.doesNotMatch(assistants, /codex mcp/);
+});
+
 test('shows the Buff logo in setup flow headers', () => {
     const source = readFileSync(new URL('../resources/js/Components/SetupFlow.vue', import.meta.url), 'utf8');
 

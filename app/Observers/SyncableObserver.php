@@ -4,12 +4,23 @@ namespace App\Observers;
 
 use App\Models\SyncedModel;
 use App\Models\SyncOutbox;
+use App\Models\WorkoutEntry;
+use App\Services\AnalyticsEventService;
 use App\Services\BuffSyncService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 
 class SyncableObserver
 {
+    public function __construct(private readonly AnalyticsEventService $analytics) {}
+
+    public function created(SyncedModel $model): void
+    {
+        if ($model instanceof WorkoutEntry && $model->source_type === WorkoutEntry::SOURCE_MANUAL) {
+            $this->analytics->record('workout_logged');
+        }
+    }
+
     public function saved(SyncedModel $model): void
     {
         $definition = config('buff.sync_models')[$model::class] ?? null;

@@ -125,6 +125,10 @@ it('pushes local changes, applies remote changes, and advances the cursor atomic
     ]);
 
     Http::fake(function (ClientRequest $request) use ($meal) {
+        if (str_ends_with($request->url(), '/analytics/events')) {
+            return Http::response(['accepted' => 1]);
+        }
+
         return Http::response([
             'acknowledged' => [[
                 'type' => 'meal_entries',
@@ -163,7 +167,8 @@ it('pushes local changes, applies remote changes, and advances the cursor atomic
         ->and(BodyMetric::query()->find('20000000-0000-4000-8000-000000000002')?->chest_cm)->toBe('102.50');
     $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $meal->id]);
 
-    Http::assertSent(fn (ClientRequest $request): bool => $request->hasHeader('Authorization', 'Bearer sync-token')
+    Http::assertSent(fn (ClientRequest $request): bool => str_ends_with($request->url(), '/sync')
+        && $request->hasHeader('Authorization', 'Bearer sync-token')
         && $request['changes'][0]['data']['date'] === '2026-08-15');
 });
 

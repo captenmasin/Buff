@@ -248,6 +248,48 @@ it('redirects legacy add shortcuts to the canonical add page', function (): void
     $this->get('/?add=1&date=2026-05-19')->assertRedirect('/add?date=2026-05-19');
 });
 
+it('becomes eligible for a subscription prompt after meals on three distinct days', function (): void {
+    $this->travelTo('2026-05-22 12:00:00');
+
+    DailyGoal::query()->create([
+        'calories' => 2000,
+        'protein_g' => 170,
+        'carbs_g' => 195,
+        'fat_g' => 60,
+        'macro_calories' => 2000,
+    ]);
+
+    foreach (['2026-05-19', '2026-05-19', '2026-05-21', '2026-05-23'] as $date) {
+        MealEntry::query()->create([
+            'date' => $date,
+            'meal_type' => 'breakfast',
+            'source_type' => MealEntry::SOURCE_CUSTOM,
+            'name' => 'Breakfast',
+            'calories' => 500,
+            'protein_g' => 30,
+            'carbs_g' => 50,
+            'fat_g' => 15,
+        ]);
+    }
+
+    $this->get('/')
+        ->assertInertia(fn (Assert $page) => $page->where('subscriptionPromptEligible', false));
+
+    MealEntry::query()->create([
+        'date' => '2026-05-22',
+        'meal_type' => 'breakfast',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Breakfast',
+        'calories' => 500,
+        'protein_g' => 30,
+        'carbs_g' => 50,
+        'fat_g' => 15,
+    ]);
+
+    $this->get('/')
+        ->assertInertia(fn (Assert $page) => $page->where('subscriptionPromptEligible', true));
+});
+
 it('reports monday first week statuses with burned calorie offset', function (): void {
     DailyGoal::query()->create([
         'calories' => 2000,

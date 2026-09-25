@@ -201,19 +201,23 @@ test('omits a chart summary when there are no readings', () => {
     assert.equal(chartSummary([], 'bodyFat', '%', 15), '');
 });
 
-test('renders chart summaries as a readable callout under the chart', () => {
+test('does not render the started-at chart summary callout on the progress page', () => {
     const source = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
 
-    assert.equal(source.match(/rounded-xl bg-secondary px-3.5 py-2.5 text-sm font-semibold tabular-nums text-foreground/g)?.length, 2);
-    assert.doesNotMatch(source, /text-sm text-muted-foreground">\{\{ weightChartSummary \}\}/);
+    assert.doesNotMatch(source, /weightChartSummary/);
+    assert.doesNotMatch(source, /bodyFatChartSummary/);
+    assert.doesNotMatch(source, /chartSummary/);
+    assert.doesNotMatch(source, /Started at/);
 });
 
-test('renders weight and body-fat trends as a swipeable carousel', () => {
+test('switches weight and body-fat trends with buttons instead of a swipe carousel', () => {
     const source = readFileSync(new URL('../resources/js/Pages/Progress.vue', import.meta.url), 'utf8');
 
-    assert.match(source, /data-chart-carousel/);
-    assert.match(source, /snap-x snap-mandatory gap-5 overflow-x-auto/);
-    assert.match(source, /slide\.offsetLeft - firstSlide\.offsetLeft/);
+    assert.doesNotMatch(source, /data-chart-carousel/);
+    assert.doesNotMatch(source, /snap-x snap-mandatory/);
+    assert.doesNotMatch(source, /touch-pan-x/);
+    assert.match(source, /aria-label="Trend chart"/);
+    assert.match(source, /activeChart === 0 \|\| !hasBodyFatChart/);
     assert.match(source, /aria-label="Weight chart"/);
     assert.match(source, /aria-label="Body fat chart"/);
 });

@@ -70,6 +70,15 @@ test('hides the drawer grabber on desktop', () => {
     assert.match(appSheetSource, /isDesktopDrawer\(\)/);
 });
 
+test('drags drawers with pointer and touch using the CSS translate property', () => {
+    assert.match(appSheetSource, /style\.translate = `0 \$\{dragY\.value\}px`/);
+    assert.match(appSheetSource, /style\.transitionDuration = '0ms'/);
+    assert.match(appSheetSource, /@pointerdown="onHandlePointerDown"/);
+    assert.match(appSheetSource, /@touchstart="onHandleTouchStart"/);
+    assert.match(appSheetSource, /@touchmove="onHandleTouchMove"/);
+    assert.match(appSheetSource, /data-drawer-handle/);
+});
+
 test('transitions the translate property used to slide sheets', () => {
     assert.match(sheetContentSource, /transition-\[translate,transform,opacity\]/);
 });
