@@ -19,6 +19,45 @@ const todaySource = readFileSync(new URL('../resources/js/Pages/Today.vue', impo
 const viteConfigSource = readFileSync(new URL('../vite.config.ts', import.meta.url), 'utf8');
 const inputSource = readFileSync(new URL('../resources/js/Components/ui/input/Input.vue', import.meta.url), 'utf8');
 
+test('disables pinch zoom and resizes app layouts for the keyboard', () => {
+    const view = readFileSync(new URL('../resources/views/app.blade.php', import.meta.url), 'utf8');
+    const viewport = view.match(/name="viewport" content="([^"]+)"/)?.[1].split(',').map((value) => value.trim()) ?? [];
+
+    assert.ok(viewport.includes('width=device-width'));
+    assert.ok(viewport.includes('viewport-fit=cover'));
+    assert.ok(viewport.includes('interactive-widget=resizes-content'));
+    assert.ok(viewport.includes('maximum-scale=1'));
+    assert.ok(viewport.includes('user-scalable=no'));
+    assert.match(view, /name="theme-color" media="\(prefers-color-scheme: light\)" content="#f5f6f6"/);
+    assert.match(view, /name="theme-color" media="\(prefers-color-scheme: dark\)" content="#151616"/);
+});
+
+test('uses the visible viewport and contains nested app scrolling', () => {
+    const setupFlow = readFileSync(new URL('../resources/js/Components/SetupFlow.vue', import.meta.url), 'utf8');
+
+    assert.match(appStyles, /body\s*\{[^}]*min-height: 100dvh;/);
+    assert.match(appStyles, /\.app-sidebar\s*\{[^}]*overscroll-behavior: contain;/);
+    assert.match(setupFlow, /<section class="[^"]*overflow-y-auto[^"]*overscroll-contain/);
+});
+
+test('keeps calendar form controls large enough to avoid focus zoom', () => {
+    const nativeSelect = readFileSync(new URL('../resources/js/Components/ui/native-select/NativeSelect.vue', import.meta.url), 'utf8');
+    const select = nativeSelect.match(/<select\b[^]*?>/)?.[0] ?? '';
+
+    assert.match(select, /\btext-base\b/);
+    assert.doesNotMatch(select, /\btext-(?:xs|sm)\b/);
+});
+
+test('protects control labels from long press and provides immediate press feedback', () => {
+    const controls = appStyles.match(/:where\(button, \[role='button'\], \[data-slot='button'\], summary, \[data-drawer-handle\]\)\s*\{([^}]+)\}/)?.[1] ?? '';
+
+    assert.match(controls, /-webkit-user-select: none;/);
+    assert.match(controls, /user-select: none;/);
+    assert.match(controls, /-webkit-touch-callout: none;/);
+    assert.match(appStyles, /:active:not\(:disabled\):not\(\[aria-disabled='true'\]\)\s*\{[^}]*opacity: 0\.8;/);
+    assert.doesNotMatch(appStyles, /(?:html|body)\s*\{[^}]*user-select:\s*none/);
+});
+
 test('builds and launches iOS through the NativePHP asset and request pipeline', () => {
     assert.equal(packageJson.scripts['build:ios'], 'vite build --mode=ios');
     assert.equal(packageJson.scripts['native:ios'], 'pnpm run build:ios && php artisan native:run ios');

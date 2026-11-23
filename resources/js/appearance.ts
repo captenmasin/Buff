@@ -14,6 +14,13 @@ export function applyAppearance(appearance: Appearance = storedAppearance()): vo
     const shouldUseDark = appearance === 'dark' || (appearance === 'system' && prefersDark);
 
     document.documentElement.classList.toggle('dark', shouldUseDark);
+    document.documentElement.style.colorScheme = shouldUseDark ? 'dark' : 'light';
+
+    const background = window.getComputedStyle(document.documentElement).backgroundColor;
+
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach((meta) => {
+        meta.content = background;
+    });
 }
 
 export function saveAppearance(appearance: Appearance): void {

@@ -1,10 +1,53 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import test from 'node:test';
-import {shouldReduceMotion} from '../resources/js/appearance.ts';
+import {applyAppearance, shouldReduceMotion} from '../resources/js/appearance.ts';
 
 const appearancePageSource = readFileSync(new URL('../resources/js/Pages/Settings/Appearance.vue', import.meta.url), 'utf8');
 const weeklyPageSource = readFileSync(new URL('../resources/js/Pages/Weekly.vue', import.meta.url), 'utf8');
+
+test('matches browser chrome and native controls to the selected appearance', (context) => {
+    const originals = ['window', 'document'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)] as const);
+    let dark = false;
+    let systemDark = false;
+    let stored = 'system';
+    const metas = [{content: ''}, {content: ''}];
+    const root = {
+        classList: {toggle: (_name: string, enabled: boolean) => { dark = enabled; }},
+        style: {colorScheme: ''},
+    };
+
+    context.after(() => {
+        for (const [key, descriptor] of originals) {
+            if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+            else Reflect.deleteProperty(globalThis, key);
+        }
+    });
+    Object.defineProperty(globalThis, 'document', {configurable: true, value: {
+        documentElement: root,
+        querySelectorAll: () => metas,
+    }});
+    Object.defineProperty(globalThis, 'window', {configurable: true, value: {
+        localStorage: {getItem: () => stored},
+        matchMedia: () => ({matches: systemDark}),
+        getComputedStyle: () => ({backgroundColor: dark ? 'rgb(21, 22, 22)' : 'rgb(245, 246, 246)'}),
+    }});
+
+    for (const [appearance, prefersDark, expectedScheme, expectedColor] of [
+        ['system', false, 'light', 'rgb(245, 246, 246)'],
+        ['system', true, 'dark', 'rgb(21, 22, 22)'],
+        ['light', true, 'light', 'rgb(245, 246, 246)'],
+        ['dark', false, 'dark', 'rgb(21, 22, 22)'],
+    ] as const) {
+        stored = appearance;
+        systemDark = prefersDark;
+
+        applyAppearance();
+
+        assert.equal(root.style.colorScheme, expectedScheme);
+        assert.deepEqual(metas.map((meta) => meta.content), [expectedColor, expectedColor]);
+    }
+});
 
 test('reduces motion when requested by the user or their device', () => {
     assert.equal(shouldReduceMotion(false, false), false);
