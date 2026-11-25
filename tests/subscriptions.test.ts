@@ -87,6 +87,16 @@ test('reports an ordinary browser as unsupported', async () => {
 });
 
 test('selects the store from the running native platform, never the asset build mode', async (context) => {
+    const originalDocument = Object.getOwnPropertyDescriptor(globalThis, 'document');
+    Object.defineProperty(globalThis, 'document', {
+        configurable: true,
+        value: {querySelector: (selector: string) => selector === 'meta[name="buff-native-runtime"]' ? {} : null},
+    });
+    context.after(() => {
+        if (originalDocument) Object.defineProperty(globalThis, 'document', originalDocument);
+        else Reflect.deleteProperty(globalThis, 'document');
+    });
+
     const {System} = await import('#nativephp');
     const isIos = context.mock.method(System, 'isIos', async () => false);
     context.mock.method(System, 'isAndroid', async () => true);

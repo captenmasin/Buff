@@ -155,8 +155,11 @@ test('configures subscriptions from the signed-in shell and gates the Photo shor
     const source = readFileSync(new URL('../resources/js/Layouts/AppShell.vue', import.meta.url), 'utf8');
 
     assert.match(source, /configureCurrentAccount\(page\.props\.buff\.account\)/);
-    assert.match(source, /mode === 'photo' && !subscriptionActive\.value/);
-    assert.match(source, /router\.visit\('\/settings\/subscription'\)/);
+    const add = readFileSync(new URL('../resources/js/Pages/Add.vue', import.meta.url), 'utf8');
+    const paywall = add.match(/<Card v-if="subscriptionPaywallTitle"[\s\S]*?<\/Card>/)?.[0] ?? '';
+    assert.match(paywall, /\{\{ subscriptionPaywallTitle \}\}/);
+    assert.match(paywall, /href="\/settings\/subscription">View Buff\+/);
+    assert.match(paywall, /:href="addModeUrl\('food'\)" variant="surface">Search foods/);
 });
 
 test('hands native ad reconciliation to the shell lifecycle and measured mobile navigation', () => {

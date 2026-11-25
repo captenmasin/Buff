@@ -52,7 +52,7 @@ it('creates and updates a body metric for a date', function (): void {
         ->and($outbox->payload['waist_cm'])->toBe('84.20');
 });
 
-it('uses the most recent weight when the weight field is empty', function (): void {
+it('uses the latest weight on or before the date when logging another measurement', function (): void {
     BodyMetric::query()->create([
         'date' => '2026-05-18',
         'weight_kg' => 82.4,
@@ -63,15 +63,40 @@ it('uses the most recent weight when the weight field is empty', function (): vo
         'weight_kg' => 81.6,
     ]);
 
+    BodyMetric::query()->create([
+        'date' => '2026-05-22',
+        'weight_kg' => 84,
+    ]);
+
     $this->post('/progress/body-metrics', [
         'date' => '2026-05-21',
         'weight_kg' => '',
+        'body_fat_percent' => 18,
     ])->assertSessionHasNoErrors();
 
     $this->assertDatabaseHas('body_metrics', [
         'date' => '2026-05-21 00:00:00',
         'weight_kg' => 81.6,
+        'body_fat_percent' => 18,
     ]);
+});
+
+it('does not create or overwrite measurements when a check-in is blank', function (): void {
+    BodyMetric::query()->create([
+        'date' => '2026-05-18',
+        'weight_kg' => 82.4,
+        'body_fat_percent' => 19,
+    ]);
+    SyncOutbox::query()->delete();
+
+    foreach (['2026-05-18', '2026-05-19'] as $date) {
+        $this->post('/progress/body-metrics', ['date' => $date, 'weight_kg' => '', 'notes' => '  '])
+            ->assertSessionHasErrors(['weight_kg' => 'Enter a measurement or note before saving.']);
+    }
+
+    $this->assertDatabaseCount('body_metrics', 1);
+    $this->assertDatabaseHas('body_metrics', ['weight_kg' => 82.4, 'body_fat_percent' => 19]);
+    $this->assertDatabaseEmpty('sync_outboxes');
 });
 
 it('rejects weights below the cloud minimum without changing existing measurements', function (): void {

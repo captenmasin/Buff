@@ -25,6 +25,37 @@ it('creates a custom meal and calculates calories', function (): void {
         ->and($entry->source_type)->toBe(MealEntry::SOURCE_CUSTOM);
 });
 
+it('preserves label calories and allows a scanned serving to be repeated at a different amount', function (): void {
+    $this->post('/meals/custom', [
+        'date' => '2026-05-19',
+        'meal_type' => 'lunch',
+        'name' => 'Packaged lunch',
+        'portion_quantity' => 1,
+        'portion_unit' => 'serving',
+        'calories' => 240,
+        'protein_g' => 10,
+        'carbs_g' => 42,
+        'fat_g' => 3.5,
+    ])->assertRedirect('/?date=2026-05-19');
+
+    $meal = MealEntry::query()->sole();
+    expect($meal->calories)->toBe(240)->and($meal->portion_unit)->toBeNull();
+
+    $this->post("/meals/{$meal->id}/repeat", [
+        'date' => '2026-05-20',
+        'portion_quantity' => 0.5,
+        'portion_unit' => null,
+    ])->assertRedirect('/?date=2026-05-20');
+
+    $this->assertDatabaseHas('meal_entries', [
+        'date' => '2026-05-20 00:00:00',
+        'portion_quantity' => 0.5,
+        'portion_unit' => null,
+        'calories' => 120,
+        'fat_g' => 1.75,
+    ]);
+});
+
 it('rejects invalid custom food without creating or changing a meal', function (string $field, mixed $value, string $message): void {
     $payload = [
         'date' => '2026-05-19',
@@ -61,6 +92,7 @@ it('rejects invalid custom food without creating or changing a meal', function (
     'zero portion' => ['portion_quantity', 0, 'The portion quantity field must be at least 0.1.'],
     'portion above 10000' => ['portion_quantity', 10000.1, 'The portion quantity field must not be greater than 10000.'],
     'unsupported unit' => ['portion_unit', 'oz', 'The selected portion unit is invalid.'],
+    'negative calories' => ['calories', -1, 'The calories field must be at least 0.'],
     'negative protein' => ['protein_g', -0.1, 'The protein g field must be at least 0.'],
     'protein above 1000' => ['protein_g', 1000.1, 'The protein g field must not be greater than 1000.'],
     'negative carbs' => ['carbs_g', -0.1, 'The carbs g field must be at least 0.'],
@@ -194,6 +226,17 @@ it('opens the add page in scan mode', function (): void {
             ->component('Add')
             ->where('mode', 'food')
             ->where('autoScan', true)
+        );
+});
+
+it('opens the label scanning paywall for the selected date and meal', function (): void {
+    $this->get('/add?mode=label&meal=lunch&date=2026-05-19')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('Add')
+            ->where('mode', 'label')
+            ->where('meal', 'lunch')
+            ->where('date', '2026-05-19')
         );
 });
 

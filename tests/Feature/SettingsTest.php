@@ -8,6 +8,7 @@ use App\Models\SyncOutbox;
 use App\Services\AppleHealthBridge;
 use App\Services\HealthConnectBridge;
 use App\Services\MealReminderBridge;
+use Illuminate\Support\Facades\Vite;
 use Inertia\Testing\AssertableInertia as Assert;
 
 it('renders the settings hub and nested section pages', function (): void {
@@ -60,6 +61,7 @@ it('renders the settings hub and nested section pages', function (): void {
 
     $this->get('/settings/account')
         ->assertOk()
+        ->assertSee('rel="modulepreload" href="'.Vite::asset('resources/js/Pages/Settings/Account.vue').'"', escape: false)
         ->assertInertia(fn (Assert $page) => $page
             ->component('Settings/Account')
             ->where('timezones', timezone_identifiers_list(DateTimeZone::ALL))
@@ -73,6 +75,7 @@ it('renders the settings hub and nested section pages', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->component('Settings/Reminders')
+            ->where('nativeRemindersAvailable', false)
             ->where('mealReminders.breakfast.time', '08:00')
         );
 
@@ -107,7 +110,10 @@ it('renders the settings hub and nested section pages', function (): void {
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('Settings/Subscription'));
 
-    $this->get('/settings/health')->assertRedirect('/settings');
+    $this->get('/settings/health')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('Settings/Health')
+        ->where('appleHealth.supported', false)
+        ->where('healthConnect.supported', false));
 });
 
 it('renders health settings on Android', function (): void {
@@ -125,6 +131,21 @@ it('renders health settings on Android', function (): void {
             ->where('healthConnect.is_android', true)
             ->where('appleHealth.is_ios', false)
         );
+});
+
+it('saves a browser reminder schedule without a native bridge', function (): void {
+    $schedule = [
+        'breakfast' => ['enabled' => true, 'time' => '08:30'],
+        'lunch' => ['enabled' => false, 'time' => '12:00'],
+        'dinner' => ['enabled' => false, 'time' => '18:00'],
+    ];
+
+    $this->from('/settings/reminders')->put('/settings/meal-reminders', $schedule)
+        ->assertRedirect('/settings/reminders')
+        ->assertSessionHas('save_status', 'Meal reminders saved.')
+        ->assertSessionHasNoErrors();
+
+    expect(AppPreference::current()->mealReminders())->toBe($schedule);
 });
 
 it('updates unit preferences from settings', function (): void {

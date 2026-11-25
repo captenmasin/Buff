@@ -1,5 +1,5 @@
 type FormatDisplayDateOptions = {
-    weekday?: 'short' | 'long';
+    weekday?: 'short' | 'long' | false;
     year?: boolean;
 };
 
@@ -21,7 +21,7 @@ export function formatDisplayDate(value: string, options: FormatDisplayDateOptio
     }
 
     return new Intl.DateTimeFormat('en-GB', {
-        weekday: options.weekday ?? 'long',
+        weekday: options.weekday === false ? undefined : options.weekday ?? 'long',
         day: 'numeric',
         month: 'long',
         year: options.year === false ? undefined : 'numeric',

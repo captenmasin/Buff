@@ -4,6 +4,7 @@ import { computed, onUnmounted, ref } from 'vue';
 import { useForm } from '@inertiajs/vue3';
 import { Pencil, Plus, Search, Trash2, UtensilsCrossed } from '@lucide/vue';
 import {foodSearchUrl, responseErrorMessage} from '../foodRequests';
+import {mealTypeForHour, type MealType} from '../mealSuggestions';
 import Card from './Card.vue';
 import ConfirmSheet from './ConfirmSheet.vue';
 import MealTypePicker from './Add/MealTypePicker.vue';
@@ -14,8 +15,6 @@ import SelectContent from './ui/select/SelectContent.vue';
 import SelectItem from './ui/select/SelectItem.vue';
 import SelectTrigger from './ui/select/SelectTrigger.vue';
 import SelectValue from './ui/select/SelectValue.vue';
-
-type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 
 interface RecipeItem {
     name: string;
@@ -55,6 +54,7 @@ const props = withDefaults(defineProps<{
     mealTypes: MealType[];
     recipes: Recipe[];
     meal?: MealType | null;
+    selectedRecipeId?: string | null;
 }>(), {
     meal: null,
 });
@@ -82,9 +82,10 @@ const recipeForm = useForm({
 
 const logForm = useForm({
     date: props.date,
-    meal_type: props.meal || smartMealType(),
+    meal_type: props.meal ?? mealTypeForHour(),
     recipe_id: '',
     servings: 1,
+    quick_log: false,
 });
 
 const customItem = ref(newCustomItem());
@@ -167,8 +168,9 @@ function startLog(recipe: Recipe): void {
     selectedRecipe.value = recipe;
     creating.value = false;
     logForm.recipe_id = recipe.id;
-    logForm.servings = recipe.servings;
-    logForm.meal_type = props.meal || smartMealType();
+    logForm.quick_log = props.selectedRecipeId === recipe.id;
+    logForm.servings = logForm.quick_log ? 1 : recipe.servings;
+    logForm.meal_type = props.meal ?? mealTypeForHour();
     logForm.clearErrors();
 }
 
@@ -180,15 +182,8 @@ function returnToRecipes(): void {
     resetRecipeEditor();
 }
 
-function smartMealType(): MealType {
-    const hour = new Date().getHours();
-
-    if (hour < 10) return 'breakfast';
-    if (hour < 14) return 'lunch';
-    if (hour < 20) return 'dinner';
-
-    return 'snacks';
-}
+const suggestedRecipe = props.recipes.find((recipe) => recipe.id === props.selectedRecipeId);
+if (suggestedRecipe) startLog(suggestedRecipe);
 
 function addCustomItem(): void {
     const name = customItem.value.name.trim();
@@ -457,11 +452,14 @@ function confirmRecipeDelete(): void {
                 <div class="rounded-xl bg-muted/60 p-3">
                     <p class="field-label">Custom ingredient</p>
                     <div class="mt-2 grid gap-2">
-                        <Input v-model="customItem.name" placeholder="Name" />
+                        <label>
+                            <span class="field-label">Ingredient name</span>
+                            <Input v-model="customItem.name" class="mt-1" />
+                        </label>
                         <div class="grid grid-cols-[minmax(0,1fr)_4.5rem] gap-2">
-                            <Input v-model.number="customItem.portion_quantity" type="number" min="0.1" step="0.1" />
+                            <Input v-model.number="customItem.portion_quantity" type="number" min="0.1" step="0.1" aria-label="Ingredient quantity" />
                             <Select v-model="customItem.portion_unit">
-                                <SelectTrigger class="px-2"><SelectValue /></SelectTrigger>
+                                <SelectTrigger class="px-2" aria-label="Ingredient unit"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="g">g</SelectItem>
                                     <SelectItem value="ml">ml</SelectItem>
@@ -469,9 +467,18 @@ function confirmRecipeDelete(): void {
                             </Select>
                         </div>
                         <div class="grid grid-cols-3 gap-2">
-                            <Input v-model.number="customItem.protein_g" type="number" min="0" step="0.1" placeholder="P" />
-                            <Input v-model.number="customItem.carbs_g" type="number" min="0" step="0.1" placeholder="C" />
-                            <Input v-model.number="customItem.fat_g" type="number" min="0" step="0.1" placeholder="F" />
+                            <label>
+                                <span class="field-label">Protein (g)</span>
+                                <Input v-model.number="customItem.protein_g" type="number" min="0" step="0.1" class="mt-1" />
+                            </label>
+                            <label>
+                                <span class="field-label">Carbs (g)</span>
+                                <Input v-model.number="customItem.carbs_g" type="number" min="0" step="0.1" class="mt-1" />
+                            </label>
+                            <label>
+                                <span class="field-label">Fat (g)</span>
+                                <Input v-model.number="customItem.fat_g" type="number" min="0" step="0.1" class="mt-1" />
+                            </label>
                         </div>
                         <p v-if="customItemError" class="text-sm text-destructive" role="alert">{{ customItemError }}</p>
                         <Button type="button" variant="surface" :disabled="!customItem.name.trim()" @click="addCustomItem">

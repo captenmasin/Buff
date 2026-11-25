@@ -10,6 +10,7 @@ use App\Models\SyncState;
 use App\Models\WorkoutEntry;
 use App\Services\BuffCredentialStore;
 use App\Services\BuffSyncService;
+use App\Services\MealReminderBridge;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Http;
@@ -83,6 +84,37 @@ it('retries pending changes through the sync resume endpoint', function (): void
     expect(SyncState::current()->last_error)->toBeNull()
         ->and(SyncState::current()->last_succeeded_at)->not->toBeNull();
     $this->assertDatabaseMissing('sync_outboxes', ['record_id' => $meal->id]);
+});
+
+it('refreshes reminder suppression when a meal arrives from another device', function (): void {
+    $this->mock(MealReminderBridge::class, function ($bridge): void {
+        $bridge->shouldReceive('refreshOnIos')->once()->andReturnUsing(function (): void {
+            expect(MealEntry::query()->where('name', 'Lunch on another device')->exists())->toBeTrue();
+        });
+    });
+    Http::fake(['*/sync' => Http::response([
+        'acknowledged' => [],
+        'changes' => [[
+            'id' => '10000000-0000-4000-8000-000000000002',
+            'type' => 'meal_entries',
+            'updated_at' => '2026-11-23T10:00:00Z',
+            'deleted' => false,
+            'data' => [
+                'date' => '2026-11-23',
+                'meal_type' => 'lunch',
+                'name' => 'Lunch on another device',
+                'source_type' => MealEntry::SOURCE_CUSTOM,
+                'calories' => 300,
+                'protein_g' => 20,
+                'carbs_g' => 40,
+                'fat_g' => 6,
+            ],
+        ]],
+        'cursor' => 1,
+        'has_more' => false,
+    ])]);
+
+    $this->postJson('/sync/resume')->assertOk()->assertJsonPath('status', BuffApiStatus::Success->name);
 });
 
 it('captures complete normalized snapshots and fresh delete tombstones', function (): void {

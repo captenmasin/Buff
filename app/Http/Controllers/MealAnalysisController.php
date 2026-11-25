@@ -8,6 +8,7 @@ use App\Services\BuffApiClient;
 use App\Services\PhotoDataUrlNormalizer;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\File;
 
 class MealAnalysisController extends Controller
@@ -17,12 +18,17 @@ class MealAnalysisController extends Controller
         $normalizer->normalize($request);
 
         $validated = $request->validate([
-            'photos' => ['required', 'array', 'min:1', 'max:3'],
+            'kind' => ['sometimes', Rule::in(['nutrition_label'])],
+            'photos' => ['required', 'array', 'min:1', $request->input('kind') === 'nutrition_label' ? 'max:1' : 'max:3'],
             'photos.*' => ['required', File::image()->types(['jpg', 'jpeg', 'png', 'webp'])->max(5 * 1024)],
-            'note' => ['nullable', 'string', 'max:1000'],
+            'note' => ['exclude_if:kind,nutrition_label', 'nullable', 'string', 'max:1000'],
         ]);
 
-        return $this->buffApiResponse($api->analyzeMeal($validated['photos'], $validated['note'] ?? null));
+        return $this->buffApiResponse($api->analyzeMeal(
+            $validated['photos'],
+            $validated['note'] ?? null,
+            $validated['kind'] ?? null,
+        ));
     }
 
     public function destroy(string $analysis, BuffApiClient $api): JsonResponse
@@ -37,6 +43,10 @@ class MealAnalysisController extends Controller
 
     public function photos(MealEntry $mealEntry, BuffApiClient $api): JsonResponse
     {
-        return $this->buffApiResponse($api->get("meals/{$mealEntry->id}/photos"));
+        $result = $api->get("meals/{$mealEntry->id}/photos");
+
+        return $result->httpStatus === 404
+            ? response()->json(['photos' => []])
+            : $this->buffApiResponse($result);
     }
 }

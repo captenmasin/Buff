@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import test from 'node:test';
 import {compile} from 'tailwindcss';
 import {nativephpHotFile} from '../vendor/nativephp/mobile/resources/js/vite-plugin.js';
+import {mealTypeForHour} from '../resources/js/mealSuggestions.ts';
 
 const appSource = readFileSync(new URL('../resources/js/app.ts', import.meta.url), 'utf8');
 const appStyles = readFileSync(new URL('../resources/css/app.css', import.meta.url), 'utf8');
@@ -112,10 +113,8 @@ test('retains native time inputs and caller sizing for workouts and reminders', 
 });
 
 test('defaults recipe logs from the current time when the optional meal query is empty', () => {
-    assert.equal(recipeModeSource.match(/props\.meal \|\| smartMealType\(\)/g)?.length, 2);
-    assert.match(recipeModeSource, /if \(hour < 10\) return 'breakfast';/);
-    assert.match(recipeModeSource, /if \(hour < 14\) return 'lunch';/);
-    assert.match(recipeModeSource, /if \(hour < 20\) return 'dinner';/);
+    assert.equal(recipeModeSource.match(/props\.meal \?\? mealTypeForHour\(\)/g)?.length, 2);
+    assert.deepEqual([9, 10, 13, 14, 19, 20].map(mealTypeForHour), ['breakfast', 'lunch', 'lunch', 'dinner', 'dinner', 'snacks']);
     assert.match(recipeModeSource, /logForm\.errors\.meal_type/);
     assert.match(recipeModeSource, /logForm\.errors\.servings/);
 });
@@ -138,12 +137,20 @@ test('renders macro presets as proportional comparison rows', () => {
     assert.doesNotMatch(dailyTargetsEditorSource, /grid grid-cols-2 overflow-hidden/);
 });
 
-test('keeps custom macro wheels stable during programmatic positioning', () => {
-    assert.doesNotMatch(dailyTargetsEditorSource, /scrollTo\(\{[^}]*behavior: 'smooth'/);
-    assert.equal(dailyTargetsEditorSource.match(/role="listbox"/g)?.length, 1);
-    assert.match(dailyTargetsEditorSource, /role="option"/);
-    assert.match(dailyTargetsEditorSource, /:aria-selected="customSplit\[column\.key\] === percent"/);
-    assert.match(dailyTargetsEditorSource, /:aria-label="`\$\{column\.label\} \$\{percent\} percent`"/);
+test('uses labelled native percentage pickers for custom macros', () => {
+    assert.match(dailyTargetsEditorSource, /<NativeSelect\s+:model-value="String\(customSplit\[column\.key\]\)"/);
+    assert.match(dailyTargetsEditorSource, /:aria-label="`\$\{column\.label\} percentage`"/);
+    assert.match(dailyTargetsEditorSource, /<NativeSelectOption v-for="percent in customOptions\(column\.key\)"/);
+    assert.match(dailyTargetsEditorSource, /<output[^>]*>\{\{ customSplit\.fat \}\}%/);
+});
+
+test('lets focus rings extend beyond both embedded goal editor cards', () => {
+    const cards = [...dailyTargetsEditorSource.matchAll(/<Card\b[^>]*:class="props\.embedded && '([^']+)'"/g)];
+
+    assert.equal(cards.length, 2);
+    for (const [, classes] of cards) {
+        assert.match(classes, /\boverflow-visible\b/);
+    }
 });
 
 test('keeps onboarding measurements canonical and validates displayed weight bounds', () => {
@@ -199,7 +206,7 @@ test('initializes calendars from their selected value and closes a reselected da
 
 test('keeps date errors and health actions visible on an empty day', () => {
     assert.match(todaySource, /v-if="dateError"[^>]*role="alert"/);
-    assert.match(todaySource, /<section v-if="showDayLists \|\| showHealthConnect"/);
+    assert.match(todaySource, /<h2[^>]*>Workouts<\/h2>[\s\S]*?<template v-if="showHealthConnect">[\s\S]*?<template v-if="hasWorkouts">/);
 });
 
 test('clears corrected workout edit errors immediately', () => {

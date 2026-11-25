@@ -560,6 +560,17 @@ function saveMetric(): void {
         return;
     }
 
+    const hasMeasurement = [metricForm.weight_kg, metricForm.body_fat_percent, ...measurementFields.map(({key}) => metricForm[key])]
+        .some((value) => value !== null && value !== '');
+
+    if (!hasMeasurement && !metricForm.notes?.trim()) {
+        metricForm.setError('weight_kg', selectedPhotoCount.value
+            ? 'Enter a measurement to save photos with a new check-in.'
+            : 'Enter a measurement or note before saving.');
+
+        return;
+    }
+
     metricForm.transform((data) => {
         const { chest_cm, waist_cm, hips_cm, upper_arm_cm, thigh_cm, ...progress } = data;
 
@@ -1041,7 +1052,10 @@ onUnmounted(() => {
 
         <Card class="space-y-4">
             <div>
-                <h2 class="card-title">Log measurement</h2>
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <h2 class="card-title">Log measurement</h2>
+                    <a v-if="hasHistory" href="#progress-history" class="rounded-md px-2 py-2 text-sm font-semibold text-link">View history</a>
+                </div>
                 <p class="mt-1 text-sm text-muted-foreground">
                     {{ hasHistory ? 'Add or update a weigh-in for any day.' : 'Your first measurement unlocks trends and history.' }}
                 </p>
@@ -1062,7 +1076,6 @@ onUnmounted(() => {
                     <label>
                         <span class="field-label">Weight {{ preferences.weight_unit }}</span>
                         <Input v-model="metricForm.weight_kg" type="number" :min="weightMinimum" :max="weightMaximum" step="0.1" class="mt-1" :placeholder="previousWeight" :aria-invalid="Boolean(metricForm.errors.weight_kg)" :aria-describedby="metricForm.errors.weight_kg ? 'metric-weight-error' : undefined" @update:model-value="metricForm.clearErrors('weight_kg')" />
-                        <span v-if="metricForm.errors.weight_kg" id="metric-weight-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.weight_kg }}</span>
                     </label>
                     <label>
                         <span class="field-label">Body fat %</span>
@@ -1165,6 +1178,7 @@ onUnmounted(() => {
                     <Textarea v-model="metricForm.notes" rows="3" maxlength="1000" class="mt-1" :aria-invalid="Boolean(metricForm.errors.notes)" :aria-describedby="metricForm.errors.notes ? 'metric-notes-error' : undefined" @update:model-value="metricForm.clearErrors('notes')" />
                     <span v-if="metricForm.errors.notes" id="metric-notes-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.notes }}</span>
                 </label>
+                <p v-if="metricForm.errors.weight_kg" id="metric-weight-error" class="text-sm text-destructive" role="alert">{{ metricForm.errors.weight_kg }}</p>
                 <Button
                     class="w-full"
                     :disabled="metricDateLoading || Boolean(metricLoadError) || Boolean(metricForm.errors.date)"
@@ -1177,7 +1191,7 @@ onUnmounted(() => {
             </form>
         </Card>
 
-        <section v-if="hasHistory" class="space-y-3">
+        <section v-if="hasHistory" id="progress-history" class="scroll-mt-4 space-y-3" tabindex="-1">
             <h2 class="text-lg font-semibold tracking-tight">Recent history</h2>
             <Card class="divide-y divide-border/60 py-2">
                 <div v-for="metric in history" :key="metric.id" class="py-3 first:pt-1 last:pb-1">

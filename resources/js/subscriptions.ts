@@ -1,4 +1,5 @@
 import subscriptionsBridge from '../../native-plugins/in-app-purchases/resources/js/in-app-purchases.js';
+import { nativeRuntimeAvailable } from './nativeRuntime.ts';
 
 export type SubscriptionPlatform = 'ios' | 'android' | 'unsupported';
 export type SubscriptionPackageKind = 'monthly' | 'annual';
@@ -145,6 +146,8 @@ export function nativeError(payload: unknown, fallback: string): {category: stri
 }
 
 export async function subscriptionPlatform(): Promise<SubscriptionPlatform> {
+    if (!nativeRuntimeAvailable()) return 'unsupported';
+
     try {
         const {System} = await import('#nativephp');
 

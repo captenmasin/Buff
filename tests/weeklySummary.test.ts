@@ -105,11 +105,12 @@ test('lets daily nutrition details wrap without moving the date and status out o
     assert.doesNotMatch(nutrition[1], /truncate|overflow-hidden|text-ellipsis|whitespace-nowrap|line-clamp/);
     assert.match(nutrition[2], /day\.effective_target/);
     for (const macro of ['protein_g', 'carbs_g', 'fat_g']) {
-        assert.ok(nutrition[2].includes(`Math.round(day.${macro})`), macro);
+        assert.ok(dailyRow.includes(`Math.round(day.${macro})`), macro);
     }
 
     assert.match(dailyRow, /<div class="min-w-0 flex-1">\s*<p class="font-semibold">/);
     assert.match(dailyRow, /class="flex shrink-0 flex-col items-end gap-1\.5"/);
     assert.match(dailyRow, /<DayStatusIndicator :status="day\.status"/);
+    assert.match(dailyRow, /:href="`\/\?date=\$\{day\.date\}`"/);
     assert.match(dailyRow, /:aria-current="day\.is_selected \? 'date' : undefined"/);
 });

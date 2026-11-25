@@ -15,6 +15,7 @@ type MealReminders = Record<MealType, {
 
 const props = defineProps<{
     mealReminders: MealReminders;
+    nativeRemindersAvailable: boolean;
 }>();
 
 const mealReminderForm = useForm<MealReminders>({
@@ -52,8 +53,7 @@ function reminderSaveError(): string | undefined {
             <div class="space-y-3">
                 <div class="flex items-start justify-between gap-3">
                     <div>
-                        <h2 class="card-title">Meal reminders</h2>
-                        <p class="mt-1 text-sm text-muted-foreground">Get a reminder to log each meal.</p>
+                        <p class="text-sm text-muted-foreground">{{ nativeRemindersAvailable ? 'Choose when Buff reminds you to log each meal.' : 'Reminders are delivered by the Buff app for iOS and Android. This browser can save your schedule.' }}</p>
                     </div>
                     <p class="shrink-0 text-sm text-muted-foreground" role="status" aria-live="polite">
                         {{ saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? (page.props.flash?.save_status ?? 'Saved') : saveStatus === 'error' ? 'Couldn’t save' : '' }}

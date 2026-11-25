@@ -439,7 +439,7 @@ class MealReminderWorker(
                     val result = if (resultFile.exists()) resultFile.readText() else ""
 
                     when (result) {
-                        MEAL_DUE_PREFIX + mealId -> showMealReminder(applicationContext, mealId)
+                        MEAL_DUE_PREFIX + mealId -> showMealReminder(applicationContext, mealId, localDate.toString())
                         MEAL_LOGGED_PREFIX + mealId -> Unit
                         else -> throw IllegalStateException(
                             result.trim().ifEmpty { "Meal reminder check returned no result." }
@@ -668,7 +668,7 @@ private fun showDeviceNotification(context: Context, deviceNotification: DeviceN
 }
 
 @SuppressLint("MissingPermission")
-private fun showMealReminder(context: Context, mealId: String) {
+private fun showMealReminder(context: Context, mealId: String, localDate: String) {
     createMealReminderChannel(context)
 
     val label = mealId.replaceFirstChar { it.titlecase() }
@@ -683,7 +683,7 @@ private fun showMealReminder(context: Context, mealId: String) {
     context.packageManager.getLaunchIntentForPackage(context.packageName)?.let { launchIntent ->
         launchIntent
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            .putExtra("notification_url", "/add?mode=food&meal=$mealId")
+            .putExtra("notification_url", "/add?mode=food&meal=$mealId&reminder=1&date=$localDate")
 
         notification.setContentIntent(PendingIntent.getActivity(
             context,

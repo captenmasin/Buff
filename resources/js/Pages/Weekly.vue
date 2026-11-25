@@ -2,7 +2,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import type { DateValue } from '@internationalized/date';
 import { parseDate } from '@internationalized/date';
-import { ChevronLeft } from '@lucide/vue';
+import { ChevronLeft, ChevronRight } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import Card from '../Components/Card.vue';
 import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
@@ -238,30 +238,29 @@ function applySelection() {
 
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Daily totals</h2>
-            <Card class="divide-y divide-border/60 px-0 py-0">
-                <div
+            <Card class="divide-y divide-border/60 overflow-hidden px-0 py-0">
+                <Link
                     v-for="day in week"
                     :key="day.date"
-                    class="flex items-center gap-3 px-4 py-3.5"
+                    :href="`/?date=${day.date}`"
+                    class="flex items-center gap-2 px-3 py-3.5 hover:bg-muted/60 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:gap-3 sm:px-4"
                     :class="day.is_selected ? 'bg-secondary/50' : ''"
                     :aria-current="day.is_selected ? 'date' : undefined"
                 >
-                    <span class="grid size-6 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground font-semibold">
-                        {{ day.label }}
-                    </span>
                     <div class="min-w-0 flex-1">
                         <p class="font-semibold">{{ formatDisplayDate(day.date, { weekday: 'short' }) }}</p>
                         <p class="mt-1 whitespace-normal text-sm text-muted-foreground">
                             {{ day.consumed_calories }} kcal
                             <span v-if="day.effective_target">/ {{ day.effective_target }}</span>
-                            <span> · P {{ Math.round(day.protein_g) }}g · C {{ Math.round(day.carbs_g) }}g · F {{ Math.round(day.fat_g) }}g</span>
                         </p>
+                        <p v-if="day.status !== 'neutral'" class="mt-0.5 text-xs text-muted-foreground">P {{ Math.round(day.protein_g) }}g · C {{ Math.round(day.carbs_g) }}g · F {{ Math.round(day.fat_g) }}g</p>
                     </div>
                     <div class="flex shrink-0 flex-col items-end gap-1.5">
                         <DayStatusIndicator :status="day.status" :size="18" />
                         <span class="max-w-24 truncate text-xs text-muted-foreground">{{ dayStatusLabel(day.status) }}</span>
                     </div>
-                </div>
+                    <ChevronRight :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+                </Link>
             </Card>
         </section>
     </section>

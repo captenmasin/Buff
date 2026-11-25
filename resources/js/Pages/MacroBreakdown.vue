@@ -106,8 +106,9 @@ function portionLabel(entry: MacroEntry): string {
         <section class="space-y-3">
             <h2 class="text-lg font-semibold tracking-tight">Foods</h2>
 
-            <Card v-if="!entries.length">
+            <Card v-if="!entries.length" class="gap-3">
                 <p class="text-sm text-muted-foreground">No food logged for this day.</p>
+                <Button :as="Link" :href="`/add?mode=food&date=${date}`" class="self-start">Add food</Button>
             </Card>
 
             <Card v-for="entry in entries" :key="entry.id">

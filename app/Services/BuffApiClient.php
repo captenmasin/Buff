@@ -58,7 +58,7 @@ class BuffApiClient
     /**
      * @param  array<int, UploadedFile>  $photos
      */
-    public function analyzeMeal(array $photos, ?string $note): BuffApiResult
+    public function analyzeMeal(array $photos, ?string $note, ?string $kind = null): BuffApiResult
     {
         $request = $this->request(config('buff.http.meal_analysis_timeout'));
 
@@ -76,7 +76,9 @@ class BuffApiClient
         }
 
         try {
-            return $this->result($request->post('meal-analyses', ['note' => $note]));
+            return $this->result($kind === 'nutrition_label'
+                ? $request->post('nutrition-labels')
+                : $request->post('meal-analyses', ['note' => $note]));
         } catch (ConnectionException) {
             return new BuffApiResult(
                 BuffApiStatus::ConnectionFailed,

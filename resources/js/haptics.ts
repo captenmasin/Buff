@@ -1,3 +1,5 @@
+import { nativeRuntimeAvailable } from './nativeRuntime.ts';
+
 type NativeBridge = {
     Device?: {
         vibrate?: () => Promise<unknown>;
@@ -13,6 +15,8 @@ export async function hapticImpact(duration = 25): Promise<void> {
 
         return;
     }
+
+    if (!nativeRuntimeAvailable()) return;
 
     try {
         const native = await import('#nativephp') as NativeBridge;

@@ -34,7 +34,7 @@ it('schedules Android meal reminders while the device is idle', function (): voi
         ->toContain('NotificationCompat.Builder(context, MEAL_NOTIFICATION_CHANNEL_ID)')
         ->toContain('R.drawable.buff_notification')
         ->not->toContain('android.R.drawable.ic_dialog_info')
-        ->toContain('"notification_url", "/add?mode=food&meal=$mealId"')
+        ->toContain('"notification_url", "/add?mode=food&meal=$mealId&reminder=1&date=$localDate"')
         ->toContain('MEAL_TIME_PATTERN.matches(time)')
         ->and($notificationIcon)
         ->toContain('<vector')
@@ -54,9 +54,10 @@ it('registers daily iOS meal notifications', function (): void {
         ->toContain('Set(reminders.keys) == Set(mealIds)')
         ->toContain('parseTime(time)')
         ->toContain('UNUserNotificationCenter.current().requestAuthorization')
-        ->toContain('UNCalendarNotificationTrigger(dateMatching: components, repeats: true)')
-        ->toContain('removePendingNotificationRequests(withIdentifiers: reminderIdentifiers)')
-        ->toContain('"notification_url": "/add?mode=food&meal=\(reminder.id)"')
+        ->toContain('UNCalendarNotificationTrigger(dateMatching: entry.components, repeats: entry.repeats)')
+        ->toContain('excludedWeekdays.contains($0.weekday) && !$0.logged')
+        ->toContain('removePendingNotificationRequests(withIdentifiers: reminderIdentifiers.filter')
+        ->toContain('"notification_url": "/add?mode=food&meal=\(entry.meal)&reminder=1"')
         ->toContain('UNUserNotificationCenterDelegate')
         ->toContain('DeepLinkRouter.shared.handle(url: url)');
 });

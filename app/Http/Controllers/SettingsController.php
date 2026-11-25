@@ -10,6 +10,7 @@ use App\Services\BuffApiClient;
 use App\Services\BuffApiResult;
 use App\Services\BuffCredentialStore;
 use App\Services\MealReminderBridge;
+use App\Services\NativeRuntime;
 use DateTimeZone;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -52,6 +53,7 @@ class SettingsController extends Controller
     {
         return Inertia::render('Settings/Reminders', [
             'mealReminders' => AppPreference::current()->mealReminders(),
+            'nativeRemindersAvailable' => NativeRuntime::available(),
         ]);
     }
 
@@ -84,14 +86,10 @@ class SettingsController extends Controller
         return Inertia::render('Settings/Subscription');
     }
 
-    public function health(): Response|RedirectResponse
+    public function health(): Response
     {
         $healthConnect = HealthConnectController::sharedStatus();
         $appleHealth = AppleHealthController::sharedStatus();
-
-        if ($healthConnect['is_android'] !== true && $appleHealth['is_ios'] !== true) {
-            return redirect('/settings');
-        }
 
         return Inertia::render('Settings/Health', [
             'healthConnect' => $healthConnect,
@@ -109,10 +107,14 @@ class SettingsController extends Controller
             return redirect()->guest(route('account.login'));
         }
 
+        $verificationRequired = $result->status === BuffApiStatus::EmailNotVerified
+            || ($credentials->account()['email_verified'] ?? false) === false;
+
         return Inertia::render('Settings/ConnectedAssistants', [
             'connections' => $this->connections($result),
-            'error' => $result->successful() ? null : $this->connectionError($result),
-            'mcpEndpoint' => config('buff.mcp_url'),
+            'error' => $result->successful() || $result->status === BuffApiStatus::EmailNotVerified ? null : $this->connectionError($result),
+            'mcpEndpoint' => $verificationRequired ? null : config('buff.mcp_url'),
+            'verificationRequired' => $verificationRequired,
         ]);
     }
 

@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import {Head, Link, router, useForm, usePage} from '@inertiajs/vue3';
 import axios from 'axios';
-import {computed, defineAsyncComponent, inject, onBeforeUnmount, onMounted, ref, watch} from 'vue';
+import {computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch} from 'vue';
 import type {DateValue} from '@internationalized/date';
-import {parseDate} from '@internationalized/date';
-import {Apple, Calendar as CalendarIcon, Check, Coffee, Crown, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
-import {formatDisplayDate} from '../dateFormat';
+import {getLocalTimeZone, parseDate, today} from '@internationalized/date';
+import {Apple, Calendar as CalendarIcon, Check, ChevronRight, Coffee, Crown, Drumstick, Dumbbell, EllipsisVertical, Plus, Pencil, RefreshCw, Sandwich, TrendingUp, Trash2, X} from '@lucide/vue';
+import {formatDisplayDate, parseLocalDate} from '../dateFormat';
 import {dayStatusLabel, type DayStatus} from '../dayStatus';
 import {responseErrorMessage} from '../foodRequests';
 import { hapticImpact } from '../haptics';
+import {mealLabels, mealSuggestionUrl, mealTypeForHour, type MealSuggestion, type MealType} from '../mealSuggestions';
+import QuickMeal from '../Components/Add/QuickMeal.vue';
 import CalorieRing from '../Components/CalorieRing.vue';
 import DayStatusIndicator from '../Components/DayStatusIndicator.vue';
 import Card from '../Components/Card.vue';
 import ConfirmSheet from '../Components/ConfirmSheet.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import FoodThumbnail from '../Components/FoodThumbnail.vue';
-import PageHeader from '../Components/PageHeader.vue';
 import Button from '../Components/ui/button/Button.vue';
 import {Calendar} from '../Components/ui/calendar';
 import Input from '../Components/ui/input/Input.vue';
@@ -28,7 +29,6 @@ const subscriptionLineGradient = ['#ffffff'];
 const subscriptionLineWaves = ['middle' as const];
 const subscriptionLinePosition = {x: 5, y: 0.82, rotate: 0.2};
 
-type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 type MacroKey = 'protein_g' | 'carbs_g' | 'fat_g';
 type MealEditMode = 'portion' | 'macros';
 
@@ -92,7 +92,6 @@ interface DailySummary {
 
 interface WeekDay {
     date: string;
-    label: string;
     status: DayStatus;
     is_today: boolean;
     is_selected: boolean;
@@ -156,6 +155,12 @@ interface MealPhoto {
     mime_type: string;
 }
 
+interface QuickMealLog {
+    id: string;
+    name: string;
+    date: string;
+}
+
 const props = defineProps<{
     summary: DailySummary;
     week: WeekDay[];
@@ -163,15 +168,15 @@ const props = defineProps<{
     healthConnect: HealthConnectState;
     appleHealth: AppleHealthState;
     subscriptionPromptEligible: boolean;
+    mealSuggestions: Partial<Record<MealType, MealSuggestion>>;
+    weeklyMealObservation: MealSuggestion | null;
+    offerMealReminder: boolean;
 }>();
-const page = usePage<{errors?: {date?: string}; buff?: {account?: SubscriptionAccount | null}}>();
-
-const mealLabels: Record<MealType, string> = {
-    breakfast: 'Breakfast',
-    lunch: 'Lunch',
-    dinner: 'Dinner',
-    snacks: 'Snacks',
-};
+const page = usePage<{
+    errors?: {date?: string};
+    buff?: {account?: SubscriptionAccount | null};
+    flash?: {quick_meal_log?: QuickMealLog | null};
+}>();
 
 const mealIcons = {
     breakfast: Coffee,
@@ -183,11 +188,37 @@ const mealIcons = {
 const hasGoal = computed(() => Boolean(props.summary.goal));
 const hasMeals = computed(() => props.mealTypes.some((mealType) => Boolean(props.summary.entries[mealType]?.length)));
 const hasWorkouts = computed(() => Boolean(props.summary.workouts?.length));
-const isEmptyDay = computed(() => !hasMeals.value && !hasWorkouts.value);
 const isToday = computed(() => props.week.some((day) => day.is_selected && day.is_today));
-const showDayLists = computed(() => !isEmptyDay.value || !isToday.value);
-const openAddDrawer = inject<() => void>('openAddDrawer')!;
-const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: 'short', year: false}));
+const currentMeal = ref(mealTypeForHour());
+let lastLocalDate = today(getLocalTimeZone()).toString();
+const suggestedMeal = computed(() => isToday.value ? props.mealSuggestions[currentMeal.value] : undefined);
+const reminderDismissed = ref(false);
+const quickMealLog = ref(page.props.flash?.quick_meal_log ?? null);
+const undoMealForm = useForm({});
+const undoableMeal = computed(() => {
+    const logged = quickMealLog.value;
+    if (!logged || logged.date !== props.summary.date) return null;
+
+    return Object.values(props.summary.entries).some((entries) => entries.some((entry) => entry.id === logged.id))
+        ? logged
+        : null;
+});
+
+watch(() => page.props.flash?.quick_meal_log, (logged) => {
+    if (logged) quickMealLog.value = logged;
+});
+
+function undoQuickMeal(): void {
+    if (undoableMeal.value) {
+        undoMealForm.delete(`/meals/${undoableMeal.value.id}`, {
+            preserveScroll: true,
+            onSuccess: () => { quickMealLog.value = null; },
+        });
+    }
+}
+
+const displayDate = computed(() => formatDisplayDate(props.summary.date, {weekday: isToday.value ? 'short' : false, year: false}));
+const addFoodUrl = computed(() => `/add?mode=food&date=${props.summary.date}${isToday.value ? `&meal=${currentMeal.value}` : ''}`);
 const dateError = computed(() => page.props.errors?.date ?? '');
 const selectedDate = computed(() => parseDate(props.summary.date));
 const shortWeekdayFormatter = new Intl.DateTimeFormat('en-GB', {weekday: 'short'});
@@ -464,6 +495,8 @@ async function syncHealthConnect() {
 }
 
 function handleWindowFocus() {
+    refreshMealContext();
+
     if (showHealthConnect.value) {
         refreshHealthConnectStatus();
     }
@@ -518,13 +551,27 @@ function refreshTodaySummaryWhenHealthConnectChanged() {
 
     healthConnectSummaryRefreshMarker.value = marker;
     router.reload({
-        only: ['summary', 'week', 'healthConnect', 'appleHealth'],
+        only: ['summary', 'week', 'healthConnect', 'appleHealth', 'mealSuggestions', 'weeklyMealObservation'],
     });
 }
 
 function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
+        refreshMealContext();
         refreshHealthConnectStatus();
+    }
+}
+
+function refreshMealContext(): void {
+    currentMeal.value = mealTypeForHour();
+    const localDate = today(getLocalTimeZone()).toString();
+
+    if (localDate !== lastLocalDate) {
+        lastLocalDate = localDate;
+
+        if (isToday.value) {
+            router.visit('/', {replace: true});
+        }
     }
 }
 
@@ -703,13 +750,11 @@ function macroPercent(consumed: number, goal?: number) {
 }
 
 function weekdayLabel(value: string, format: 'short' | 'long') {
-    const [year, month, day] = String(value).split('-').map(Number);
+    const date = parseLocalDate(value);
 
-    if (!year || !month || !day) {
+    if (Number.isNaN(date.getTime())) {
         return value;
     }
-
-    const date = new Date(year, month - 1, day);
 
     return (format === 'short' ? shortWeekdayFormatter : longWeekdayFormatter).format(date);
 }
@@ -753,10 +798,16 @@ onBeforeUnmount(() => {
 <template>
     <Head title="Today"/>
 
-    <section class="space-y-5">
-        <PageHeader>
-            {{ displayDate }}
-            <template #actions>
+    <section class="space-y-3 sm:space-y-4">
+        <header class="flex items-center justify-between gap-2 sm:gap-3">
+            <div class="min-w-0">
+                <h1 class="page-title [--text-page-title:clamp(1.55rem,8.3vw,2rem)]">{{ isToday ? 'Today' : weekdayLabel(summary.date, 'long') }}</h1>
+                <p class="mt-1 text-sm text-muted-foreground">
+                    <time :datetime="summary.date">{{ displayDate }}</time>
+                    <Link v-if="!isToday" href="/" class="ml-2 inline-flex min-h-6 items-center font-semibold text-link underline underline-offset-2">Today</Link>
+                </p>
+            </div>
+            <div class="flex shrink-0 items-center gap-2">
                 <Popover v-slot="{ close }">
                     <PopoverTrigger as-child>
                         <Button variant="outline" size="icon" class="rounded-full" aria-label="Select date">
@@ -774,97 +825,109 @@ onBeforeUnmount(() => {
                         />
                     </PopoverContent>
                 </Popover>
-            </template>
-        </PageHeader>
+                <Button :as="Link" :href="addFoodUrl" class="min-h-11 rounded-full px-3.5">
+                    <Plus :size="16" class="max-[360px]:hidden" aria-hidden="true" />Add food
+                </Button>
+            </div>
+        </header>
 
         <p v-if="dateError" class="rounded-xl bg-danger-soft p-3 text-sm text-danger-soft-foreground" role="alert">{{ dateError }}</p>
 
-        <nav class="grid grid-cols-7 gap-1 rounded-2xl bg-card p-1.5 shadow-card" aria-label="Week">
+        <nav class="grid grid-cols-7 gap-0.5 rounded-2xl bg-card p-1.5 shadow-card sm:gap-1" aria-label="Week">
             <Link
                 v-for="day in week"
                 :key="day.date"
                 :href="`/?date=${day.date}`"
-                class="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl text-sm font-semibold"
-                :class="day.is_selected ? 'bg-secondary text-foreground' : 'text-muted-foreground active:bg-muted'"
+                class="flex min-h-15 flex-col items-center justify-center gap-0.5 rounded-xl text-xs font-medium hover:bg-muted active:bg-muted"
+                :class="day.is_selected ? 'bg-secondary text-foreground hover:bg-secondary' : 'text-muted-foreground'"
                 :aria-current="day.is_selected ? 'date' : undefined"
-                :aria-label="`${weekdayLabel(day.date, 'long')} ${day.date}, ${dayStatusLabel(day.status)}${day.is_today ? ', today' : ''}`"
+                :aria-label="`${formatDisplayDate(day.date, {year: false})}, ${dayStatusLabel(day.status)}${day.is_today ? ', today' : ''}`"
             >
-                <span class="sm:hidden">{{ day.label }}</span>
-                <span class="hidden sm:inline lg:hidden">{{ weekdayLabel(day.date, 'short') }}</span>
-                <span class="hidden lg:inline">{{ weekdayLabel(day.date, 'long') }}</span>
-                <DayStatusIndicator :status="day.status" :size="16" />
+                <span>{{ weekdayLabel(day.date, 'short') }}</span>
+                <span class="text-base leading-none font-semibold text-foreground tabular-nums">{{ Number(day.date.slice(-2)) }}</span>
+                <DayStatusIndicator :status="day.status" :size="12" />
             </Link>
         </nav>
 
         <div v-if="!hasGoal" class="rounded-xl border border-warning/35 bg-warning-soft p-4 text-sm text-warning-soft-foreground">
-            Set your daily calorie and macro goals before logging meals.
+            Set goals to see your remaining calories and macros.
             <Link href="/goals" class="font-semibold underline">Set goals</Link>
         </div>
 
-        <Card v-if="hasGoal && isEmptyDay && isToday">
-            <div class="flex items-start gap-3">
-                <div class="grid h-11 w-11 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground">
-                    <Plus :size="20" />
-                </div>
-                <div class="min-w-0 flex-1">
-                    <h2 class="card-title">Start today</h2>
-                    <p class="mt-1 text-sm text-muted-foreground">Log a meal or workout to begin tracking this day.</p>
-                </div>
-            </div>
-            <div class="mt-4 grid grid-cols-2 gap-2">
-                <Button variant="default" @click="openAddDrawer()">Add food</Button>
-                <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" variant="outline">Add workout</Button>
-            </div>
-        </Card>
-
-        <Card>
+        <div class="grid gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] sm:gap-4">
             <CalorieRing
                 :consumed="summary.totals.calories"
                 :goal="summary.goal?.calories ?? 0"
                 :remaining="summary.totals.calories_remaining"
                 :burned="summary.log.burned_calories"
             />
-            <div class="mt-5 grid grid-cols-3 gap-4">
-                <Link
-                    v-for="macro in macros"
-                    :key="macro.key"
-                    :href="`/macros/${macro.slug}?date=${summary.date}`"
-                    class="-mx-1 rounded-xl px-1 py-1 active:bg-muted"
-                >
-                    <p class="field-label">{{ macro.label }}</p>
-                    <p class="mt-1.5 text-lg font-semibold tracking-tight">
-                        {{ Math.round(macro.consumed ?? 0) }}g
-                        <span class="text-xs font-medium text-muted-foreground">/ {{ Math.round(macro.goal ?? 0) }}g</span>
-                    </p>
-                    <Progress class="mt-2 h-1.5" :model-value="macroProgress(macro.consumed, macro.goal)" :indicator-class="macro.color" />
-                </Link>
+            <Card class="justify-between gap-1 px-4 py-3 sm:px-5 sm:py-4">
+                <h2 class="text-lg font-semibold tracking-tight">Macros</h2>
+                <div class="grid grid-cols-3 gap-2 sm:grid-cols-1 sm:gap-0">
+                    <Link
+                        v-for="macro in macros"
+                        :key="macro.key"
+                        :href="`/macros/${macro.slug}?date=${summary.date}`"
+                        class="grid min-h-11 min-w-0 content-center gap-1.5 rounded-lg px-1.5 py-1.5 hover:bg-muted active:bg-muted sm:-mx-1.5"
+                    >
+                        <span class="flex flex-col gap-x-2 gap-y-0.5 sm:flex-row sm:items-baseline sm:justify-between">
+                            <span class="flex items-center gap-1.5 text-xs font-semibold sm:text-sm">
+                                <span class="size-1.5 shrink-0 rounded-full" :class="macro.color" aria-hidden="true" />{{ macro.label }}
+                            </span>
+                            <span class="text-xs tabular-nums sm:text-sm">
+                                <strong>{{ Math.round(macro.consumed) }} g</strong>
+                                <span v-if="macro.goal !== undefined" class="text-muted-foreground"> / {{ Math.round(macro.goal) }} g</span>
+                            </span>
+                        </span>
+                        <Progress v-if="macro.goal" class="h-1.5" :model-value="macroProgress(macro.consumed, macro.goal)" :indicator-class="`${macro.color} motion-reduce:transition-none`" aria-hidden="true" />
+                    </Link>
+                </div>
+            </Card>
+        </div>
+
+        <p class="sr-only" role="status">{{ undoableMeal ? `${undoableMeal.name} logged.` : '' }}</p>
+        <Card v-if="undoableMeal" class="flex-row flex-wrap items-center justify-between gap-2">
+            <p class="min-w-0 break-words">{{ undoableMeal.name }} logged.</p>
+            <Button type="button" variant="outline" size="sm" :loading="undoMealForm.processing" loading-label="Undoing…" @click="undoQuickMeal">
+                Undo
+            </Button>
+            <p v-if="undoMealForm.hasErrors" class="basis-full text-sm text-destructive" role="alert">{{ Object.values(undoMealForm.errors)[0] }}</p>
+        </Card>
+        <QuickMeal v-else-if="suggestedMeal" :key="`${summary.date}-${suggestedMeal.meal_type}-${suggestedMeal.id}`" :date="summary.date" :meal="suggestedMeal" />
+
+        <Card v-if="offerMealReminder && !reminderDismissed" class="gap-3">
+            <h2 class="card-title">Want a reminder to log a meal?</h2>
+            <div class="flex flex-wrap gap-2">
+                <Button :as="Link" href="/settings/reminders" size="sm">Set a reminder</Button>
+                <Button type="button" variant="ghost" size="sm" @click="reminderDismissed = true">Not now</Button>
             </div>
         </Card>
 
-        <section v-if="showDayLists" class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-                <h2 class="text-lg font-semibold tracking-tight">Meals</h2>
-                <Button :as="Link" :href="`/add?mode=food&date=${summary.date}`" size="sm"><Plus class="w-4" />Add food</Button>
-            </div>
+        <div class="grid items-start gap-3 md:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)] sm:gap-4">
+            <Card class="min-w-0 gap-2 px-4 py-3 sm:px-5">
+                <div class="flex items-center justify-between gap-2">
+                    <h2 class="text-lg font-semibold tracking-tight">Meals</h2>
+                    <Button :as="Link" :href="addFoodUrl" size="sm"><Plus :size="16" aria-hidden="true" />Add food</Button>
+                </div>
 
-            <div class="space-y-3">
-                <Card v-for="mealType in mealTypes" :key="mealType" class="px-0 py-0">
-                    <div class="px-0 py-3">
-                        <div class="flex items-center justify-between gap-2 px-5 text-muted-foreground">
-                            <div class="flex items-center gap-2">
-                                <component :is="mealIcons[mealType]" class="w-4"></component>
+                <div v-if="hasMeals" class="divide-y divide-border border-t border-border">
+                    <div v-for="mealType in mealTypes" :key="mealType" class="py-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex min-w-0 items-center gap-2">
+                                <span class="grid size-8 shrink-0 place-items-center rounded-lg bg-secondary text-foreground" aria-hidden="true">
+                                    <component :is="mealIcons[mealType]" :size="16" />
+                                </span>
                                 <h3 class="font-semibold text-foreground">{{ mealLabels[mealType] }}</h3>
                             </div>
                             <Button
-                                v-if="!summary.entries[mealType]?.length"
                                 :as="Link"
                                 :href="`/add?mode=food&date=${summary.date}&meal=${mealType}`"
                                 variant="ghost"
-                                size="sm"
-                                class="pr-0"
+                                size="icon"
+                                class="size-11 rounded-lg"
                                 :aria-label="`Add ${mealLabels[mealType].toLowerCase()}`"
                             >
-                                <Plus class="w-4" />Add
+                                <Plus :size="16" aria-hidden="true" />
                             </Button>
                         </div>
 
@@ -872,109 +935,120 @@ onBeforeUnmount(() => {
                             <div v-for="entry in summary.entries[mealType]" :key="entry.id">
                                 <Button
                                     variant="ghost"
-                                    class="h-auto w-full min-w-0 items-center justify-between gap-3 rounded-none border-0 px-5 py-2.5 text-left active:translate-y-0"
-                                    :aria-label="`View ${entry.name}`"
+                                    class="h-auto min-h-11 w-full min-w-0 items-center justify-between gap-2 rounded-lg border-0 px-2 py-2 text-left active:translate-y-0"
                                     @click="openMeal(entry, mealType, $event)"
                                 >
                                     <span class="min-w-0">
-                                        <span class="block truncate font-medium text-foreground">{{ entry.name }}</span>
-                                        <span class="block text-xs text-muted-foreground">
+                                        <span class="block whitespace-normal break-words font-medium text-foreground">{{ entry.name }}</span>
+                                        <span v-if="entry.portion_quantity !== null" class="block text-xs text-muted-foreground">
                                             {{ mealPortionLabel(entry) }}
                                         </span>
                                     </span>
-                                    <span class="shrink-0 text-right">
-                                        <span class="block text-sm font-semibold tabular-nums text-foreground">{{ entry.calories }}</span>
-                                        <span class="text-xs font-medium text-muted-foreground">kcal</span>
+                                    <span class="ml-auto shrink-0 text-right text-xs text-muted-foreground">
+                                        <strong class="text-sm font-semibold text-foreground tabular-nums">{{ entry.calories }}</strong> kcal
                                     </span>
+                                    <ChevronRight :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
                                 </Button>
                             </div>
                         </div>
 
-                        <p v-else class="mb-2 px-5 text-sm text-muted-foreground">No {{ mealLabels[mealType].toLowerCase() }} yet.</p>
-                    </div>
-                </Card>
-            </div>
-        </section>
-
-        <section v-if="showDayLists || showHealthConnect" class="space-y-3">
-            <div class="flex items-center justify-between gap-3">
-                <h2 class="text-lg font-semibold tracking-tight">Workouts</h2>
-                <div class="flex items-center gap-2">
-                    <template v-if="showHealthConnect">
-                        <Button
-                            v-if="canSyncHealthConnect"
-                            variant="outline"
-                            size="sm"
-                            class="rounded-full"
-                            :disabled="healthConnectLoading"
-                            aria-label="Sync health workouts"
-                            @click="syncHealthConnect"
-                        >
-                            <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
-                            Sync
-                        </Button>
-                        <Button
-                            v-else
-                            size="sm"
-                            :disabled="healthConnectLoading || !healthImport?.state.available"
-                            @click="connectHealthConnect"
-                        >
-                            Connect
-                        </Button>
-                    </template>
-                    <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" size="sm"><Plus class="w-4" />Add workout</Button>
-                </div>
-            </div>
-
-            <Card class="py-1">
-                <div v-if="summary.workouts?.length" class="divide-y divide-border/60">
-                    <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
-                        <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-secondary text-link">
-                            <Dumbbell :size="18"/>
-                        </div>
-                        <div class="min-w-0 flex-1">
-                            <p class="truncate font-medium">{{ workout.title }}</p>
-                            <p class="text-sm text-muted-foreground">
-                                {{ workout.logged_time }}
-                            </p>
-                        </div>
-                        <p class="min-w-10 shrink-0 text-center leading-none">
-                            <span class="block text-sm font-semibold tabular-nums">{{ workout.calories_burned }}</span>
-                            <span class="mt-1 block text-xs font-medium leading-none text-muted-foreground">kcal</span>
-                        </p>
-                        <Popover v-slot="{ close }">
-                            <PopoverTrigger as-child>
-                                <Button variant="ghost" size="icon" class="h-9 w-9 text-muted-foreground/70" aria-label="Workout actions">
-                                    <EllipsisVertical :size="20"/>
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent align="end" class="w-40 gap-0.5 p-1" role="group" aria-label="Workout actions">
-                                <Button variant="ghost" size="sm" class="w-full justify-start" @click="startEditingWorkout(workout, close)">
-                                    <Pencil :size="16"/>Edit
-                                </Button>
-                                <Button variant="ghost" size="sm" class="w-full justify-start text-destructive hover:text-destructive" @click="close(); requestDelete('workout', workout.id, `Delete ${workout.title}?`)">
-                                    <Trash2 :size="16"/>Delete
-                                </Button>
-                            </PopoverContent>
-                        </Popover>
+                        <p v-else class="pb-2 pl-10 text-sm text-muted-foreground">Nothing logged</p>
                     </div>
                 </div>
-
-                <div v-else class="py-6 text-center text-sm text-muted-foreground">No workouts yet.</div>
-                <dl v-if="summary.workouts?.length" class="-mx-5 border-t border-border/60 py-3 text-center">
-                    <dt class="text-xs font-medium text-muted-foreground">Total burned</dt>
-                    <dd class="mt-1 font-semibold tabular-nums">{{ summary.log.burned_calories }} kcal</dd>
-                </dl>
+                <p v-else class="pb-1 text-sm text-muted-foreground">No meals logged.</p>
             </Card>
-        </section>
 
-        <Button :as="Link" :href="`/weekly?date=${summary.date}`" variant="ghost" class="h-auto w-full justify-between rounded-2xl bg-card px-5 py-4 shadow-card">
-            <span class="flex items-center gap-2">
-                <TrendingUp :size="18" />
-                Weekly roundup
-            </span>
-            <span class="text-sm font-medium text-muted-foreground">Calories & macros</span>
-        </Button>
+            <div class="grid min-w-0 gap-3 sm:gap-4">
+                <Card class="gap-2 px-4 py-3 sm:px-5">
+                    <div class="flex items-center justify-between gap-3">
+                        <h2 class="text-lg font-semibold tracking-tight">Workouts</h2>
+                        <div class="flex flex-wrap justify-end gap-2">
+                            <template v-if="showHealthConnect">
+                                <Button
+                                    v-if="canSyncHealthConnect"
+                                    variant="outline"
+                                    size="sm"
+                                    class="rounded-full"
+                                    :disabled="healthConnectLoading"
+                                    aria-label="Sync health workouts"
+                                    @click="syncHealthConnect"
+                                >
+                                    <RefreshCw :size="16" :class="{ 'animate-spin': healthConnectLoading }"/>
+                                    Sync
+                                </Button>
+                                <Button
+                                    v-else
+                                    size="sm"
+                                    :disabled="healthConnectLoading || !healthImport?.state.available"
+                                    @click="connectHealthConnect"
+                                >
+                                    Connect
+                                </Button>
+                            </template>
+                            <Button :as="Link" :href="`/add?mode=workout&date=${summary.date}`" size="sm"><Plus class="w-4" />Add workout</Button>
+                        </div>
+                    </div>
+
+                    <template v-if="hasWorkouts">
+                        <div class="divide-y divide-border border-t border-border">
+                            <div v-for="workout in summary.workouts" :key="workout.id" class="flex items-center gap-3 py-3">
+                                <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-secondary text-link">
+                                    <Dumbbell :size="18"/>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <p class="truncate font-medium">{{ workout.title }}</p>
+                                    <p class="text-sm text-muted-foreground">
+                                        {{ workout.logged_time }}
+                                    </p>
+                                </div>
+                                <p class="min-w-10 shrink-0 text-center leading-none">
+                                    <span class="block text-sm font-semibold tabular-nums">{{ workout.calories_burned }}</span>
+                                    <span class="mt-1 block text-xs font-medium leading-none text-muted-foreground">kcal</span>
+                                </p>
+                                <Popover v-slot="{ close }">
+                                    <PopoverTrigger as-child>
+                                        <Button variant="ghost" size="icon" class="h-9 w-9 text-muted-foreground/70" aria-label="Workout actions">
+                                            <EllipsisVertical :size="20"/>
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent align="end" class="w-40 gap-0.5 p-1" role="group" aria-label="Workout actions">
+                                        <Button variant="ghost" size="sm" class="w-full justify-start" @click="startEditingWorkout(workout, close)">
+                                            <Pencil :size="16"/>Edit
+                                        </Button>
+                                        <Button variant="ghost" size="sm" class="w-full justify-start text-destructive hover:text-destructive" @click="close(); requestDelete('workout', workout.id, `Delete ${workout.title}?`)">
+                                            <Trash2 :size="16"/>Delete
+                                        </Button>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+
+                        <dl class="flex items-center justify-between gap-2 border-t border-border py-2">
+                            <dt class="text-xs font-medium text-muted-foreground">Total burned</dt>
+                            <dd class="font-semibold tabular-nums">{{ summary.log.burned_calories }} kcal</dd>
+                        </dl>
+                    </template>
+                    <p v-else class="pb-1 text-sm text-muted-foreground">No workouts logged.</p>
+                </Card>
+
+                <Button :as="Link" :href="`/weekly?date=${summary.date}`" variant="ghost" class="h-auto min-h-12 w-full justify-start rounded-2xl bg-card px-4 py-3 shadow-card sm:px-5">
+                    <TrendingUp :size="18" class="text-link" aria-hidden="true" />
+                    Weekly roundup
+                    <ChevronRight :size="16" class="ml-auto text-muted-foreground" aria-hidden="true" />
+                </Button>
+            </div>
+        </div>
+
+        <Card v-if="isToday && weeklyMealObservation" class="gap-3">
+            <p class="break-words">
+                <strong>{{ weeklyMealObservation.name }}</strong> was your highest-protein
+                {{ weeklyMealObservation.meal_type === 'snacks' ? 'snack' : mealLabels[weeklyMealObservation.meal_type].toLowerCase() }}
+                entry in the past 7 days ({{ weeklyMealObservation.protein_g }} g).
+            </p>
+            <Button :as="Link" :href="mealSuggestionUrl(summary.date, weeklyMealObservation)" variant="outline" size="sm" class="self-start">
+                View entry
+            </Button>
+        </Card>
 
         <p class="text-center text-xs text-muted-foreground">🔥 {{ summary.streak }} day streak</p>
 

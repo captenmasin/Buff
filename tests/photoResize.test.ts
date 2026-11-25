@@ -1,6 +1,30 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { resizePhoto } from '../resources/js/photoResize.ts';
+import { captureVideoPhoto, resizePhoto } from '../resources/js/photoResize.ts';
+
+test('encodes the full live camera frame as a bounded JPEG', async (t) => {
+    const originalDocument = globalThis.document;
+    t.after(() => { globalThis.document = originalDocument; });
+    const video = {videoWidth: 1920, videoHeight: 1080} as HTMLVideoElement;
+    const drawCalls: unknown[][] = [];
+    globalThis.document = {
+        createElement: () => ({
+            getContext: () => ({
+                fillRect() {},
+                drawImage(...args: unknown[]) { drawCalls.push(args); },
+            }),
+            toBlob(callback: BlobCallback, type: string) {
+                callback(new Blob(['frame'], {type}));
+            },
+        }),
+    } as unknown as Document;
+
+    const photo = await captureVideoPhoto(video);
+
+    assert.deepEqual(drawCalls, [[video, 0, 0, 1600, 900]]);
+    assert.equal(photo.type, 'image/jpeg');
+    await assert.rejects(captureVideoPhoto({videoWidth: 0, videoHeight: 0} as HTMLVideoElement), /Camera is not ready/);
+});
 
 test('rejects original photos when JPEG preparation fails', async (t) => {
     const originalCreateImageBitmap = globalThis.createImageBitmap;

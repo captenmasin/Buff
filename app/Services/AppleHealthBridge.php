@@ -96,7 +96,7 @@ class AppleHealthBridge
             return true;
         }
 
-        if (! function_exists('nativephp_call')) {
+        if (! NativeRuntime::available()) {
             return false;
         }
 

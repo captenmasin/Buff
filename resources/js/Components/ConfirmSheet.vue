@@ -15,12 +15,14 @@ const props = withDefaults(defineProps<{
     open: boolean
     title: string
     message: string
+    cancelLabel?: string
     confirmLabel?: string
     processing?: boolean
     processingLabel?: string
     error?: string
 }>(), {
     confirmLabel: 'Delete',
+    cancelLabel: 'Cancel',
     processingLabel: 'Deleting…',
     error: '',
 })
@@ -66,7 +68,7 @@ onBeforeUnmount(() => window.removeEventListener('buff:android-back', handleNati
             </AlertDialogHeader>
             <p v-if="error" class="text-sm text-destructive" role="alert">{{ error }}</p>
             <AlertDialogFooter>
-                <AlertDialogCancel variant="surface" :disabled="processing" @click="emit('cancel')">Cancel</AlertDialogCancel>
+                <AlertDialogCancel variant="surface" :disabled="processing" @click="emit('cancel')">{{ cancelLabel }}</AlertDialogCancel>
                 <Button
                     type="button"
                     variant="destructive-solid"

@@ -8,6 +8,7 @@ use App\Models\BodyMetric;
 use App\Models\BodyProfile;
 use App\Models\DailyGoal;
 use App\Models\HealthConnectIgnoredWorkout;
+use App\Models\MealEntry;
 use App\Models\PendingBodyMetricPhotoUpload;
 use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\SyncedModel;
@@ -158,13 +159,13 @@ class BuffSyncService
     private function applyResponse(SyncState $state, string $deviceId, Collection $sent, array $data): bool
     {
         $sentByRecord = $sent->keyBy(fn (SyncOutbox $entry): string => $entry->record_type.':'.$entry->record_id);
-        $remindersChanged = false;
+        $changedModels = [];
 
-        $applied = Model::withoutEvents(function () use ($state, $deviceId, $data, $sentByRecord, &$remindersChanged): bool {
+        $applied = Model::withoutEvents(function () use ($state, $deviceId, $data, $sentByRecord, &$changedModels): bool {
             Schema::disableForeignKeyConstraints();
 
             try {
-                return DB::transaction(function () use ($state, $deviceId, $data, $sentByRecord, &$remindersChanged): bool {
+                return DB::transaction(function () use ($state, $deviceId, $data, $sentByRecord, &$changedModels): bool {
                     $currentState = SyncState::query()
                         ->whereKey($state->getKey())
                         ->where('device_id', $deviceId)
@@ -194,7 +195,7 @@ class BuffSyncService
                         }
 
                         if (! $accepted) {
-                            $remindersChanged = $this->applyRemote($serverRecord) || $remindersChanged;
+                            $changedModels[] = $this->applyRemote($serverRecord);
                         }
                     }
 
@@ -203,7 +204,7 @@ class BuffSyncService
                             continue;
                         }
 
-                        $remindersChanged = $this->applyRemote($change) || $remindersChanged;
+                        $changedModels[] = $this->applyRemote($change);
                     }
 
                     $currentState->update([
@@ -219,9 +220,11 @@ class BuffSyncService
             }
         });
 
-        if ($applied && $remindersChanged) {
+        if ($applied && in_array(AppPreference::class, $changedModels, true)) {
             $preferences = AppPreference::query()->find(AppPreference::ID) ?? new AppPreference;
             $this->mealReminders->sync($preferences->mealReminders());
+        } elseif ($applied && in_array(MealEntry::class, $changedModels, true)) {
+            $this->mealReminders->refreshOnIos();
         }
 
         return $applied;
@@ -338,13 +341,13 @@ class BuffSyncService
     }
 
     /** @param array<string, mixed> $change */
-    private function applyRemote(array $change): bool
+    private function applyRemote(array $change): ?string
     {
         $modelClass = $this->modelFor((string) ($change['type'] ?? ''));
         $id = $change['id'] ?? null;
 
         if ($modelClass === null || ! is_string($id)) {
-            return false;
+            return null;
         }
 
         $model = $modelClass::query()->find($id);
@@ -352,17 +355,17 @@ class BuffSyncService
         if (($change['deleted'] ?? false) === true) {
             $model?->delete();
 
-            return $modelClass === AppPreference::class;
+            return $modelClass;
         }
 
         if (! is_array($change['data'] ?? null) || ! is_string($change['updated_at'] ?? null)) {
-            return false;
+            return null;
         }
 
         $fields = config('buff.sync_models')[$modelClass]['fields'] ?? null;
 
         if (! is_array($fields)) {
-            return false;
+            return null;
         }
 
         if ($modelClass === DailyGoal::class && BodyProfile::query()->doesntExist()) {
@@ -387,7 +390,7 @@ class BuffSyncService
         $model->save();
         $model->timestamps = true;
 
-        return $modelClass === AppPreference::class;
+        return $modelClass;
     }
 
     /**

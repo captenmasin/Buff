@@ -43,14 +43,19 @@ test('switches between all foods and recipes under one add food page', () => {
 });
 
 test('keeps food search primary and groups the alternative entry actions', () => {
-    const foodSearchCard = addSource.match(/<Card v-if="mode === 'food'">[\s\S]*?<p v-if="nativeMessage"/)?.[0] ?? '';
+    const foodSearchLayout = addSource.match(/<div v-if="showFoodSearch"[\s\S]*?(?=\s+<AppSheet\b)/)?.[0] ?? '';
 
-    assert.match(foodSearchCard, /<form role="search" class="relative"/);
-    assert.match(foodSearchCard, /aria-label="Search foods"/);
-    assert.match(foodSearchCard, /grid grid-cols-2 gap-2 max-\[360px\]:grid-cols-1/);
-    assert.match(foodSearchCard, /Scan barcode/);
-    assert.match(foodSearchCard, /Add custom food/);
-    assert.doesNotMatch(foodSearchCard, /<h2[^>]*>Search food<\/h2>/);
+    assert.match(foodSearchLayout, /<form role="search"[^>]*aria-labelledby="add-food-search-label"/);
+    assert.match(foodSearchLayout, /<label[^>]*for="add-food-search"[^>]*>Search foods<\/label>/);
+    assert.match(foodSearchLayout, /<Input\s+id="add-food-search"/);
+    assert.match(foodSearchLayout, /Recent foods[\s\S]*?<\/Card>[\s\S]*?<Card[^>]*>\s*<h2[^>]*>More ways to log<\/h2>/);
+    assert.match(foodSearchLayout, /More ways to log[\s\S]*?@click="startScan"[\s\S]*?<template v-for="method in loggingLinks"/);
+    assert.match(foodSearchLayout, /v-if="method\.mode === 'label'"[\s\S]*?@click="openLabelCamera"/);
+    assert.match(foodSearchLayout, /<Button\s+v-else\s+:as="Link"\s+:href="addModeUrl\(method\.mode\)"/);
+
+    const loggingLinks = addSource.match(/const loggingLinks = \[([\s\S]*?)\]/)?.[1] ?? '';
+    const loggingOrder = [...loggingLinks.matchAll(/mode: '([^']+)'/g)].map(([, mode]) => mode);
+    assert.deepEqual(loggingOrder, ['custom', 'photo', 'label', 'recipe', 'workout']);
 });
 
 test('exposes product portions and recipe log controls accessibly', () => {
@@ -65,9 +70,11 @@ test('exposes product portions and recipe log controls accessibly', () => {
 
 test('shows custom macro errors and clears corrected workout creation errors', () => {
     assert.match(addSource, /customMealForm\.errors\[field\[0\]\]/);
+    assert.match(addSource, /<WorkoutEntryForm :date="props.date"/);
+    const workoutSource = readFileSync(new URL('../resources/js/Components/Add/WorkoutEntryForm.vue', import.meta.url), 'utf8');
 
     for (const field of ['title', 'calories_burned', 'time']) {
-        assert.match(addSource, new RegExp(`workoutForm\\.clearErrors\\('${field}'\\)`));
+        assert.match(workoutSource, new RegExp(`form\\.clearErrors\\('${field}'\\)`));
     }
 });
 
@@ -129,7 +136,9 @@ test('preserves custom food and photo review scroll only for validation errors',
 
     for (const analysisId of ['', '01a07176-6e67-7ab0-b155-7d367354c529']) {
         const form = useForm({ date: '2026-09-04', meal_type: 'lunch', name: '', portion_quantity: 100, portion_unit: 'g', protein_g: '', carbs_g: '60', fat_g: '20', analysis_id: analysisId });
-        const submit = new Function('customMealForm', 'selectedMealType', 'hapticImpact', `${declaration}; return addCustomMeal;`)(form, { value: 'dinner' }, () => {});
+        const submit = new Function('customMealForm', 'selectedMealType', 'hapticImpact', 'customNutrition', `${declaration}; return addCustomMeal;`)(
+            form, { value: 'dinner' }, () => {}, { value: { protein_g: 0, carbs_g: 60, fat_g: 20 } },
+        );
 
         submit();
         await Promise.resolve();

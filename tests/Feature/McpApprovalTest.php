@@ -47,6 +47,22 @@ it('resolves a deep-link token without approving it', function (): void {
         && $request->hasHeader('Authorization', 'Bearer mobile-token'));
 });
 
+it('links an unavailable approval back to email verification', function (): void {
+    $token = str_repeat('A', 64);
+    Http::fake([
+        '*/mcp/browser-approvals/'.$token => Http::response(['code' => 'email_not_verified'], 403),
+    ]);
+
+    $this->get('/mcp-approve?token='.$token)->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->component('McpApproval')
+        ->where('verificationRequired', true)
+        ->where('token', $token)
+        ->where('approval', null));
+
+    $this->get('/account/verify?approval='.$token)->assertRedirect('/mcp-approve?token='.$token);
+    $this->get('/account/verify?next=https://example.test')->assertRedirect('/');
+});
+
 it('approves only after the local consent form is posted', function (): void {
     $token = str_repeat('B', 64);
     Http::fake([

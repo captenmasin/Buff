@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
+use Symfony\Component\HttpFoundation\Response as HttpResponse;
 
 class McpApprovalController extends Controller
 {
@@ -19,11 +20,13 @@ class McpApprovalController extends Controller
         private readonly BuffCredentialStore $credentials,
     ) {}
 
-    public function show(Request $request): Response|RedirectResponse
+    public function show(Request $request): Response|HttpResponse
     {
         $token = $request->string('token')->toString();
 
-        abort_unless(strlen($token) === 64 && ctype_alnum($token), 404);
+        if (strlen($token) !== 64 || ! ctype_alnum($token)) {
+            return $this->missingRequest($request);
+        }
 
         $result = $this->api->get('mcp/browser-approvals/'.$token);
 
@@ -40,6 +43,7 @@ class McpApprovalController extends Controller
             'approval' => $approval,
             'approved' => false,
             'error' => $approval === null ? $this->errorMessage($result) : null,
+            'verificationRequired' => $result->status === BuffApiStatus::EmailNotVerified,
         ]);
     }
 
@@ -79,9 +83,11 @@ class McpApprovalController extends Controller
         return redirect()->route('mcp.approval.complete')->with('mcp_approval_complete', true);
     }
 
-    public function complete(Request $request): Response
+    public function complete(Request $request): Response|HttpResponse
     {
-        abort_unless($request->session()->pull('mcp_approval_complete') === true, 404);
+        if ($request->session()->pull('mcp_approval_complete') !== true) {
+            return $this->missingRequest($request);
+        }
 
         return Inertia::render('McpApproval', [
             'token' => null,
@@ -89,6 +95,16 @@ class McpApprovalController extends Controller
             'approved' => true,
             'error' => null,
         ]);
+    }
+
+    private function missingRequest(Request $request): HttpResponse
+    {
+        return Inertia::render('McpApproval', [
+            'token' => null,
+            'approval' => null,
+            'approved' => false,
+            'error' => 'Open a new connection request from your AI assistant.',
+        ])->toResponse($request)->setStatusCode(404);
     }
 
     /** @return array{status: string, clientName: string, redirectOrigin: string, expiresAt: string}|null */
@@ -116,6 +132,7 @@ class McpApprovalController extends Controller
             $result->httpStatus === 404 => 'This connection request is invalid or has expired.',
             $result->status === BuffApiStatus::ConnectionFailed => 'Could not connect to Buff. Check your connection and try again.',
             $result->status === BuffApiStatus::Unauthenticated => 'Your session expired. Sign in again to continue.',
+            $result->status === BuffApiStatus::EmailNotVerified => 'Verify your email before connecting an AI assistant.',
             $result->status === BuffApiStatus::Forbidden => $result->message ?? 'This account cannot approve the connection.',
             $result->status === BuffApiStatus::RateLimited => 'Too many attempts. Try again shortly.',
             default => 'The connection request could not be loaded. Try again from your AI assistant.',

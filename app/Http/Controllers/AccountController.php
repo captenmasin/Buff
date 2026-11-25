@@ -60,7 +60,7 @@ class AccountController extends Controller
         ]);
     }
 
-    public function verificationPage(): Response|RedirectResponse
+    public function verificationPage(Request $request): Response|RedirectResponse
     {
         $account = $this->credentials->account();
 
@@ -68,11 +68,18 @@ class AccountController extends Controller
             return redirect()->route('account.login');
         }
 
+        $approval = $request->string('approval')->toString();
+        $destination = match (true) {
+            strlen($approval) === 64 && ctype_alnum($approval) => route('mcp.approval.show', ['token' => $approval], absolute: false),
+            $request->string('next')->toString() === 'assistants' => '/settings/connected-assistants',
+            default => '/',
+        };
+
         if (($account['email_verified'] ?? false) === true) {
-            return redirect('/');
+            return redirect($destination);
         }
 
-        return $this->page('verify', ['email' => $account['email'] ?? null]);
+        return $this->page('verify', ['email' => $account['email'] ?? null, 'verificationDestination' => $destination]);
     }
 
     public function register(Request $request, LocalAccountData $localData): RedirectResponse

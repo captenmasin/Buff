@@ -71,6 +71,18 @@ it('hides MCP installation when no endpoint is configured', function (): void {
             ->where('mcpEndpoint', null));
 });
 
+it('prompts for verification before showing assistant setup', function (): void {
+    config()->set('buff.mcp_url', 'https://api.example.test/mcp/buff');
+    Http::fake([
+        '*/mcp/connections' => Http::response(['code' => 'email_not_verified'], 403),
+    ]);
+
+    $this->get('/settings/connected-assistants')->assertOk()->assertInertia(fn (Assert $page) => $page
+        ->where('verificationRequired', true)
+        ->where('mcpEndpoint', null)
+        ->where('error', null));
+});
+
 it('revokes one connected assistant through the account API', function (): void {
     $connectionId = '10000000-0000-4000-8000-000000000042';
     Http::fake([

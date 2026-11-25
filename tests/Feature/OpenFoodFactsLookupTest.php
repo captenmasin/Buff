@@ -13,6 +13,24 @@ beforeEach(function (): void {
     ]);
 });
 
+it('rejects letters in a barcode without querying the food database', function (): void {
+    Http::fake();
+
+    $this->postJson('/barcode/lookup', ['barcode' => 'ab12345678'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.barcode.0', 'Enter the digits printed below the barcode.');
+
+    Http::assertNothingSent();
+});
+
+it('returns guidance for an unknown barcode', function (): void {
+    Http::fake(['*/foods/barcodes/12345678' => Http::response(['code' => 'food_not_found'], 404)]);
+
+    $this->postJson('/barcode/lookup', ['barcode' => '12345678'])
+        ->assertUnprocessable()
+        ->assertJsonPath('errors.barcode.0', 'No food was found for this barcode. Check the digits or add it as a custom food.');
+});
+
 it('fetches and stores a normalized barcode product from buff-server', function (): void {
     Http::fake(['*/foods/barcodes/737628064502' => Http::response([
         'product' => productPayload(),

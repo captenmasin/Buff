@@ -249,7 +249,12 @@ onBeforeUnmount(() => {
     <section class="space-y-5">
         <SettingsPageHeader>{{ healthImport?.name ?? 'Health' }}</SettingsPageHeader>
 
-        <Card>
+        <Card v-if="!healthImport" class="gap-2">
+            <h2 class="card-title">Connect health data in the Buff app</h2>
+            <p class="text-sm text-muted-foreground">Open Settings in Buff for iOS to connect Apple Health, or in Buff for Android to connect Health Connect.</p>
+        </Card>
+
+        <Card v-else>
             <div class="flex items-start gap-3">
                 <div class="grid h-10 w-10 flex-none place-items-center rounded-xl bg-primary-container text-primary-container-foreground">
                     <Link2 :size="18"/>

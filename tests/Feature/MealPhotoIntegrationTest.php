@@ -84,6 +84,37 @@ it('accepts bridge-safe meal photo data URLs', function (): void {
     Http::assertSent(fn (ClientRequest $request): bool => $request->hasFile('photos[]'));
 });
 
+it('forwards a single label photo and returns the extracted nutrition', function (): void {
+    Http::fake(['*/nutrition-labels' => Http::response([
+        'analysis' => ['draft' => ['kind' => 'nutrition_label', 'calories' => 240]],
+    ], 201)]);
+    $photo = UploadedFile::fake()->image('label.jpg', 800, 600);
+
+    $this->postJson('/meal-analyses', [
+        'kind' => 'nutrition_label',
+        'photos' => ['data:image/jpeg;base64,'.base64_encode((string) file_get_contents($photo->getPathname()))],
+    ])->assertOk()
+        ->assertJsonPath('analysis.draft.kind', 'nutrition_label')
+        ->assertJsonPath('analysis.draft.calories', 240);
+
+    Http::assertSent(fn (ClientRequest $request): bool => $request->url() === 'https://api.usebuff.app/api/v1/nutrition-labels'
+        && $request->hasFile('photos[]')
+        && $request->hasHeader('Authorization', 'Bearer photo-token'));
+});
+
+it('preserves the Buff+ rejection for a nutrition label scan', function (): void {
+    Http::fake(['*/nutrition-labels' => Http::response([
+        'message' => 'AI meal analysis requires a Buff+ subscription.',
+        'code' => 'subscription_required',
+    ], 403)]);
+
+    $this->post('/meal-analyses', [
+        'kind' => 'nutrition_label',
+        'photos' => [UploadedFile::fake()->image('label.jpg')],
+    ])->assertForbidden()
+        ->assertJsonPath('code', 'subscription_required');
+});
+
 it('proxies a follow-up correction to revise the draft', function (): void {
     $analysisId = '20000000-0000-4000-8000-000000000002';
 
@@ -274,4 +305,20 @@ it('proxies cancellation and temporary meal photo URLs without storing them', fu
         ->assertJsonPath('photos.0.url', $temporaryUrl);
 
     expect(json_encode($meal->fresh()->getAttributes()))->not->toContain($temporaryUrl);
+});
+
+it('returns an empty photo list for a local meal that is absent from the server', function (): void {
+    $meal = MealEntry::query()->create([
+        'date' => '2026-08-15',
+        'meal_type' => 'dinner',
+        'source_type' => MealEntry::SOURCE_CUSTOM,
+        'name' => 'Chicken bowl',
+        'calories' => 526,
+        'protein_g' => 42,
+        'carbs_g' => 58,
+        'fat_g' => 14,
+    ]);
+    Http::fake(["*/meals/{$meal->id}/photos" => Http::response(status: 404)]);
+
+    $this->getJson("/meals/{$meal->id}/photos")->assertOk()->assertJson(['photos' => []]);
 });

@@ -1,50 +1,52 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
-import { calorieRemainingAriaLabel, calorieRemainingLabel, calorieRingStrokeClass } from '../resources/js/calorieRing.ts';
+import { calorieBudget } from '../resources/js/calorieRing.ts';
 
-test('keeps the calorie ring green at or under the daily target', () => {
-    assert.equal(calorieRingStrokeClass(0, 2410), 'stroke-success');
-    assert.equal(calorieRingStrokeClass(2410, 2410), 'stroke-success');
-    assert.equal(calorieRingStrokeClass(1800, 2410), 'stroke-success');
+test('shows calories left and progress against the effective daily target', () => {
+    const budget = calorieBudget(1306, 894, 2200);
+
+    assert.equal(budget.amount, 894);
+    assert.equal(budget.caption, 'kcal remaining');
+    assert.equal(budget.percentLabel, '59%');
+    assert.ok(Math.abs(budget.progress - 59.36) < 0.01);
+    assert.equal(budget.overTarget, false);
 });
 
-test('turns the calorie ring red when intake exceeds the daily target', () => {
-    assert.equal(calorieRingStrokeClass(2411, 2410), 'stroke-destructive');
-    assert.equal(calorieRingStrokeClass(2994, 2410), 'stroke-destructive');
+test('fills the ring when intake exceeds the target while showing the actual percentage', () => {
+    const budget = calorieBudget(2600, -300, 2300);
+
+    assert.equal(budget.amount, 300);
+    assert.equal(budget.caption, 'kcal over target');
+    assert.equal(budget.progress, 100);
+    assert.equal(budget.percentLabel, '113%');
+    assert.equal(budget.overTarget, true);
 });
 
-test('stays green when there is no daily target yet', () => {
-    assert.equal(calorieRingStrokeClass(500, 0), 'stroke-success');
+test('distinguishes an empty log from a target reached exactly', () => {
+    assert.equal(calorieBudget(0, 2300, 2300).progress, 0);
+
+    const budget = calorieBudget(2300, 0, 2300);
+    assert.equal(budget.amount, 0);
+    assert.equal(budget.caption, 'kcal remaining');
+    assert.equal(budget.progress, 100);
+    assert.equal(budget.overTarget, false);
 });
 
-test('says how many calories are left under the daily target', () => {
-    assert.equal(calorieRemainingLabel(300, 2300), '300 left of 2300');
-    assert.equal(calorieRemainingLabel(0, 2300), '0 left of 2300');
+test('shows calories eaten when there is no daily target', () => {
+    const budget = calorieBudget(500, 0, 0);
+
+    assert.equal(budget.hasTarget, false);
+    assert.equal(budget.overTarget, false);
+    assert.equal(budget.amount, 500);
+    assert.equal(budget.caption, 'kcal eaten');
 });
 
-test('says how far over budget calories are instead of a negative left amount', () => {
-    assert.equal(calorieRemainingLabel(-300, 2300), "You're 300 over");
-    assert.equal(calorieRemainingLabel(-1.4, 2300), "You're 1 over");
-});
-
-test('falls back when there is no daily calorie target', () => {
-    assert.equal(calorieRemainingLabel(100, 0), 'No daily target yet');
-});
-
-test('keeps screen-reader copy aligned with the visible remaining label', () => {
-    assert.equal(calorieRemainingAriaLabel(2000, 300, 2300), '2000 of 2300 calories, 300 remaining');
-    assert.equal(calorieRemainingAriaLabel(2600, -300, 2300), '2600 of 2300 calories, 300 over');
-    assert.equal(calorieRemainingAriaLabel(500, 0, 0), '500 calories, no daily target yet');
-});
-
-test('binds the stroke class from the calorie ring helper', () => {
+test('gives the calorie ring a named progress indicator with the visible percentage', () => {
     const source = readFileSync(new URL('../resources/js/Components/CalorieRing.vue', import.meta.url), 'utf8');
 
-    assert.match(source, /import \{ calorieRemainingAriaLabel, calorieRemainingLabel, calorieRingStrokeClass \} from '\.\.\/calorieRing'/);
-    assert.match(source, /calorieRingStrokeClass\(props\.consumed, props\.goal\)/);
-    assert.match(source, /calorieRemainingLabel\(props\.remaining, props\.goal\)/);
-    assert.match(source, /:class="strokeClass"/);
-    assert.match(source, /\{\{ remainingLabel \}\}/);
-    assert.doesNotMatch(source, /\{\{ remaining \}\} left of \{\{ goal \}\}/);
+    assert.match(source, /<template v-if="budget\.hasTarget">\s*<progress[\s\S]*?aria-label="Daily calorie target"/);
+    assert.match(source, /:aria-valuetext="[^"]*budget\.percentLabel/);
+    assert.match(source, /aria-hidden="true">\s*<svg[\s\S]*?\{\{ budget\.percentLabel \}\}/);
+    assert.match(source, /budget\.overTarget \? 'stroke-fat' : 'stroke-brand-acid'/);
 });

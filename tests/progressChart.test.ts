@@ -22,6 +22,7 @@ test('parses calendar dates at local midnight', () => {
 
 test('formats display dates without a year when requested', () => {
     assert.equal(formatDisplayDate('2026-08-23', { weekday: 'short', year: false }), 'Sun 23 August');
+    assert.equal(formatDisplayDate('2026-08-23', { weekday: false, year: false }), '23 August');
 });
 
 test('uses timestamps for the selected window so Unovis can rescale on range changes', () => {

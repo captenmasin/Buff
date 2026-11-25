@@ -51,8 +51,29 @@ export function gramsForSplit(calories: number, split: MacroSplit): MacroGrams {
     return { protein, carbs, fat };
 }
 
+function macroEnergy(grams: MacroGrams) {
+    return { protein: grams.protein * 4, carbs: grams.carbs * 4, fat: grams.fat * 9 };
+}
+
 export function macroCalories(grams: MacroGrams): number {
-    return Math.round((grams.protein * 4) + (grams.carbs * 4) + (grams.fat * 9));
+    const energy = macroEnergy(grams);
+
+    return Math.round(energy.protein + energy.carbs + energy.fat);
+}
+
+export function macroEnergyShares(grams: MacroGrams): MacroSplit {
+    const energy = macroEnergy(grams);
+    const total = energy.protein + energy.carbs + energy.fat;
+
+    if (!Number.isFinite(total) || total <= 0) {
+        return { protein: 0, carbs: 0, fat: 0 };
+    }
+
+    return {
+        protein: energy.protein / total * 100,
+        carbs: energy.carbs / total * 100,
+        fat: energy.fat / total * 100,
+    };
 }
 
 export function splitWithinGramBounds(calories: number, split: MacroSplit): boolean {

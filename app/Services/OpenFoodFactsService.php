@@ -30,9 +30,10 @@ class OpenFoodFactsService
             return $cached;
         }
 
-        $message = match ($result->status) {
-            BuffApiStatus::Unauthenticated => 'Sign in to look up new foods.',
-            BuffApiStatus::ConnectionFailed => 'You are offline and this barcode is not stored on this device.',
+        $message = match (true) {
+            $result->httpStatus === 404 => 'No food was found for this barcode. Check the digits or add it as a custom food.',
+            $result->status === BuffApiStatus::Unauthenticated => 'Sign in to look up new foods.',
+            $result->status === BuffApiStatus::ConnectionFailed => 'You are offline and this barcode is not stored on this device.',
             default => $result->errors['barcode'][0] ?? $result->message ?? 'Buff could not find that barcode.',
         };
 

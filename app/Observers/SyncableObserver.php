@@ -2,11 +2,13 @@
 
 namespace App\Observers;
 
+use App\Models\MealEntry;
 use App\Models\SyncedModel;
 use App\Models\SyncOutbox;
 use App\Models\WorkoutEntry;
 use App\Services\AnalyticsEventService;
 use App\Services\BuffSyncService;
+use App\Services\MealReminderBridge;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Date;
 
@@ -23,6 +25,10 @@ class SyncableObserver
 
     public function saved(SyncedModel $model): void
     {
+        if ($model instanceof MealEntry && ($model->wasRecentlyCreated || $model->wasChanged(['date', 'meal_type']))) {
+            defer(fn () => app(MealReminderBridge::class)->refreshOnIos(), 'refresh-meal-reminders');
+        }
+
         $definition = config('buff.sync_models')[$model::class] ?? null;
 
         if (! is_array($definition)) {
@@ -44,6 +50,10 @@ class SyncableObserver
 
     public function deleted(SyncedModel $model): void
     {
+        if ($model instanceof MealEntry) {
+            defer(fn () => app(MealReminderBridge::class)->refreshOnIos(), 'refresh-meal-reminders');
+        }
+
         $definition = config('buff.sync_models')[$model::class] ?? null;
 
         if (! is_array($definition)) {

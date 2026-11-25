@@ -24,6 +24,7 @@ class HandleInertiaRequests extends Middleware
             'flash' => [
                 'message' => fn () => $request->session()->get('message'),
                 'save_status' => fn () => $request->session()->get('save_status'),
+                'quick_meal_log' => fn () => $request->session()->get('quick_meal_log'),
             ],
             'buff' => [
                 'account' => $credentials->account(),

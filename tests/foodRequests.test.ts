@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {stripTypeScriptTypes} from 'node:module';
 import test from 'node:test';
-import {compile, ref} from 'vue';
+import {compile, computed, reactive, ref} from 'vue';
 import {foodSearchUrl, responseErrorMessage} from '../resources/js/foodRequests.ts';
 
 test('updates shared input values before notifying search listeners', () => {
@@ -37,6 +37,53 @@ test('updates shared input values before notifying search listeners', () => {
 
 test('serializes the visible food query and device locale into the request URL', () => {
     assert.equal(foodSearchUrl('crème & yogurt', 'fr-FR'), '/food-products/search?q=cr%C3%A8me+%26+yogurt&locale=fr-FR');
+});
+
+test('opens food search from the Add landing page and prioritizes matches over recent foods', () => {
+    const source = readFileSync(new URL('../resources/js/Pages/Add.vue', import.meta.url), 'utf8');
+    const definitions = source.slice(source.indexOf('const foodSearchQuery ='), source.indexOf('const loggingLinks ='));
+    const recentFoodLimit = Number(source.match(/const recentFoodLimit = (\d+);/)?.[1]);
+    const props = reactive({mode: 'choose', previousFoodEntries: ['Oats', 'Yoghurt', 'Banana', 'Toast']});
+    const query = ref('');
+    const results = ref(['Yoghurt']);
+    const expand = ref(false);
+    const labelReview = ref(false);
+    const subscriptionActive = ref(false);
+    const controls = new Function(
+        'computed', 'props', 'foodSearch', 'foodSearchResults', 'showAllRecentFoods', 'nutritionLabel', 'recentFoodLimit', 'subscriptionActive',
+        `${definitions}\nreturn {showFoodSearch, visibleFoods, subscriptionPaywallTitle};`,
+    )(computed, props, query, results, expand, labelReview, recentFoodLimit, subscriptionActive);
+
+    assert.equal(controls.showFoodSearch.value, true);
+    assert.deepEqual(controls.visibleFoods.value, ['Oats', 'Yoghurt', 'Banana']);
+    expand.value = true;
+    assert.deepEqual(controls.visibleFoods.value, props.previousFoodEntries);
+    query.value = ' yoghurt ';
+    assert.deepEqual(controls.visibleFoods.value, ['Yoghurt']);
+    results.value = [];
+    assert.deepEqual(controls.visibleFoods.value, []);
+    query.value = ' ';
+    assert.deepEqual(controls.visibleFoods.value, props.previousFoodEntries);
+
+    props.mode = 'food';
+    assert.equal(controls.showFoodSearch.value, true);
+    labelReview.value = true;
+    assert.equal(controls.showFoodSearch.value, false);
+    props.mode = 'recipe';
+    labelReview.value = false;
+    assert.equal(controls.showFoodSearch.value, false);
+
+    props.mode = 'label';
+    assert.equal(controls.subscriptionPaywallTitle.value, 'Label scanning requires Buff+');
+    assert.equal(controls.showFoodSearch.value, false);
+    subscriptionActive.value = true;
+    assert.equal(controls.subscriptionPaywallTitle.value, null);
+    assert.equal(controls.showFoodSearch.value, true);
+
+    props.mode = 'photo';
+    assert.equal(controls.subscriptionPaywallTitle.value, null);
+    subscriptionActive.value = false;
+    assert.equal(controls.subscriptionPaywallTitle.value, 'Photo analysis requires Buff+');
 });
 
 for (const phase of ['queued', 'pending success', 'pending failure']) {

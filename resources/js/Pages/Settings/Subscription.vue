@@ -81,6 +81,13 @@ async function refreshServer(silent = false): Promise<boolean | null> {
     }
 }
 
+async function refreshStatus(): Promise<void> {
+    statusMessage.value = '';
+    const entitled = await refreshServer();
+
+    if (entitled !== null) statusMessage.value = entitled ? 'Buff+ is active.' : 'There’s no active Buff+ subscription on this account.';
+}
+
 async function confirmWithServer(action: 'purchase' | 'restore'): Promise<void> {
     busy.value = 'refresh';
     const entitled = await refreshServer();
@@ -275,7 +282,11 @@ onUnmounted(() => removeNativeListeners?.());
 
             <Card v-else-if="platformResolved && platform === 'unsupported'" class="gap-2">
                 <h2 class="card-title">Use the Buff mobile app</h2>
-                <p class="text-sm text-muted-foreground">Purchases and restore are available in Buff for iOS and Android.</p>
+                <p class="text-sm text-muted-foreground">In Buff for iOS or Android, go to Settings → Subscription to subscribe or restore a purchase. Then refresh your status here.</p>
+                <div class="mt-2 grid grid-cols-2 gap-2">
+                    <Button as="a" href="https://apps.apple.com/app/id6805952212" variant="surface" target="_blank" rel="noopener noreferrer">App Store</Button>
+                    <Button as="a" href="https://play.google.com/store/apps/details?id=com.spacemancodes.buff" variant="surface" target="_blank" rel="noopener noreferrer">Google Play</Button>
+                </div>
             </Card>
 
             <p v-if="refreshing || statusMessage" class="rounded-xl bg-muted p-3 text-sm" role="status" aria-live="polite">
@@ -291,7 +302,7 @@ onUnmounted(() => removeNativeListeners?.());
                     Manage subscription
                     <ExternalLink :size="17" aria-hidden="true" />
                 </Button>
-                <Button variant="ghost" :disabled="refreshing" @click="refreshServer()">Refresh status</Button>
+                <Button variant="ghost" :disabled="refreshing" @click="refreshStatus">Refresh status</Button>
             </div>
 
             <p class="text-xs leading-relaxed text-muted-foreground">

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {Head, useForm} from '@inertiajs/vue3';
+import {Head, Link, useForm} from '@inertiajs/vue3';
 import {Bot, ChevronDown, Clock3, Copy, Share2} from '@lucide/vue';
 import {computed, ref} from 'vue';
 import Card from '../../Components/Card.vue';
@@ -19,6 +19,7 @@ const props = defineProps<{
     connections: Connection[];
     error: string | null;
     mcpEndpoint: string | null;
+    verificationRequired: boolean;
 }>();
 
 const revocationForm = useForm({connection: ''});
@@ -134,6 +135,11 @@ function revoke(connection: Connection) {
     <section class="space-y-8">
         <SettingsPageHeader>Connected AI assistants</SettingsPageHeader>
 
+        <Card v-if="verificationRequired" class="gap-3">
+            <h2 class="card-title">Verify your email to connect an assistant</h2>
+            <Button :as="Link" href="/account/verify?next=assistants" class="self-start">Verify email</Button>
+        </Card>
+
         <p v-if="error" class="rounded-xl bg-danger-soft p-4 text-sm text-danger-soft-foreground" role="alert">
             {{ error }}
         </p>
@@ -160,7 +166,6 @@ function revoke(connection: Connection) {
                         </div>
                         <div>
                             <h3 class="card-title">No assistants have access</h3>
-                            <p class="mt-1 text-sm text-muted-foreground">Connect one below — you can finish the whole flow on your phone.</p>
                         </div>
                     </div>
                 </Card>

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { Check, Minus, Plus } from '@lucide/vue';
-import { computed, nextTick, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import Card from './Card.vue';
 import Button from './ui/button/Button.vue';
+import { NativeSelect, NativeSelectOption } from './ui/native-select';
 import { NumberField, NumberFieldDecrement, NumberFieldIncrement, NumberFieldInput } from './ui/number-field';
 import { gramsForSplit, hasValidFivePercentSplit, macroPresets, splitFromGrams, splitWithinGramBounds, type MacroSplit } from '../goalMacros';
 import { hapticImpact } from '../haptics';
@@ -20,6 +21,7 @@ const fatG = defineModel<number>('fat_g', { required: true });
 
 const props = defineProps<{
     errors?: Partial<Record<string, string>>;
+    embedded?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -49,12 +51,9 @@ const selectedSplitWithinBounds = computed(() => splitWithinGramBounds(Number(ca
 const hasRepresentableSplit = computed(() => hasValidFivePercentSplit(Number(calories.value)));
 const canSave = computed(() => hasRepresentableSplit.value && selectedSplitWithinBounds.value);
 const percentageOptions = Array.from({ length: 21 }, (_, index) => index * 5);
-const customScrollerElements: Partial<Record<'protein' | 'carbs', HTMLElement>> = {};
-const scrollerItemHeight = 40;
 const pickerColumns = [
-    { key: 'protein', label: 'Protein', color: 'text-protein', scrollable: true },
-    { key: 'carbs', label: 'Carbs', color: 'text-carbs', scrollable: true },
-    { key: 'fat', label: 'Fat', color: 'text-fat', scrollable: false },
+    { key: 'protein', label: 'Protein' },
+    { key: 'carbs', label: 'Carbs' },
 ] as const;
 const macros = computed(() => [
     { key: 'protein' as const, label: 'Protein', percent: activeSplit.value.protein, grams: generatedGrams.value.protein, color: 'bg-protein' },
@@ -79,61 +78,17 @@ function selectCustom(): void {
     hapticImpact();
     activePreset.value = null;
     applySplit(customSplit.value);
-    nextTick(() => {
-        scrollToCustom('protein', customSplit.value.protein);
-        scrollToCustom('carbs', customSplit.value.carbs);
-    });
 }
 
-function updateCustom(key: 'protein' | 'carbs' | 'fat', value: number): void {
-    if (key === 'fat') {
-        return;
-    }
-
-    customSplit.value = key === 'protein'
-        ? { protein: value, carbs: Math.min(customSplit.value.carbs, 100 - value), fat: 100 - value - Math.min(customSplit.value.carbs, 100 - value) }
-        : { protein: customSplit.value.protein, carbs: Math.min(value, 100 - customSplit.value.protein), fat: 100 - customSplit.value.protein - Math.min(value, 100 - customSplit.value.protein) };
-    activePreset.value = null;
+function updateCustom(key: 'protein' | 'carbs', value: number): void {
+    const other = key === 'protein' ? 'carbs' : 'protein';
+    const percent = Math.min(value, 100 - customSplit.value[other]);
+    customSplit.value = {...customSplit.value, [key]: percent, fat: 100 - percent - customSplit.value[other]};
     applySplit(customSplit.value);
 }
 
-function customOptions(key: 'protein' | 'carbs' | 'fat'): number[] {
-    if (key === 'fat') {
-        return [];
-    }
-
+function customOptions(key: 'protein' | 'carbs'): number[] {
     return percentageOptions.filter((percent) => percent <= 100 - (key === 'protein' ? customSplit.value.carbs : customSplit.value.protein));
-}
-
-function setCustomScrollerRef(key: 'protein' | 'carbs', element: unknown): void {
-    if (element instanceof HTMLElement) {
-        customScrollerElements[key] = element;
-    }
-}
-
-function bindPickerScroller(key: (typeof pickerColumns)[number]['key'], element: unknown): void {
-    if (key !== 'fat') {
-        setCustomScrollerRef(key, element);
-    }
-}
-
-function scrollToCustom(key: 'protein' | 'carbs' | 'fat', percent: number): void {
-    if (key === 'fat') {
-        return;
-    }
-
-    const index = customOptions(key).indexOf(percent);
-    customScrollerElements[key]?.scrollTo({ top: Math.max(0, index) * scrollerItemHeight });
-}
-
-function handleCustomScroller(key: 'protein' | 'carbs' | 'fat', event: Event): void {
-    if (key === 'fat') {
-        return;
-    }
-
-    const options = customOptions(key);
-    const index = Math.max(0, Math.min(options.length - 1, Math.round((event.currentTarget as HTMLElement).scrollTop / scrollerItemHeight)));
-    updateCustom(key, options[index]);
 }
 
 watch(calories, (value, previous) => {
@@ -149,7 +104,7 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
 
 <template>
     <div class="space-y-4">
-        <Card>
+        <Card :class="props.embedded && 'overflow-visible rounded-none p-0 shadow-none'">
             <NumberField
                 v-model="calories"
                 :min="calorieMin"
@@ -181,33 +136,35 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
             </NumberField>
             <p v-if="props.errors?.calories" class="mt-2 text-center text-sm text-destructive">{{ props.errors.calories }}</p>
 
-            <div
-                class="mt-5 flex h-2.5 overflow-hidden rounded-full bg-muted"
-                role="img"
-                :aria-label="`${activeSplit.protein}% protein, ${activeSplit.carbs}% carbs, ${activeSplit.fat}% fat`"
-            >
+            <template v-if="!props.embedded">
                 <div
-                    v-for="macro in macros"
-                    :key="macro.key"
-                    class="h-full"
-                    :class="macro.color"
-                    :style="{ width: `${macro.percent}%` }"
-                />
-            </div>
-
-            <div class="mt-4 grid grid-cols-3 gap-2">
-                <div v-for="macro in macros" :key="macro.key" class="rounded-xl bg-muted p-3 text-center">
-                    <p class="field-label">{{ macro.label }}</p>
-                    <p class="mt-1 text-lg font-semibold tracking-tight tabular-nums">{{ Math.round(macro.grams) }}g</p>
-                    <p class="text-xs text-muted-foreground">{{ macro.percent }}%</p>
+                    class="mt-5 flex h-2.5 overflow-hidden rounded-full bg-muted"
+                    role="img"
+                    :aria-label="`${activeSplit.protein}% protein, ${activeSplit.carbs}% carbs, ${activeSplit.fat}% fat`"
+                >
+                    <div
+                        v-for="macro in macros"
+                        :key="macro.key"
+                        class="h-full"
+                        :class="macro.color"
+                        :style="{ width: `${macro.percent}%` }"
+                    />
                 </div>
-            </div>
+
+                <div class="mt-4 grid grid-cols-3 gap-2">
+                    <div v-for="macro in macros" :key="macro.key" class="rounded-xl bg-muted p-3 text-center">
+                        <p class="field-label">{{ macro.label }}</p>
+                        <p class="mt-1 text-lg font-semibold tracking-tight tabular-nums">{{ Math.round(macro.grams) }}g</p>
+                        <p class="text-xs text-muted-foreground">{{ macro.percent }}%</p>
+                    </div>
+                </div>
+            </template>
         </Card>
 
-        <Card class="space-y-4">
+        <Card class="space-y-4" :class="props.embedded && 'overflow-visible rounded-none p-0 shadow-none'">
             <div>
-                <h2 class="card-title">Macro split</h2>
-                <p class="mt-1 text-sm text-muted-foreground">How calories divide across protein, carbs, and fat.</p>
+                <component :is="props.embedded ? 'h3' : 'h2'" class="card-title">Macro split</component>
+                <p v-if="!props.embedded" class="mt-1 text-sm text-muted-foreground">How calories divide across protein, carbs, and fat.</p>
             </div>
 
             <div class="space-y-2" role="radiogroup" aria-label="Macro split">
@@ -274,72 +231,27 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
                 </button>
             </div>
 
-            <div v-if="activePreset === null" class="overflow-hidden rounded-xl bg-muted">
-                <div class="grid grid-cols-3 px-2 pt-3 text-center">
-                    <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
-                        <span class="size-1.5 rounded-full bg-protein" aria-hidden="true" />
-                        Protein
-                    </span>
-                    <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
-                        <span class="size-1.5 rounded-full bg-carbs" aria-hidden="true" />
-                        Carbs
-                    </span>
-                    <span class="macro-value inline-flex items-center justify-center gap-1.5 text-muted-foreground">
-                        <span class="size-1.5 rounded-full bg-fat" aria-hidden="true" />
-                        Fat
-                    </span>
-                </div>
-                <div class="relative grid grid-cols-3">
-                    <div class="pointer-events-none absolute inset-x-2 top-1/2 z-0 h-10 -translate-y-1/2 rounded-lg bg-card shadow-sm ring-1 ring-border/70" />
-                    <div
-                        v-for="column in pickerColumns"
-                        :key="column.key"
-                        class="relative z-10"
-                    >
-                        <div
-                            v-if="column.scrollable"
-                            :ref="(element) => bindPickerScroller(column.key, element)"
-                            class="macro-wheel h-40 snap-y snap-mandatory overflow-y-auto py-[60px] text-center"
-                            role="listbox"
-                            aria-orientation="vertical"
+            <div v-if="activePreset === null" class="space-y-2 rounded-xl bg-muted p-3">
+                <div class="grid grid-cols-3 gap-2">
+                    <label v-for="column in pickerColumns" :key="column.key">
+                        <span class="field-label">{{ column.label }}</span>
+                        <NativeSelect
+                            :model-value="String(customSplit[column.key])"
                             :aria-label="`${column.label} percentage`"
-                            @scroll.passive="handleCustomScroller(column.key, $event)"
+                            class="mt-1 w-full rounded-lg bg-card [&_select]:h-11"
+                            @update:model-value="updateCustom(column.key, Number($event))"
                         >
-                            <button
-                                v-for="percent in customOptions(column.key)"
-                                :key="percent"
-                                type="button"
-                                role="option"
-                                :aria-selected="customSplit[column.key] === percent"
-                                :aria-label="`${column.label} ${percent} percent`"
-                                class="flex h-10 w-full appearance-none snap-center items-center justify-center bg-transparent p-0 font-normal"
-                                :class="customSplit[column.key] === percent ? column.color : 'text-muted-foreground/35'"
-                                @click="updateCustom(column.key, percent); scrollToCustom(column.key, percent)"
-                            >
-                                <span class="macro-value w-[3ch] text-right">{{ percent }}</span>
-                                <span class="w-5" aria-hidden="true" />
-                            </button>
-                        </div>
-                        <div
-                            v-else
-                            class="macro-value flex h-40 items-center justify-center"
-                            :class="column.color"
-                        >
-                            <span class="macro-value w-[3ch] text-right">{{ customSplit.fat }}</span>
-                            <span class="w-5" aria-hidden="true" />
-                        </div>
-                        <span
-                            class="macro-value pointer-events-none absolute inset-0 flex items-center justify-center"
-                            :class="column.color"
-                            aria-hidden="true"
-                        >
-                            <span class="w-[3ch]" />
-                            <span class="w-5">%</span>
-                        </span>
+                            <NativeSelectOption v-for="percent in customOptions(column.key)" :key="percent" :value="String(percent)">
+                                {{ percent }}%
+                            </NativeSelectOption>
+                        </NativeSelect>
+                    </label>
+                    <div>
+                        <span class="field-label">Fat</span>
+                        <output class="mt-1 flex h-11 items-center px-2 text-base font-semibold tabular-nums text-fat">{{ customSplit.fat }}%</output>
                     </div>
-                    <div class="pointer-events-none absolute inset-x-0 top-0 z-20 h-14 bg-gradient-to-b from-muted to-transparent" />
-                    <div class="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-14 bg-gradient-to-t from-muted to-transparent" />
                 </div>
+                <p class="text-xs text-muted-foreground">Fat fills the remaining percentage.</p>
             </div>
 
             <p v-if="!hasRepresentableSplit" class="text-sm text-destructive">This calorie target cannot be represented with 5% macro steps.</p>
@@ -348,17 +260,3 @@ watch(canSave, (value) => emit('valid', value), { immediate: true });
         </Card>
     </div>
 </template>
-
-<style scoped>
-.macro-wheel {
-    scrollbar-width: none;
-    overscroll-behavior: contain;
-}
-.macro-wheel::-webkit-scrollbar { display: none; }
-.macro-value {
-    font-size: 1rem;
-    font-weight: 400;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-}
-</style>

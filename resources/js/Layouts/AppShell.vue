@@ -5,6 +5,7 @@ import { computed, nextTick, onMounted, onUnmounted, provide, ref } from 'vue';
 import { Home, Plus, Scale, Settings, Target, X } from '@lucide/vue';
 import { hapticImpact } from '../haptics';
 import AddChooser from '../Components/Add/AddChooser.vue';
+import WorkoutEntryForm from '../Components/Add/WorkoutEntryForm.vue';
 import AppSheet from '../Components/AppSheet.vue';
 import OfflineBanner from '../Components/OfflineBanner.vue';
 import Button from '../Components/ui/button/Button.vue';
@@ -143,12 +144,6 @@ function handleNativeAndroidBack() {
 function openAddMode(mode: string, extra?: Record<string, string>) {
     hapticImpact();
     closeDrawerImmediately();
-
-    if (mode === 'photo' && !subscriptionActive.value) {
-        router.visit('/settings/subscription');
-
-        return;
-    }
 
     const params = new URLSearchParams({ mode, ...(extra ?? {}) });
     const selectedDate = page.props.summary?.date;
@@ -465,14 +460,22 @@ onUnmounted(() => {
             class="bottom-drawer"
             @close="closeAddDrawer"
         >
-            <div class="mb-5 flex items-center justify-between">
+            <div class="mb-3 flex items-center justify-between">
                 <h2 id="add-drawer-title" class="card-title">Add</h2>
                 <Button variant="surface" size="icon" class="rounded-full" aria-label="Close add drawer" @click="closeAddDrawer">
                     <X :size="20" />
                 </Button>
             </div>
 
-            <AddChooser :subscription-active="subscriptionActive" @select="openAddMode" />
+            <AddChooser :subscription-active="subscriptionActive" @select="openAddMode">
+                <template #workout>
+                    <WorkoutEntryForm
+                        :date="page.props.summary?.date"
+                        :replace-history="drawerHistoryActive"
+                        @saved="closeDrawerImmediately"
+                    />
+                </template>
+            </AddChooser>
         </AppSheet>
 
         <nav v-if="!isSettingsSubpage" class="bottom-nav fixed inset-x-0 bottom-0 z-20 border-t border-border/70 bg-card/50 shadow-card backdrop-blur-lg sm:hidden">

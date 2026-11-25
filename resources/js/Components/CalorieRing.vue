@@ -1,6 +1,7 @@
 <script setup lang="ts">
+import { Flame } from '@lucide/vue';
 import { computed } from 'vue';
-import { calorieRemainingAriaLabel, calorieRemainingLabel, calorieRingStrokeClass } from '../calorieRing';
+import { calorieBudget } from '../calorieRing';
 
 const props = withDefaults(defineProps<{
     consumed: number;
@@ -13,51 +14,50 @@ const props = withDefaults(defineProps<{
     burned: 0,
 });
 
-const radius = 46;
-const circumference = 2 * Math.PI * radius;
-const progress = computed(() => {
-    if (!props.goal) {
-        return 0;
-    }
-
-    return Math.min(1, Math.max(0, props.consumed / props.goal));
-});
-const dashOffset = computed(() => circumference * (1 - progress.value));
-const strokeClass = computed(() => calorieRingStrokeClass(props.consumed, props.goal));
-const remainingLabel = computed(() => calorieRemainingLabel(props.remaining, props.goal));
-const ariaLabel = computed(() => calorieRemainingAriaLabel(props.consumed, props.remaining, props.goal));
+const budget = computed(() => calorieBudget(props.consumed, props.remaining, props.goal));
+const calories = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 0 });
 </script>
 
 <template>
-    <div
-        class="flex items-center gap-4"
-        role="img"
-        :aria-label="ariaLabel"
-    >
-        <div class="relative grid size-28 shrink-0 place-items-center">
-            <svg viewBox="0 0 112 112" class="size-full -rotate-90" aria-hidden="true">
-                <circle cx="56" cy="56" :r="radius" fill="none" class="stroke-muted" stroke-width="8" />
-                <circle
-                    cx="56"
-                    cy="56"
-                    :r="radius"
-                    fill="none"
-                    class="transition-[stroke-dashoffset,stroke] duration-300 ease-out motion-reduce:transition-none"
-                    :class="strokeClass"
-                    stroke-width="8"
-                    stroke-linecap="round"
-                    :stroke-dasharray="circumference"
-                    :stroke-dashoffset="dashOffset"
+    <section class="flex min-w-0 flex-col rounded-2xl bg-brand-night p-4 text-brand-white shadow-card dark:border dark:border-border sm:p-5">
+        <div class="flex items-center justify-between gap-2">
+            <h2 class="text-lg font-semibold tracking-tight">Calories</h2>
+            <Flame :size="20" class="text-brand-acid" aria-hidden="true" />
+        </div>
+        <div class="flex flex-1 flex-wrap items-center gap-x-4 gap-y-2 py-3 sm:gap-x-6">
+            <template v-if="budget.hasTarget">
+                <progress
+                    class="sr-only"
+                    :value="budget.progress"
+                    max="100"
+                    aria-label="Daily calorie target"
+                    :aria-valuetext="`${budget.percentLabel} of target eaten`"
                 />
-            </svg>
-            <div class="absolute inset-0 grid place-items-center text-center">
-                <p class="text-display font-bold leading-none tracking-tight tabular-nums">{{ consumed }}</p>
+                <div class="relative grid size-20 shrink-0 place-items-center sm:size-24" aria-hidden="true">
+                    <svg viewBox="0 0 96 96" class="absolute inset-0 size-full -rotate-90" fill="none" stroke-width="8">
+                        <circle cx="48" cy="48" r="42" class="stroke-brand-white/20 forced-colors:[stroke:GrayText]" />
+                        <circle
+                            cx="48" cy="48" r="42" pathLength="100"
+                            stroke-dasharray="100"
+                            :stroke-dashoffset="100 - budget.progress"
+                            class="transition-[stroke-dashoffset,stroke] duration-200 ease-out motion-reduce:transition-none forced-colors:[stroke:CanvasText]"
+                            :class="budget.overTarget ? 'stroke-fat' : 'stroke-brand-acid'"
+                        />
+                    </svg>
+                    <span class="text-base font-semibold tabular-nums">{{ budget.percentLabel }}</span>
+                </div>
+            </template>
+            <div class="min-w-0">
+                <p class="font-heading text-[clamp(2.5rem,10vw,4rem)] leading-none font-black tracking-[-0.065em] italic tabular-nums">
+                    {{ calories.format(budget.amount) }}
+                </p>
+                <p class="mt-1 text-sm text-brand-white/80">{{ budget.caption }}</p>
             </div>
         </div>
-        <div class="min-w-0 flex-1">
-            <p class="font-semibold tracking-tight">Calories</p>
-            <p class="mt-1 text-sm text-muted-foreground">{{ remainingLabel }}</p>
-            <p v-if="burned" class="mt-1 text-sm text-muted-foreground">{{ burned }} burned</p>
+        <div v-if="budget.hasTarget || burned" class="flex flex-wrap gap-x-4 gap-y-1 border-t border-brand-white/15 pt-3 text-sm text-brand-white/80">
+            <span v-if="budget.hasTarget"><strong class="text-brand-white">{{ calories.format(consumed) }}</strong> eaten</span>
+            <span v-if="budget.hasTarget"><strong class="text-brand-white">{{ calories.format(goal) }}</strong> target</span>
+            <span v-if="burned"><strong class="text-brand-white">{{ calories.format(burned) }}</strong> burned</span>
         </div>
-    </div>
+    </section>
 </template>

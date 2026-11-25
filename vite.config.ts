@@ -1,7 +1,7 @@
 import path from 'node:path';
 import tailwindcss from '@tailwindcss/vite';
 import vue from '@vitejs/plugin-vue';
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { bunny } from 'laravel-vite-plugin/fonts';
 import laravel from 'laravel-vite-plugin';
 import { nativephpHotFile, nativephpMobile } from './vendor/nativephp/mobile/resources/js/vite-plugin.js';
@@ -22,7 +22,7 @@ function nativeAssetPlatform(): Plugin {
     };
 }
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
     resolve: {
         alias: {
             '@': path.resolve(import.meta.dirname, 'resources/js'),
@@ -51,8 +51,11 @@ export default defineConfig({
         nativeAssetPlatform(),
     ],
     server: {
+        allowedHosts: [loadEnv(mode, import.meta.dirname, 'APP_URL').APP_URL]
+            .filter((url) => url && URL.canParse(url))
+            .map((url) => new URL(url).hostname),
         watch: {
             ignored: ['**/storage/framework/views/**'],
         },
     },
-});
+}));

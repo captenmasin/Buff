@@ -16,6 +16,7 @@ const props = defineProps<{
     } | null;
     approved: boolean;
     error: string | null;
+    verificationRequired?: boolean;
 }>();
 
 const approvalForm = useForm({ token: props.token ?? '' });
@@ -140,9 +141,12 @@ function deny() {
                             <h1 id="approval-title" class="text-2xl font-bold tracking-tight">Connection unavailable</h1>
                             <p class="text-sm leading-6 text-muted-foreground" role="alert">{{ error }}</p>
                         </div>
-                        <Button :as="Link" href="/" variant="surface" class="w-full">
+                        <Button v-if="verificationRequired && token" :as="Link" :href="`/account/verify?approval=${encodeURIComponent(token)}`" class="w-full">
+                            Verify email
+                        </Button>
+                        <Button v-else :as="Link" href="/settings/connected-assistants" variant="surface" class="w-full">
                             <ArrowLeft :size="18" />
-                            Back to Buff
+                            Connected AI assistants
                         </Button>
                     </div>
                 </Transition>

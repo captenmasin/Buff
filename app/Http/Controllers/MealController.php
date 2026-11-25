@@ -8,6 +8,7 @@ use App\Models\PendingMealAnalysisConfirmation;
 use App\Models\Recipe;
 use App\Services\AnalyticsEventService;
 use App\Services\BuffSyncService;
+use App\Services\MealSuggestions;
 use App\Services\NutritionCalculator;
 use App\Services\OpenFoodFactsService;
 use App\Services\PortionParser;
@@ -17,6 +18,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -26,7 +28,7 @@ class MealController extends Controller
 {
     public function __construct(private readonly AnalyticsEventService $analytics) {}
 
-    public function create(Request $request): Response
+    public function create(Request $request, MealSuggestions $suggestions): Response
     {
         $validated = $request->validate(['date' => ['nullable', 'date']]);
         $mode = $request->string('mode')->toString();
@@ -37,16 +39,24 @@ class MealController extends Controller
 
         $meal = $request->string('meal')->toString();
         $meal = in_array($meal, MealEntry::MEAL_TYPES, true) ? $meal : null;
-        $availableModes = ['food', 'custom', 'workout', 'photo', 'recipe'];
+        $availableModes = ['food', 'custom', 'workout', 'photo', 'recipe', 'label'];
+        $date = isset($validated['date']) ? Carbon::parse($validated['date']) : today();
+        $entryId = $request->string('entry')->toString();
+        $entry = $mode === 'food' && Str::isUuid($entryId) ? $this->previousFoodEntryQuery()->find($entryId) : null;
+        $recipeId = $request->string('recipe')->toString();
 
         return Inertia::render('Add', [
-            'date' => isset($validated['date'])
-                ? Carbon::parse($validated['date'])->toDateString()
-                : today()->toDateString(),
+            'date' => $date->toDateString(),
             'mealTypes' => MealEntry::MEAL_TYPES,
             'meal' => $meal,
             'mode' => in_array($mode, $availableModes, true) ? $mode : 'choose',
             'autoScan' => $request->boolean('scan'),
+            'selectedPreviousEntry' => $entry !== null ? $this->previousFoodEntryPayload($entry) : null,
+            'selectedRecipeId' => $mode === 'recipe' && Str::isUuid($recipeId) ? $recipeId : null,
+            'reminderSuggestion' => fn (): ?array => $mode === 'food' && $entry === null && $meal !== null && $request->boolean('reminder')
+                && ! MealEntry::query()->whereDate('date', $date->toDateString())->where('meal_type', $meal)->exists()
+                    ? ($suggestions->forMissingMeals($date, [$meal])[$meal] ?? null)
+                    : null,
             'previousFoodEntries' => $this->previousFoodEntries(),
             'previousCustomMeals' => $this->previousCustomMeals(),
             'recipes' => Recipe::query()
@@ -59,13 +69,13 @@ class MealController extends Controller
 
     public function lookupBarcode(Request $request, OpenFoodFactsService $openFoodFacts, PortionParser $portionParser): JsonResponse
     {
-        $request->merge([
-            'barcode' => preg_replace('/\s+/', '', (string) $request->input('barcode', '')) ?? '',
-        ]);
+        if (is_string($request->input('barcode'))) {
+            $request->merge(['barcode' => preg_replace('/\s+/', '', $request->input('barcode'))]);
+        }
 
         $validated = $request->validate([
-            'barcode' => ['required', 'string', 'max:32'],
-        ]);
+            'barcode' => ['required', 'string', 'regex:/\A\d{4,32}\z/'],
+        ], ['barcode.regex' => 'Enter the digits printed below the barcode.']);
 
         $product = $openFoodFacts->lookup($validated['barcode']);
 
@@ -127,7 +137,8 @@ class MealController extends Controller
             'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
             'name' => ['required', 'string', 'max:120'],
             'portion_quantity' => ['required', 'numeric', 'min:0.1', 'max:10000'],
-            'portion_unit' => ['required', Rule::in(['g', 'ml'])],
+            'portion_unit' => ['required', Rule::in(['g', 'ml', 'serving'])],
+            'calories' => ['nullable', 'integer', 'min:0', 'max:20000'],
             'protein_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'carbs_g' => ['required', 'numeric', 'min:0', 'max:1000'],
             'fat_g' => ['required', 'numeric', 'min:0', 'max:1000'],
@@ -140,7 +151,8 @@ class MealController extends Controller
         $meal = MealEntry::query()->create([
             ...$validated,
             'source_type' => MealEntry::SOURCE_CUSTOM,
-            'calories' => $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
+            'portion_unit' => $validated['portion_unit'] === 'serving' ? null : $validated['portion_unit'],
+            'calories' => $validated['calories'] ?? $calculator->macroCalories($validated['protein_g'], $validated['carbs_g'], $validated['fat_g']),
         ]);
 
         if (is_string($analysisId)) {
@@ -154,8 +166,8 @@ class MealController extends Controller
 
         $this->analytics->record($analysisId ? 'meal_added_photo' : 'meal_added_custom');
 
-        return redirect('/?date='.$validated['date'])->with(
-            'message',
+        return $this->loggedMeal(
+            $meal,
             $analysisId ? 'Meal added. Its photos will attach after sync.' : 'Custom food added.',
         );
     }
@@ -179,7 +191,7 @@ class MealController extends Controller
             ]);
         }
 
-        MealEntry::query()->create([
+        $meal = MealEntry::query()->create([
             'date' => $validated['date'],
             'meal_type' => $validated['meal_type'],
             'source_type' => MealEntry::SOURCE_BARCODE,
@@ -192,7 +204,7 @@ class MealController extends Controller
 
         $this->analytics->record(($validated['add_method'] ?? 'barcode') === 'search' ? 'meal_added_search' : 'meal_added_barcode');
 
-        return redirect('/?date='.$validated['date'])->with('message', 'Meal added.');
+        return $this->loggedMeal($meal, 'Meal added.');
     }
 
     public function storeFromRecipe(Request $request): RedirectResponse
@@ -202,6 +214,7 @@ class MealController extends Controller
             'meal_type' => ['required', Rule::in(MealEntry::MEAL_TYPES)],
             'recipe_id' => ['required', 'uuid', 'exists:recipes,id'],
             'servings' => ['required', 'numeric', 'min:0.1', 'max:100'],
+            'quick_log' => ['sometimes', 'boolean'],
         ]);
 
         $recipe = Recipe::query()->findOrFail($validated['recipe_id']);
@@ -209,7 +222,7 @@ class MealController extends Controller
         $factor = $loggedServings / max((float) $recipe->servings, 0.1);
         $totals = $recipe->totals();
 
-        MealEntry::query()->create([
+        $meal = MealEntry::query()->create([
             'date' => $validated['date'],
             'meal_type' => $validated['meal_type'],
             'source_type' => MealEntry::SOURCE_RECIPE,
@@ -225,7 +238,7 @@ class MealController extends Controller
 
         $this->analytics->record('meal_added_recipe');
 
-        return redirect('/?date='.$validated['date'])->with('message', 'Recipe logged.');
+        return $this->loggedMeal($meal, 'Recipe logged.', $request->boolean('quick_log'));
     }
 
     public function update(Request $request, MealEntry $mealEntry, NutritionCalculator $calculator): RedirectResponse
@@ -282,7 +295,8 @@ class MealController extends Controller
             'date' => ['required', 'date'],
             'meal_type' => ['nullable', Rule::in(MealEntry::MEAL_TYPES)],
             'portion_quantity' => ['nullable', 'required_with:portion_unit', 'numeric', 'min:0.1', 'max:10000'],
-            'portion_unit' => ['nullable', 'required_with:portion_quantity', Rule::in(['g', 'ml'])],
+            'portion_unit' => ['nullable', Rule::requiredIf(fn (): bool => $request->filled('portion_quantity') && $mealEntry->portion_unit !== null), Rule::in(['g', 'ml'])],
+            'quick_log' => ['sometimes', 'boolean'],
         ]);
 
         $copy = $mealEntry->replicate([
@@ -296,15 +310,29 @@ class MealController extends Controller
         $copy->date = Carbon::parse($validated['date'])->toDateString();
         $copy->meal_type = $validated['meal_type'] ?? $mealEntry->meal_type;
 
-        if (array_key_exists('portion_quantity', $validated) && array_key_exists('portion_unit', $validated)) {
-            $this->applyPortion($copy, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'], $calculator);
+        if (isset($validated['portion_quantity'])) {
+            $this->applyPortion($copy, $mealEntry, $validated['portion_quantity'], $validated['portion_unit'] ?? null, $calculator);
         }
 
         $copy->save();
 
         $this->analytics->record('meal_repeated');
 
-        return redirect('/?date='.$copy->date->toDateString())->with('message', 'Meal added again.');
+        return $this->loggedMeal($copy, 'Meal added again.', $request->boolean('quick_log'));
+    }
+
+    private function loggedMeal(MealEntry $meal, string $message, bool $quickLog = false): RedirectResponse
+    {
+        $date = $meal->date->toDateString();
+        $response = redirect('/?date='.$date);
+
+        if (MealEntry::query()->whereKeyNot($meal->getKey())->doesntExist()) {
+            $response->with('offer_meal_reminder', true);
+        }
+
+        return $quickLog
+            ? $response->with('quick_meal_log', ['id' => $meal->id, 'name' => $meal->name, 'date' => $date])
+            : $response->with('message', $message);
     }
 
     public function destroy(MealEntry $mealEntry): RedirectResponse
@@ -353,7 +381,7 @@ class MealController extends Controller
             return;
         }
 
-        if ($source->portion_quantity === null || $source->portion_unit !== $unit) {
+        if ((float) $source->portion_quantity <= 0 || $source->portion_unit !== $unit) {
             throw ValidationException::withMessages([
                 'portion_unit' => 'Use the original portion unit for this saved meal.',
             ]);
@@ -412,6 +440,7 @@ class MealController extends Controller
             mb_strtolower($entry->name),
             (float) $entry->portion_quantity,
             (string) $entry->portion_unit,
+            $entry->calories,
             (float) $entry->protein_g,
             (float) $entry->carbs_g,
             (float) $entry->fat_g,
@@ -448,6 +477,7 @@ class MealController extends Controller
                 mb_strtolower($entry->name),
                 (float) $entry->portion_quantity,
                 (string) $entry->portion_unit,
+                $entry->calories,
                 (float) $entry->protein_g,
                 (float) $entry->carbs_g,
                 (float) $entry->fat_g,

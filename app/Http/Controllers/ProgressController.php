@@ -15,6 +15,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -95,15 +96,9 @@ class ProgressController extends Controller
 
     public function store(Request $request, AnalyticsEventService $analytics): RedirectResponse
     {
-        if (! $request->filled('weight_kg')) {
-            $request->merge([
-                'weight_kg' => BodyMetric::query()->latest('date')->value('weight_kg'),
-            ]);
-        }
-
         $validated = $request->validate([
             'date' => ['required', 'date', 'before_or_equal:today'],
-            'weight_kg' => ['required', 'numeric', 'min:20', 'max:1000'],
+            'weight_kg' => ['nullable', 'numeric', 'min:20', 'max:1000'],
             'body_fat_percent' => ['nullable', 'numeric', 'min:1', 'max:80'],
             'chest_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
             'waist_cm' => ['nullable', 'numeric', 'min:1', 'max:500'],
@@ -113,15 +108,26 @@ class ProgressController extends Controller
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
+        if (! $request->anyFilled(['weight_kg', 'body_fat_percent', 'notes', ...self::MEASUREMENT_FIELDS])) {
+            throw ValidationException::withMessages(['weight_kg' => 'Enter a measurement or note before saving.']);
+        }
+
+        $date = Carbon::parse($validated['date'])->startOfDay();
+        $weight = $validated['weight_kg'] ?? BodyMetric::query()->whereDate('date', '<=', $date)->latest('date')->value('weight_kg');
+
+        if ($weight === null) {
+            throw ValidationException::withMessages(['weight_kg' => 'Enter a weight for your first check-in.']);
+        }
+
         $measurements = collect(self::MEASUREMENT_FIELDS)
             ->filter(fn (string $field): bool => array_key_exists($field, $validated))
             ->mapWithKeys(fn (string $field): array => [$field => $validated[$field]])
             ->all();
 
         $metric = BodyMetric::query()->updateOrCreate(
-            ['date' => Carbon::parse($validated['date'])->startOfDay()],
+            ['date' => $date],
             array_merge([
-                'weight_kg' => $validated['weight_kg'],
+                'weight_kg' => $weight,
                 'body_fat_percent' => $validated['body_fat_percent'] ?? null,
                 'notes' => $validated['notes'] ?? null,
             ], $measurements)

@@ -29,11 +29,13 @@ const props = withDefaults(defineProps<{
     screen: 'login' | 'register' | 'forgot' | 'reset' | 'verify';
     email?: string | null;
     token?: string;
+    verificationDestination?: string;
     appleLoginAvailable: boolean;
     socialLoginUrl: string;
 }>(), {
     email: '',
     token: '',
+    verificationDestination: '/',
 });
 
 const page = usePage<{
@@ -83,7 +85,7 @@ const title = computed(() => ({
     login: 'Sign in',
     register: 'Create account',
     forgot: 'Reset password',
-    reset: 'Choose a new password',
+    reset: props.token.trim() ? 'Choose a new password' : 'Request a password reset link',
     verify: 'Check your email',
 }[props.screen]));
 const registerSteps: RegisterStep[] = ['name', 'method', 'email', 'password'];
@@ -110,7 +112,7 @@ async function checkVerification() {
         const { data } = await axios.get('/account/verification-status');
 
         if (data.verified) {
-            router.visit('/');
+            router.visit(props.verificationDestination, {replace: true});
         }
     } catch {
         // The next visible poll retries; account errors remain on the PHP side.
@@ -507,7 +509,11 @@ async function signInWith(provider: SocialProvider) {
                 </Card>
 
                 <Card v-else-if="screen === 'reset'">
-                    <form class="space-y-4" @submit.prevent="resetForm.post('/reset-password')">
+                    <div v-if="!token.trim()" class="space-y-4">
+                        <p class="text-sm text-muted-foreground">Open the link in your reset email to choose a new password.</p>
+                        <Button :as="Link" href="/account/forgot-password" class="w-full">Send a reset link</Button>
+                    </div>
+                    <form v-else class="space-y-4" @submit.prevent="resetForm.post('/reset-password')">
                         <label class="block">
                             <span class="field-label">Email</span>
                             <Input v-model="resetForm.email" type="email" autocomplete="email" required class="mt-1" />
